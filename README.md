@@ -1,6 +1,6 @@
 # alexa-skill-mcp-bridge
 
-Test your MCP server on a physical Alexa+ device as if it were an Alexa+ add-on, before you have access to Amazon's Alexa+ add-on tooling.
+Test your MCP server as if it were an Alexa+ add-on, before you have access to Amazon's Alexa+ add-on tooling. In your terminal, in the Alexa developer console's simulator, or on a physical Alexa+ device.
 
 You put your MCP server URL into one config file. A generator turns the server's tools into an Alexa interaction model. One CDK stack deploys an agent on Amazon Bedrock AgentCore Runtime (Strands Agents, Amazon Nova 2 Lite) that does what the Alexa+ orchestrator would do: picks the tool, fills arguments, handles elicitation, turns tool results into short spoken answers, and keeps conversation context. An Alexa skill connects that agent to your Alexa+ device.
 
@@ -10,11 +10,11 @@ You put your MCP server URL into one config file. A generator turns the server's
 
 ## Pick a track
 
-| Track                                                            | What you get                                                             | Needs AWS?                                                            | Needs an Alexa+ device? |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------ | --------------------------------------------------------------------- | ----------------------- |
-| [A. Local](#track-a-local-no-deployment)                         | Chat with your MCP server through the real agent in your terminal        | Credentials and Bedrock model access only (the model runs in Bedrock) | No                      |
-| [B. Cloud](#track-b-deploy-to-the-cloud)                         | The agent runs on AgentCore Runtime; you chat with it from your terminal | Yes, one CDK stack                                                    | No                      |
-| [C. Device](#track-c-the-alexa-skill-on-a-physical-alexa-device) | The Alexa skill, end to end on your Alexa+ device                        | Yes                                                                   | Yes                     |
+| Track                                                                | What you get                                                                                                           | Needs AWS?                                                            | Needs a device?                                                                           |
+| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [A. Local](#track-a-local-no-deployment)                             | Chat with an MCP server through the real agent in your terminal. The bundled sample server works; your own is optional | Credentials and Bedrock model access only (the model runs in Bedrock) | No                                                                                        |
+| [B. Cloud](#track-b-deploy-to-the-cloud)                             | The agent runs on AgentCore Runtime; you chat with it from your terminal                                               | Yes, one CDK stack                                                    | No                                                                                        |
+| [C. Skill](#track-c-the-alexa-skill-in-the-simulator-or-on-a-device) | The Alexa skill end to end, in the browser simulator or on a device                                                    | Yes                                                                   | No: the developer console's simulator runs the skill in the browser. A device is optional |
 
 Each track builds on the previous one. `npm run doctor -- --track local|cloud|skill` checks every prerequisite of a track and prints the exact command to fix what is missing. Run it whenever something fails.
 
@@ -52,6 +52,8 @@ Then enable **Amazon Nova 2 Lite** under Model access in the [Bedrock console fo
 **An MCP server.** Yours, or the bundled sample (two tools, one of them elicits). Requirements for yours are [below](#requirements-your-server-must-meet).
 
 ## Track A: local, no deployment
+
+You do not need an MCP server of your own to start. The bundled sample has two tools, one of which asks the user a question back, so the whole flow including elicitation is exercised.
 
 Terminal 1, if you use the sample server:
 
@@ -98,11 +100,11 @@ npm run chat -- --remote               # the same chat, through the deployed run
 
 The first `--remote` turn provisions the runtime and may take a while; the ones after it are fast. The stack costs a few cents a month idle; see [docs/cost.md](docs/cost.md).
 
-## Track C: the Alexa skill on a physical Alexa+ device
+## Track C: the Alexa skill, in the simulator or on a device
 
 Additional prerequisites:
 
-- **An Amazon developer account** at https://developer.amazon.com, and an Alexa+ device (or Alexa+ screen device) signed in to the same Amazon account.
+- **An Amazon developer account** at https://developer.amazon.com. A physical Alexa+ device (or Alexa+ screen device) is optional: the developer console's Test simulator runs the deployed skill in the browser. If you do use a device, sign it in to the same Amazon account.
 - **The ASK CLI**, logged in:
 
   ```bash
@@ -118,7 +120,11 @@ Then, from the repo root:
 3. `ask deploy` creates the skill with the generated interaction model and prints the skill id (`amzn1.ask.skill.…`).
 4. Put that id into `bridge.config.ts` as `skill.id` and run `npm run deploy` again. Until then the Lambda accepts requests from any skill.
 5. In the [Alexa developer console](https://developer.amazon.com/alexa/console/ask), open the skill, go to Test, and set testing to Development.
-6. On the device: "Alexa, open my bridge" (or whatever `skill.invocationName` says). The first launch after a while may say it is still starting up; open it again.
+6. Talk to it, either way:
+   - **In the browser**: type or hold the microphone in the Test simulator: "open my bridge" (or whatever `skill.invocationName` says).
+   - **On a device**: "Alexa, open my bridge".
+
+   The first launch after a while may say it is still starting up; open it again.
 
 Say a request the interaction model knows ("search hotels in Berlin") or use free text ("ask my bridge to find hotels in Berlin"). When the tool asks a question, answer with a number, a date, yes or no, or "the answer is …" for free text.
 
