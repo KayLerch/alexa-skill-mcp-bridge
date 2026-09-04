@@ -1,0 +1,167 @@
+{
+  "_generated": {
+    "by": "alexa-skill-mcp-bridge generator",
+    "notice": "Generated file. Do not edit by hand; run `npm run generate`.",
+    "source": "http://localhost:3000/mcp"
+  },
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "my bridge",
+      "intents": [
+        {
+          "name": "SearchHotelsIntent",
+          "slots": [
+            {
+              "name": "checkIn",
+              "type": "AMAZON.DATE"
+            },
+            {
+              "name": "checkOut",
+              "type": "AMAZON.DATE"
+            },
+            {
+              "name": "guests",
+              "type": "AMAZON.NUMBER"
+            },
+            {
+              "name": "destination",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "search hotels",
+            "search hotels please",
+            "can you search hotels",
+            "i want to search hotels",
+            "please search hotels",
+            "search hotels check in on {checkIn}",
+            "search hotels check out on {checkOut}",
+            "search hotels guests {guests}",
+            "search hotels check in on {checkIn} check out on {checkOut} guests {guests}",
+            "search hotels destination {destination}",
+            "search hotels for {destination}",
+            "search hotels {destination}",
+            "help me search hotels",
+            "search hotels now",
+            "i'd like to search hotels"
+          ]
+        },
+        {
+          "name": "GetWeatherIntent",
+          "slots": [
+            {
+              "name": "city",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "get weather",
+            "get weather please",
+            "can you get weather",
+            "i want to get weather",
+            "please get weather",
+            "get weather city {city}",
+            "get weather for {city}",
+            "get weather {city}",
+            "help me get weather",
+            "get weather now",
+            "i'd like to get weather"
+          ]
+        },
+        {
+          "name": "AMAZON.YesIntent"
+        },
+        {
+          "name": "AMAZON.NoIntent"
+        },
+        {
+          "name": "DateAnswerIntent",
+          "slots": [
+            {
+              "name": "date",
+              "type": "AMAZON.DATE"
+            }
+          ],
+          "samples": [
+            "{date}",
+            "on {date}",
+            "the {date}",
+            "it's {date}",
+            "from {date}",
+            "starting {date}",
+            "make it {date}"
+          ]
+        },
+        {
+          "name": "NumberAnswerIntent",
+          "slots": [
+            {
+              "name": "number",
+              "type": "AMAZON.NUMBER"
+            }
+          ],
+          "samples": [
+            "{number}",
+            "{number} people",
+            "{number} of them",
+            "make it {number}",
+            "the number is {number}",
+            "just {number}",
+            "{number} please"
+          ]
+        },
+        {
+          "name": "FreeTextAnswerIntent",
+          "slots": [
+            {
+              "name": "answer",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "the answer is {answer}",
+            "i'd say {answer}",
+            "it's {answer}",
+            "answer {answer}",
+            "my answer is {answer}",
+            "i mean {answer}"
+          ]
+        },
+        {
+          "name": "FreeTextIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ask {query}",
+            "tell {query}",
+            "i want to {query}",
+            "please {query}",
+            "can you {query}",
+            "i need {query}",
+            "help me {query}"
+          ]
+        },
+        {
+          "name": "AMAZON.HelpIntent"
+        },
+        {
+          "name": "AMAZON.StopIntent"
+        },
+        {
+          "name": "AMAZON.CancelIntent"
+        },
+        {
+          "name": "AMAZON.FallbackIntent"
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent"
+        }
+      ],
+      "types": []
+    }
+  }
+}

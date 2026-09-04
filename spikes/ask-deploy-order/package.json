@@ -1,0 +1,11 @@
+{
+  "name": "spike-ask-deploy-order",
+  "private": true,
+  "type": "module",
+  "description": "S6: can SMAPI create a custom skill without an endpoint so the skill id exists before the first CDK deploy?",
+  "dependencies": {
+    "aws-cdk": "^2.1139.0",
+    "aws-cdk-lib": "2.268.0",
+    "constructs": "^10.8.1"
+  }
+}

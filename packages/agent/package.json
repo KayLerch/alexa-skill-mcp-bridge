@@ -1,0 +1,30 @@
+{
+  "name": "@alexa-mcp-bridge/agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AgentCore Runtime container: MCP client, elicitation parking, agent loop, prompts, memory.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@alexa-mcp-bridge/core": "0.1.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1125.0",
+    "@aws-sdk/client-secrets-manager": "^3.1125.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@strands-agents/sdk": "^1.16.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@alexa-mcp-bridge/sample-mcp-server": "0.1.0"
+  }
+}

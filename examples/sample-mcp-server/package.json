@@ -1,0 +1,26 @@
+{
+  "name": "@alexa-mcp-bridge/sample-mcp-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Streamable HTTP MCP server (2025-11-25) with one tool that elicits input. For testing the bridge.",
+  "type": "module",
+  "main": "./dist/app.js",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  },
+  "types": "./dist/app.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/app.d.ts",
+      "default": "./dist/app.js"
+    }
+  },
+  "bin": {
+    "sample-mcp-server": "./dist/server.js"
+  }
+}

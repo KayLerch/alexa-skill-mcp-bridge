@@ -1,0 +1,43 @@
+{
+  "name": "alexa-skill-mcp-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Test an MCP server on a physical Echo as if it were an Alexa+ add-on.",
+  "license": "Apache-2.0",
+  "author": "Kay Lerch",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "workspaces": [
+    "packages/*",
+    "infra",
+    "examples/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck:tooling": "tsc -p tsconfig.tooling.json",
+    "lint": "eslint . && prettier --check . && npm run typecheck:tooling",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "test:live": "BRIDGE_TEST_LIVE=1 vitest run packages/cli",
+    "sample:start": "tsc -b examples/sample-mcp-server && node examples/sample-mcp-server/dist/server.js",
+    "chat": "tsc -b && node packages/cli/dist/chat.js",
+    "generate": "tsc -b && node packages/generator/dist/cli.js",
+    "agent:dev": "tsc -b && node scripts/agent-dev.ts",
+    "synth": "tsc -b && cdk synth --app 'node infra/dist/bin/app.js' --quiet",
+    "deploy": "tsc -b && node scripts/deploy.ts",
+    "destroy": "tsc -b && node scripts/destroy.ts",
+    "check-model-access": "tsc -b && node scripts/check-model-access.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "aws-cdk": "^2.1139.0",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.6",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.69.0",
+    "vitest": "^3.2.7"
+  }
+}

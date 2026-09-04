@@ -1,0 +1,11 @@
+{
+  "name": "spike-cdk-synth-gateway",
+  "private": true,
+  "type": "module",
+  "description": "S5: synth-only check of aws-cdk-lib/aws-bedrockagentcore Runtime, Memory, Gateway and MCP target surfaces.",
+  "dependencies": {
+    "aws-cdk": "^2.1139.0",
+    "aws-cdk-lib": "2.268.0",
+    "constructs": "^10.8.1"
+  }
+}

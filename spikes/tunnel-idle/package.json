@@ -1,0 +1,10 @@
+{
+  "name": "spike-tunnel-idle",
+  "private": true,
+  "type": "module",
+  "description": "S3: does a cloudflared quick tunnel keep an idle elicitation stream open for 30 s and 90 s, with and without server pings?",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "zod": "^4.5.4"
+  }
+}

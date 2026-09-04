@@ -1,0 +1,25 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "bridge deploy order probe",
+          "summary": "Probe: can a custom skill be created without an endpoint?",
+          "description": "Throwaway skill created by spikes/ask-deploy-order. Delete after the probe.",
+          "examplePhrases": ["Alexa, open bridge probe"],
+          "keywords": []
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["US"],
+      "category": "ORGANIZERS_AND_ASSISTANTS",
+      "testingInstructions": "Probe only."
+    },
+    "apis": {
+      "custom": {
+        "interfaces": []
+      }
+    }
+  }
+}

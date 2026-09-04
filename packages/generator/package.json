@@ -1,0 +1,25 @@
+{
+  "name": "@alexa-mcp-bridge/generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP scan → tool manifest, Alexa interaction model, sample utterances.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "bridge-generate": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@alexa-mcp-bridge/core": "0.1.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1125.0",
+    "@aws-sdk/client-secrets-manager": "^3.1125.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@alexa-mcp-bridge/sample-mcp-server": "0.1.0"
+  }
+}

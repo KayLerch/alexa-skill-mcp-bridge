@@ -1,0 +1,9 @@
+{
+  "name": "spike-nova-latency",
+  "private": true,
+  "type": "module",
+  "description": "S4: Nova 2 Lite tool-use latency baseline, one tool round trip per run.",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1125.0"
+  }
+}

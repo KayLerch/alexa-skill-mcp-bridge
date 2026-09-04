@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.tsbuildinfo
+cdk.out/
+cdk-outputs.json
+.env
+.env.*
+*.log
+.DS_Store
+coverage/
+skill-package/.ask/
+spikes/*/cdk.out/
+spikes/*/node_modules/
+spikes/*/results/

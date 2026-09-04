@@ -1,0 +1,107 @@
+{
+  "_generated": {
+    "by": "alexa-skill-mcp-bridge generator",
+    "notice": "Generated file. Do not edit by hand; run `npm run generate`.",
+    "source": "http://localhost:3000/mcp"
+  },
+  "protocolVersion": "2025-11-25",
+  "server": {
+    "name": "sample-hotel-and-weather",
+    "version": "0.1.0",
+    "instructions": "This server searches hotels and reports weather in a few European and US cities. Hotel search needs a destination, check-in and check-out dates, and the number of guests; if guests is missing the tool asks for it. Prices are per night in euros."
+  },
+  "tools": [
+    {
+      "name": "search_hotels",
+      "description": "Find hotels in a destination city for a date range. Returns up to three matches sorted by rating. Asks for the number of guests when it is not provided.",
+      "intent": "SearchHotelsIntent",
+      "slots": [
+        {
+          "argument": "checkIn",
+          "slot": "checkIn",
+          "slotType": "AMAZON.DATE",
+          "required": true
+        },
+        {
+          "argument": "checkOut",
+          "slot": "checkOut",
+          "slotType": "AMAZON.DATE",
+          "required": true
+        },
+        {
+          "argument": "guests",
+          "slot": "guests",
+          "slotType": "AMAZON.NUMBER",
+          "required": false
+        },
+        {
+          "argument": "destination",
+          "slot": "destination",
+          "slotType": "AMAZON.SearchQuery",
+          "required": true
+        }
+      ],
+      "elicitedArguments": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "destination": {
+            "type": "string",
+            "description": "City to search in, e.g. Berlin"
+          },
+          "checkIn": {
+            "type": "string",
+            "description": "Check-in date, ISO 8601 (YYYY-MM-DD)"
+          },
+          "checkOut": {
+            "type": "string",
+            "description": "Check-out date, ISO 8601 (YYYY-MM-DD)"
+          },
+          "guests": {
+            "description": "Number of guests, 1 to 6",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 6
+          }
+        },
+        "required": [
+          "destination",
+          "checkIn",
+          "checkOut"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_weather",
+      "description": "Current weather for a city: conditions plus high and low temperature in Celsius.",
+      "intent": "GetWeatherIntent",
+      "slots": [
+        {
+          "argument": "city",
+          "slot": "city",
+          "slotType": "AMAZON.SearchQuery",
+          "required": true
+        }
+      ],
+      "elicitedArguments": [],
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "description": "City name, e.g. Hamburg"
+          }
+        },
+        "required": [
+          "city"
+        ],
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ],
+  "examplePhrases": [
+    "search hotels check in on tomorrow",
+    "get weather city some city"
+  ]
+}

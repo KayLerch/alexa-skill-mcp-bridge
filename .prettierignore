@@ -1,0 +1,12 @@
+node_modules
+dist
+cdk.out
+*.tsbuildinfo
+packages/skill-lambda/generated
+skill-package/interactionModels
+spikes/*/results
+package-lock.json
+# Owner-authored documents; keep their formatting as written
+CLAUDE.md
+EXECUTION-PLAN.md
+alexa-skill-mcp-bridge-brief.md

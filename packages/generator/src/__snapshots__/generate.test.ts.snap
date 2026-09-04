@@ -1,0 +1,281 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`generate (template utterances) > matches the snapshot for the sample server 1`] = `
+{
+  "_generated": {
+    "by": "alexa-skill-mcp-bridge generator",
+    "notice": "Generated file. Do not edit by hand; run \`npm run generate\`.",
+    "source": "<url>",
+  },
+  "examplePhrases": [
+    "search hotels check in on tomorrow",
+    "get weather city some city",
+  ],
+  "protocolVersion": "2025-11-25",
+  "server": {
+    "instructions": "This server searches hotels and reports weather in a few European and US cities. Hotel search needs a destination, check-in and check-out dates, and the number of guests; if guests is missing the tool asks for it. Prices are per night in euros.",
+    "name": "sample-hotel-and-weather",
+    "version": "0.1.0",
+  },
+  "tools": [
+    {
+      "description": "Find hotels in a destination city for a date range. Returns up to three matches sorted by rating. Asks for the number of guests when it is not provided.",
+      "elicitedArguments": [],
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "checkIn": {
+            "description": "Check-in date, ISO 8601 (YYYY-MM-DD)",
+            "type": "string",
+          },
+          "checkOut": {
+            "description": "Check-out date, ISO 8601 (YYYY-MM-DD)",
+            "type": "string",
+          },
+          "destination": {
+            "description": "City to search in, e.g. Berlin",
+            "type": "string",
+          },
+          "guests": {
+            "description": "Number of guests, 1 to 6",
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer",
+          },
+        },
+        "required": [
+          "destination",
+          "checkIn",
+          "checkOut",
+        ],
+        "type": "object",
+      },
+      "intent": "SearchHotelsIntent",
+      "name": "search_hotels",
+      "slots": [
+        {
+          "argument": "checkIn",
+          "required": true,
+          "slot": "checkIn",
+          "slotType": "AMAZON.DATE",
+        },
+        {
+          "argument": "checkOut",
+          "required": true,
+          "slot": "checkOut",
+          "slotType": "AMAZON.DATE",
+        },
+        {
+          "argument": "guests",
+          "required": false,
+          "slot": "guests",
+          "slotType": "AMAZON.NUMBER",
+        },
+        {
+          "argument": "destination",
+          "required": true,
+          "slot": "destination",
+          "slotType": "AMAZON.SearchQuery",
+        },
+      ],
+    },
+    {
+      "description": "Current weather for a city: conditions plus high and low temperature in Celsius.",
+      "elicitedArguments": [],
+      "inputSchema": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "properties": {
+          "city": {
+            "description": "City name, e.g. Hamburg",
+            "type": "string",
+          },
+        },
+        "required": [
+          "city",
+        ],
+        "type": "object",
+      },
+      "intent": "GetWeatherIntent",
+      "name": "get_weather",
+      "slots": [
+        {
+          "argument": "city",
+          "required": true,
+          "slot": "city",
+          "slotType": "AMAZON.SearchQuery",
+        },
+      ],
+    },
+  ],
+}
+`;
+
+exports[`generate (template utterances) > matches the snapshot for the sample server 2`] = `
+{
+  "_generated": {
+    "by": "alexa-skill-mcp-bridge generator",
+    "notice": "Generated file. Do not edit by hand; run \`npm run generate\`.",
+    "source": "<url>",
+  },
+  "interactionModel": {
+    "languageModel": {
+      "intents": [
+        {
+          "name": "SearchHotelsIntent",
+          "samples": [
+            "search hotels",
+            "search hotels please",
+            "can you search hotels",
+            "i want to search hotels",
+            "please search hotels",
+            "search hotels check in on {checkIn}",
+            "search hotels check out on {checkOut}",
+            "search hotels guests {guests}",
+            "search hotels check in on {checkIn} check out on {checkOut} guests {guests}",
+            "search hotels destination {destination}",
+            "search hotels for {destination}",
+            "search hotels {destination}",
+            "help me search hotels",
+            "search hotels now",
+            "i'd like to search hotels",
+          ],
+          "slots": [
+            {
+              "name": "checkIn",
+              "type": "AMAZON.DATE",
+            },
+            {
+              "name": "checkOut",
+              "type": "AMAZON.DATE",
+            },
+            {
+              "name": "guests",
+              "type": "AMAZON.NUMBER",
+            },
+            {
+              "name": "destination",
+              "type": "AMAZON.SearchQuery",
+            },
+          ],
+        },
+        {
+          "name": "GetWeatherIntent",
+          "samples": [
+            "get weather",
+            "get weather please",
+            "can you get weather",
+            "i want to get weather",
+            "please get weather",
+            "get weather city {city}",
+            "get weather for {city}",
+            "get weather {city}",
+            "help me get weather",
+            "get weather now",
+            "i'd like to get weather",
+          ],
+          "slots": [
+            {
+              "name": "city",
+              "type": "AMAZON.SearchQuery",
+            },
+          ],
+        },
+        {
+          "name": "AMAZON.YesIntent",
+        },
+        {
+          "name": "AMAZON.NoIntent",
+        },
+        {
+          "name": "DateAnswerIntent",
+          "samples": [
+            "{date}",
+            "on {date}",
+            "the {date}",
+            "it's {date}",
+            "from {date}",
+            "starting {date}",
+            "make it {date}",
+          ],
+          "slots": [
+            {
+              "name": "date",
+              "type": "AMAZON.DATE",
+            },
+          ],
+        },
+        {
+          "name": "NumberAnswerIntent",
+          "samples": [
+            "{number}",
+            "{number} people",
+            "{number} of them",
+            "make it {number}",
+            "the number is {number}",
+            "just {number}",
+            "{number} please",
+          ],
+          "slots": [
+            {
+              "name": "number",
+              "type": "AMAZON.NUMBER",
+            },
+          ],
+        },
+        {
+          "name": "FreeTextAnswerIntent",
+          "samples": [
+            "the answer is {answer}",
+            "i'd say {answer}",
+            "it's {answer}",
+            "answer {answer}",
+            "my answer is {answer}",
+            "i mean {answer}",
+          ],
+          "slots": [
+            {
+              "name": "answer",
+              "type": "AMAZON.SearchQuery",
+            },
+          ],
+        },
+        {
+          "name": "FreeTextIntent",
+          "samples": [
+            "ask {query}",
+            "tell {query}",
+            "i want to {query}",
+            "please {query}",
+            "can you {query}",
+            "i need {query}",
+            "help me {query}",
+          ],
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery",
+            },
+          ],
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+        },
+        {
+          "name": "AMAZON.StopIntent",
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+        },
+      ],
+      "invocationName": "my bridge",
+      "types": [],
+    },
+  },
+}
+`;

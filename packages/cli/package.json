@@ -1,0 +1,19 @@
+{
+  "name": "@alexa-mcp-bridge/cli",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local harness: chat REPL running the agent in-process, or --remote against the deployed runtime.",
+  "type": "module",
+  "main": "./dist/chat.js",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@alexa-mcp-bridge/agent": "0.1.0",
+    "@alexa-mcp-bridge/core": "0.1.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1125.0"
+  },
+  "devDependencies": {
+    "@alexa-mcp-bridge/sample-mcp-server": "0.1.0"
+  }
+}

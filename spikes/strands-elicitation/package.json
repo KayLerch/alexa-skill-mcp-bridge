@@ -1,0 +1,11 @@
+{
+  "name": "spike-strands-elicitation",
+  "private": true,
+  "type": "module",
+  "description": "S1: does the Strands ElicitationCallback accept a promise settled later, and does the installed MCP SDK negotiate 2025-11-25?",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.30.0",
+    "@strands-agents/sdk": "1.16.0",
+    "zod": "^4.5.4"
+  }
+}

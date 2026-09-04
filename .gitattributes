@@ -1,0 +1,3 @@
+# Generated artifacts (regenerate with `npm run generate`)
+packages/skill-lambda/generated/** linguist-generated=true
+skill-package/interactionModels/custom/** linguist-generated=true

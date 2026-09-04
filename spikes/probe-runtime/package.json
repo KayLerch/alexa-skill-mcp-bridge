@@ -1,0 +1,12 @@
+{
+  "name": "spike-probe-runtime",
+  "private": true,
+  "type": "module",
+  "description": "S2: AgentCore Runtime behavior probe (parked promise, ping semantics, cold start, session reuse, id format).",
+  "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.1125.0",
+    "aws-cdk": "^2.1139.0",
+    "aws-cdk-lib": "2.268.0",
+    "constructs": "^10.8.1"
+  }
+}
