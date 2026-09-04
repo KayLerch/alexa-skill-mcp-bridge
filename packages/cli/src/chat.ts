@@ -51,7 +51,13 @@ const identity = {
 };
 
 const bridge: Bridge = args.remote
-  ? createRemoteBridge({ identity, budgetMs, debug, region: config.aws.region })
+  ? createRemoteBridge({
+      identity,
+      budgetMs,
+      debug,
+      region: config.aws.region,
+      stillWorkingMessage: config.skill.stillWorkingMessage,
+    })
   : createLocalBridge({
       config: { ...config, features: { ...config.features, debug } },
       identity,

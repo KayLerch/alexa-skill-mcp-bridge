@@ -5,6 +5,7 @@ import {
   type ElicitRequestParams,
   type ElicitResult,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { Logger } from '@alexa-mcp-bridge/core';
 import type { McpAuth } from './auth.js';
 import { parseToolResult, type McpToolResult } from './result.js';
@@ -44,6 +45,8 @@ export interface BridgeMcpClientOptions {
   callTimeoutMs: number;
   onElicitation: ElicitationHandler;
   logger: Logger;
+  /** Replacement fetch (SigV4 signing for the Gateway). */
+  fetch?: FetchLike;
 }
 
 export class BridgeMcpClient {
@@ -109,6 +112,7 @@ export class BridgeMcpClient {
     const transport = new StreamableHTTPClientTransport(new URL(url), {
       ...(auth.authProvider ? { authProvider: auth.authProvider } : {}),
       ...(Object.keys(auth.headers).length ? { requestInit: { headers: auth.headers } } : {}),
+      ...(this.options.fetch ? { fetch: this.options.fetch } : {}),
     });
     const client = new Client(
       { name: 'alexa-skill-mcp-bridge', version: '0.1.0' },

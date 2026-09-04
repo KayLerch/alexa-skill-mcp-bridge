@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-US": {
+          "name": "my bridge",
+          "summary": "Talks to an MCP server through the alexa-skill-mcp-bridge.",
+          "description": "Development skill created by alexa-skill-mcp-bridge. It forwards each turn to an agent on Amazon Bedrock AgentCore Runtime, which calls the tools of an MCP server and speaks the results.",
+          "examplePhrases": [
+            "Alexa, open my bridge",
+            "Alexa, ask my bridge to search hotels",
+            "Alexa, ask my bridge for the weather"
+          ],
+          "keywords": ["mcp", "bridge", "developer"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["US"],
+      "category": "ORGANIZERS_AND_ASSISTANTS",
+      "testingInstructions": "Development only. Needs the CDK stack from alexa-skill-mcp-bridge deployed."
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "arn:aws:lambda:us-east-1:000000000000:function:REPLACE-WITH-LambdaArn-FROM-npm-run-deploy"
+        },
+        "interfaces": []
+      }
+    }
+  }
+}

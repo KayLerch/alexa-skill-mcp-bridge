@@ -15,9 +15,9 @@ If the brief and the plan disagree, the brief wins; say so and fix the plan.
 
 ## Repo state
 
-Pre-scaffold as of 2026-09-03: the brief, the plan, and this file. The layout below is the target. A path that does not exist yet belongs to a plan phase that has not run. Do not create packages ahead of their phase.
+Scaffolded through plan Phase 7 as of 2026-09-03: every package below exists, `npm run build`, `npm test`, `npm run lint`, and `npm run synth` pass. Not yet done: the deploy-dependent spikes (S2, S3, S6), a device test, and the 20-run latency measurement. See the plan's section 16.
 
-## Layout (target)
+## Layout
 
 ```
 bridge.config.ts             THE config file. Typed, commented, zod-validated. Secrets by name only.
@@ -31,7 +31,8 @@ skill-package                ASK CLI project. skill.json, generated interaction 
 examples/sample-mcp-server   Streamable HTTP server with search_hotels (elicits guests) and get_weather.
 spikes                       Day-one verification probes. Outside the npm workspaces. Re-runnable.
 docs                         architecture, config, cost, troubleshooting.
-scripts                      deploy, destroy, check-model-access, create-skill.
+scripts                      deploy, destroy, check-model-access, agent-dev. Run by Node 22 directly (type stripping).
+ask-resources.json           ASK CLI project file at the root; `ask deploy` runs from here and reads skill-package/.
 ```
 
 ## Commands (once scaffolded)
@@ -100,18 +101,24 @@ They carry a `_generated` marker and a `.gitattributes` entry. Regenerate with `
 
 ## Verify before you rely on it
 
-The brief names SDK surfaces from memory. Check the installed version before using any of these and record the result in the plan's decision log:
+The brief names SDK surfaces from memory. These were checked against the installed versions on 2026-09-03 (plan section 16); re-check after any upgrade and record the result in the plan's decision log:
 
-- Strands TS: `McpClient`, `ElicitationCallback`, `BedrockModel`, the memory store or conversation manager interface, the reasoning-effort parameter for Nova 2 Lite.
+- Strands TS: `McpClient` (not used for calls, see D21), `ElicitationCallback`, `BedrockModel` (`additionalRequestFields`), the memory store or conversation manager interface, the reasoning-effort parameter for Nova 2 Lite (`reasoningConfig.maxReasoningEffort`).
 - MCP SDK: `StreamableHTTPClientTransport`, `ElicitRequestSchema`, how to read the negotiated protocol version after `initialize`, the 60 s default request timeout on the server side.
 - CDK: `Runtime.lifecycleConfiguration` property names, `DockerImageAsset` as the runtime image, `GatewayTarget` NoAuth.
 - AgentCore: `runtimeSessionId` constraints, `/ping` `HealthyBusy` semantics, whether the microVM keeps running between invocations.
 
-Anything in brief section 12 is an assumption until a spike under `spikes/` has confirmed it. Do not build on it before then.
+Anything in brief section 12 is an assumption until a spike under `spikes/` has confirmed it. Items 1, 8 (baseline), and 9 (synth) are confirmed; 2 to 7 and 10 wait for a deploy. Do not build on the open ones before then.
+
+Two things learned the hard way that the code now enforces:
+
+- A tool result sent to Nova must carry one content block, `json` or `text`, never both (D28).
+- `tools/call` must use an explicit timeout above the SDK's 60 s default, or a spoken answer arrives too late (D21, D26).
 
 ## Working habits here
 
-- Before changing the turn flow, read `packages/agent/src/turn.ts` and the state machine table in the plan (section 6.2).
+- Before changing the turn flow, read `packages/agent/src/turn.ts` and the state machine table in the plan (section 6.2) or `docs/architecture.md`.
+- Prettier runs on save in CI's `npm run lint`; when editing files programmatically, run `npm run format` first so exact-match edits land on formatted text.
 - A new dependency needs a one-line reason in the commit message. Keep the count low; contributors should not need to learn a framework.
 - Do not widen scope from the brief's section 11 (widgets, web frontend, account linking, other locales, 2026-07-28 elicitation, progressive responses). Leave hooks, do not build them.
 - When a task finishes, tick it in the plan. When a decision is made that the brief did not make, add a row to the plan's decision table with a "revisit if" condition.

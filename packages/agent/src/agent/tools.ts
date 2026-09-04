@@ -45,13 +45,13 @@ export class BridgeMcpTool extends Tool {
         : {};
     try {
       const result = await this.client.callTool(this.name, args, { signal: context.cancelSignal });
-      const content: (JsonBlock | TextBlock)[] = [];
-      if (result.structuredContent) {
-        content.push(new JsonBlock({ json: result.structuredContent as JSONValue }));
-      }
+      // One block only. Nova collapses its context on a result that mixes json and text
+      // (measured: 545 input tokens instead of 1712, empty answer; see plan D28).
       const text = toolResultText(result);
-      if (text) content.push(new TextBlock(text));
-      if (content.length === 0) content.push(new TextBlock('The tool returned no content.'));
+      const content: (JsonBlock | TextBlock)[] =
+        !result.isError && result.structuredContent
+          ? [new JsonBlock({ json: result.structuredContent as JSONValue })]
+          : [new TextBlock(text || 'The tool returned no content.')];
       if (result._meta?.ui?.resourceUri) {
         // Widgets are out of scope for v1; the hook stays so a visual frontend can pick this up.
         this.logger.debug('tool result carries a ui resource', {

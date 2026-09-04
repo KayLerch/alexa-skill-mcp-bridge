@@ -18,9 +18,13 @@
   },
   "dependencies": {
     "@alexa-mcp-bridge/core": "0.1.0",
+    "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-bedrock-agentcore": "^3.1125.0",
     "@aws-sdk/client-secrets-manager": "^3.1125.0",
+    "@aws-sdk/credential-provider-node": "^3.972.82",
     "@modelcontextprotocol/sdk": "^1.30.0",
+    "@smithy/protocol-http": "^5.6.2",
+    "@smithy/signature-v4": "^5.7.3",
     "@strands-agents/sdk": "^1.16.0",
     "zod": "^4.5.4"
   },

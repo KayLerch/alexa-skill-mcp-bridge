@@ -6,7 +6,9 @@
     "declarationMap": false,
     "sourceMap": false,
     "noEmit": true,
-    "erasableSyntaxOnly": true
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["bridge.config.ts", "scripts/**/*.ts", "vitest.config.ts", "eslint.config.js"]
 }

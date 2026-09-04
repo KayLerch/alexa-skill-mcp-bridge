@@ -12,6 +12,7 @@ const server = createAgentServer({
   memory: createMemoryAdapter(config, process.env, logger),
   logger,
   port: Number(process.env.PORT ?? 8080),
+  ...(process.env.MCP_GATEWAY_URL ? { gatewayUrl: process.env.MCP_GATEWAY_URL } : {}),
 });
 
 await server.start();

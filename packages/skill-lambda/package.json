@@ -1,0 +1,20 @@
+{
+  "name": "@alexa-mcp-bridge/skill-lambda",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Alexa endpoint: thin ASK SDK handlers that build TurnInput, call the bridge, render TurnOutput.",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@alexa-mcp-bridge/core": "0.1.0",
+    "@aws-sdk/client-bedrock-agentcore": "^3.1125.0",
+    "ask-sdk-core": "^2.14.0",
+    "ask-sdk-model": "^1.86.0"
+  },
+  "devDependencies": {
+    "@alexa-mcp-bridge/agent": "0.1.0"
+  }
+}

@@ -5,6 +5,8 @@
     { "path": "packages/agent" },
     { "path": "packages/generator" },
     { "path": "packages/cli" },
+    { "path": "packages/skill-lambda" },
+    { "path": "infra" },
     { "path": "examples/sample-mcp-server" }
   ]
 }

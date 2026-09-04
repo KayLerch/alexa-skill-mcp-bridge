@@ -1,23 +1,28 @@
 import type { BridgeConfig, Logger } from '@alexa-mcp-bridge/core';
+import { createAgentCoreMemory } from './agentcore-memory.js';
 import { noopMemory, type MemoryAdapter } from './store.js';
 
 /**
- * Picks the memory adapter for this process. The AgentCore Memory adapter (Phase 6) plugs in
- * here when MEMORY_ID is set; without it, or with memory.shortTerm off, memory is a no-op.
+ * Picks the memory adapter for this process: AgentCore Memory when the stack passed a
+ * MEMORY_ID and memory.shortTerm is on, otherwise a no-op (local chat, tests).
  */
 export function createMemoryAdapter(
   config: BridgeConfig,
   env: NodeJS.ProcessEnv,
   logger: Logger,
 ): MemoryAdapter {
-  if (!config.memory.shortTerm || !env.MEMORY_ID) {
+  const memoryId = env.MEMORY_ID;
+  if (!config.memory.shortTerm || !memoryId) {
     logger.info('memory disabled', {
-      reason: env.MEMORY_ID ? 'memory.shortTerm is false' : 'MEMORY_ID unset',
+      reason: memoryId ? 'memory.shortTerm is false' : 'MEMORY_ID unset',
     });
     return noopMemory;
   }
-  logger.warn(
-    'MEMORY_ID is set but the AgentCore Memory adapter is not implemented yet; memory is a no-op',
-  );
-  return noopMemory;
+  return createAgentCoreMemory({
+    memoryId,
+    region: config.aws.region,
+    hydrateLastEvents: config.memory.hydrateLastEvents,
+    longTerm: config.memory.longTerm,
+    logger,
+  });
 }

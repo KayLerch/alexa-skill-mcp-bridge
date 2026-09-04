@@ -12,3 +12,4 @@ skill-package/.ask/
 spikes/*/cdk.out/
 spikes/*/node_modules/
 spikes/*/results/
+.ask/

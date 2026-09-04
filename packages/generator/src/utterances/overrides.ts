@@ -7,8 +7,8 @@ import { dedupe, normalizeUtterance, validUtterance } from './validate.js';
  * Developer-authored utterances in skill-package/overrides/<locale>.utterances.json survive
  * regeneration. Shape: { "SearchHotelsIntent": ["find me a hotel in {destination}"], ... }.
  */
-const overridesSchema = z.record(z.string(), z.array(z.string()));
-export type UtteranceOverrides = z.infer<typeof overridesSchema>;
+const overridesSchema = z.record(z.string(), z.union([z.array(z.string()), z.string()]));
+export type UtteranceOverrides = Record<string, string[]>;
 
 export function readOverrides(path: string): UtteranceOverrides {
   if (!existsSync(path)) return {};
@@ -16,7 +16,12 @@ export function readOverrides(path: string): UtteranceOverrides {
   if (!parsed.success) {
     throw new Error(`${path} must map intent names to arrays of utterances.`);
   }
-  return parsed.data;
+  // Keys starting with an underscore are comments.
+  return Object.fromEntries(
+    Object.entries(parsed.data).filter(
+      (e): e is [string, string[]] => !e[0].startsWith('_') && Array.isArray(e[1]),
+    ),
+  );
 }
 
 export interface MergeReport {

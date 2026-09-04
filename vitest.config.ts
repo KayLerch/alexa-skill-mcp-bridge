@@ -16,7 +16,8 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['packages/**/*.test.ts', 'infra/**/*.test.ts', 'examples/**/*.test.ts'],
+    include: ['packages/**/*.test.ts', 'infra/test/**/*.test.ts', 'examples/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/cdk.out/**'],
     testTimeout: 30_000,
     hookTimeout: 30_000,
   },

@@ -24,6 +24,7 @@ export interface AgentServerOptions {
   logger: Logger;
   port?: number;
   host?: string;
+  gatewayUrl?: string;
 }
 
 export interface AgentServer {

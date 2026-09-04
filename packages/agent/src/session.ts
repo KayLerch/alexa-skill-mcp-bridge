@@ -6,6 +6,7 @@ import { askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
 import { BridgeMcpClient } from './mcp/client.js';
+import { sigV4Fetch } from './mcp/gateway.js';
 import type { MemoryAdapter } from './memory/store.js';
 import { TurnRun } from './turn-run.js';
 
@@ -29,6 +30,8 @@ export interface BridgeSessionOptions {
   logger: Logger;
   secretResolver?: SecretResolver;
   now?: () => Date;
+  /** Set by the stack when features.gateway is on: the Gateway URL, called with SigV4. */
+  gatewayUrl?: string;
 }
 
 /** A tools/call may sit parked on several spoken answers; the queue enforces the per-answer timeout. */
@@ -137,10 +140,15 @@ export class BridgeSession {
 
   private async connect(identity: SessionIdentity): Promise<void> {
     const { config, logger, memory } = this.options;
-    const auth = await resolveMcpAuth(config, this.options.secretResolver);
+    // Through the Gateway the server's own auth is the Gateway's job; the agent signs with SigV4.
+    const gatewayUrl = this.options.gatewayUrl;
+    const auth = gatewayUrl
+      ? { headers: {} }
+      : await resolveMcpAuth(config, this.options.secretResolver);
     const mcp = new BridgeMcpClient({
-      url: config.mcp.url,
+      url: gatewayUrl ?? config.mcp.url,
       auth,
+      ...(gatewayUrl ? { fetch: sigV4Fetch(config.aws.region) } : {}),
       minProtocolVersion: config.mcp.protocolVersion,
       callTimeoutMs: TOOL_CALL_TIMEOUT_MS,
       onElicitation: (params) => this.queue.elicit(params),

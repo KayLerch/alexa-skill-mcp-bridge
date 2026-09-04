@@ -1,0 +1,26 @@
+# Build context for packages/agent/Dockerfile is the repo root. Keep only what the image needs:
+# the root manifests, core and agent sources, and every workspace's package.json (npm ci wants them).
+**/node_modules
+**/dist
+**/cdk.out
+**/*.tsbuildinfo
+**/*.test.ts
+**/__snapshots__
+.git
+.github
+spikes
+docs
+skill-package
+scripts
+*.md
+**/README.md
+infra/**
+!infra/package.json
+examples/**
+!examples/sample-mcp-server/package.json
+packages/cli/**
+!packages/cli/package.json
+packages/generator/**
+!packages/generator/package.json
+packages/skill-lambda/**
+!packages/skill-lambda/package.json
