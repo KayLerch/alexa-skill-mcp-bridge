@@ -4,7 +4,7 @@ Guidance for coding agents working in `alexa-skill-mcp-bridge`. Humans read the 
 
 ## What this is
 
-A bridge that lets a developer test an MCP server on a physical Echo as if it were an Alexa+ add-on. An Alexa skill (thin Lambda) forwards each turn to an agent on Amazon Bedrock AgentCore Runtime. The agent (Strands Agents, Nova 2 Lite) is the MCP client: it picks tools, fills arguments, handles elicitation, and turns results into short spoken answers. It reproduces the mechanics of Alexa+, not Alexa's own model judgment.
+A bridge that lets a developer test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on. An Alexa skill (thin Lambda) forwards each turn to an agent on Amazon Bedrock AgentCore Runtime. The agent (Strands Agents, Nova 2 Lite) is the MCP client: it picks tools, fills arguments, handles elicitation, and turns results into short spoken answers. It reproduces the mechanics of Alexa+, not Alexa's own model judgment.
 
 ## Read first
 
@@ -43,7 +43,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 | `npm run build` | `tsc -b` across packages. |
 | `npm test` | vitest, no AWS credentials needed. |
 | `npm run lint` | ESLint and Prettier check. |
-| `npm run sample:start` | Sample MCP server on port 3000. |
+| `npm run sample:start` | Sample MCP server on port 3939 (`PORT=` to change). |
 | `npm run chat` | In-process agent REPL against `mcp.url`. Fastest dev loop. `--debug` shows tool calls and timings. |
 | `npm run chat -- --remote` | Same REPL through the deployed runtime. |
 | `npm run generate` | Rebuild manifest and interaction model from the MCP server. Run after any config change that touches `mcp.*`, `skill.invocationName`, or `skill.locales`. |

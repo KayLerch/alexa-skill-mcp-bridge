@@ -16,6 +16,8 @@ import type { BridgeConfig, Logger, TurnInput, TurnOutput } from '@alexa-mcp-bri
 export interface Bridge {
   turn(input: TurnInput): Promise<TurnOutput>;
   close(): Promise<void>;
+  /** Waits for warm-up (in-process only). Resolves with the failure reason, or undefined when ready. */
+  waitReady?(timeoutMs: number): Promise<string | undefined>;
 }
 
 export interface BridgeIdentity {
@@ -52,5 +54,15 @@ export function createLocalBridge(options: LocalBridgeOptions): Bridge {
         debug: options.debug,
       }),
     close: () => session.close(),
+    waitReady: async (timeoutMs) => {
+      const state = await session.ready(
+        { actorId: options.identity.actorId, locale: options.identity.locale },
+        timeoutMs,
+      );
+      if (state === 'ready') return undefined;
+      if (state === 'warming')
+        return `still connecting to ${options.config.mcp.url} after ${timeoutMs} ms`;
+      return session.warmupError?.message ?? 'warm-up failed';
+    },
   };
 }

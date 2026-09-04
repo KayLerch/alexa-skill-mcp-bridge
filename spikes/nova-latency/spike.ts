@@ -28,7 +28,7 @@ if (values.help) {
   process.exit(0);
 }
 
-const SYSTEM = `You are a voice assistant speaking through an Amazon Echo. You help the user by calling the tools of an MCP server called "sample-hotel-and-weather".
+const SYSTEM = `You are a voice assistant speaking through an Alexa+ device. You help the user by calling the tools of an MCP server called "sample-hotel-and-weather".
 
 Rules for every answer:
 - Answer in one to three short sentences. This is spoken aloud.

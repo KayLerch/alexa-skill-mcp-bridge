@@ -2,7 +2,7 @@
   "name": "alexa-skill-mcp-bridge",
   "version": "0.1.0",
   "private": true,
-  "description": "Test an MCP server on a physical Echo as if it were an Alexa+ add-on.",
+  "description": "Test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on.",
   "license": "Apache-2.0",
   "author": "Kay Lerch",
   "type": "module",
@@ -15,20 +15,33 @@
     "examples/*"
   ],
   "scripts": {
+    "doctor": "node scripts/check-node.mjs && tsc -b && node scripts/doctor.ts",
     "build": "tsc -b",
+    "prebuild": "node scripts/check-node.mjs",
     "typecheck:tooling": "tsc -p tsconfig.tooling.json",
     "lint": "eslint . && prettier --check . && npm run typecheck:tooling",
+    "prelint": "node scripts/check-node.mjs",
     "format": "prettier --write .",
     "test": "vitest run",
+    "pretest": "node scripts/check-node.mjs",
     "test:live": "BRIDGE_TEST_LIVE=1 vitest run packages/cli",
+    "pretest:live": "node scripts/check-node.mjs",
     "sample:start": "tsc -b examples/sample-mcp-server && node examples/sample-mcp-server/dist/server.js",
-    "chat": "tsc -b && node packages/cli/dist/chat.js",
+    "presample:start": "node scripts/check-node.mjs",
+    "chat": "tsc -b && node packages/cli/dist/src/chat.js",
+    "prechat": "node scripts/check-node.mjs",
     "generate": "tsc -b && node packages/generator/dist/cli.js",
+    "pregenerate": "node scripts/check-node.mjs",
     "agent:dev": "tsc -b && node scripts/agent-dev.ts",
+    "preagent:dev": "node scripts/check-node.mjs",
     "synth": "tsc -b && cd infra && cdk synth --quiet",
+    "presynth": "node scripts/check-node.mjs",
     "deploy": "tsc -b && node scripts/deploy.ts",
+    "predeploy": "node scripts/check-node.mjs",
     "destroy": "tsc -b && node scripts/destroy.ts",
-    "check-model-access": "tsc -b && node scripts/check-model-access.ts"
+    "predestroy": "node scripts/check-node.mjs",
+    "check-model-access": "tsc -b && node scripts/check-model-access.ts",
+    "precheck-model-access": "node scripts/check-node.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
@@ -40,6 +53,8 @@
     "typescript-eslint": "^8.69.0",
     "vitest": "^3.2.7",
     "@aws-sdk/client-ecr": "^3.1125.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.1125.0"
+    "@aws-sdk/client-bedrock-runtime": "^3.1125.0",
+    "@aws-sdk/client-cloudformation": "^3.1125.0",
+    "@aws-sdk/client-sts": "^3.1125.0"
   }
 }

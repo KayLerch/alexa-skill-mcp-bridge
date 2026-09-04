@@ -2,7 +2,7 @@
   "_generated": {
     "by": "alexa-skill-mcp-bridge generator",
     "notice": "Generated file. Do not edit by hand; run `npm run generate`.",
-    "source": "http://localhost:3000/mcp"
+    "source": "http://localhost:3939/mcp"
   },
   "interactionModel": {
     "languageModel": {

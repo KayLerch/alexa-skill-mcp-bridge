@@ -46,6 +46,6 @@ The runtime session id must be at least 33 characters and contain no dots. The b
 
 An npm 10 resolver bug triggered by some peer-dependency sets. The repo pins versions that install cleanly; if you upgraded a dependency, try `npm install --legacy-peer-deps` to confirm, then pick a version that installs without it.
 
-## Port 3000 is taken
+## The sample server says its port is in use
 
-`PORT=3210 npm run sample:start` and point `mcp.url` at that port.
+Another program holds the port. `PORT=3940 npm run sample:start`, then set `mcp.url` in `bridge.config.ts` to `http://localhost:3940/mcp`.

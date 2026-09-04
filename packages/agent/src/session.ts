@@ -49,6 +49,8 @@ export class BridgeSession {
   private agent?: Agent;
   private warmup?: Promise<void>;
   private identity?: SessionIdentity;
+  /** Why the last warm-up failed, for frontends that can show it (the CLI). */
+  warmupError?: Error;
 
   constructor(private readonly options: BridgeSessionOptions) {
     this.config = options.config;
@@ -74,6 +76,7 @@ export class BridgeSession {
       },
       (err: unknown) => {
         this.state = 'failed';
+        this.warmupError = err instanceof Error ? err : new Error(String(err));
         this.logger.error('warm-up failed', errorFields(err));
       },
     );
@@ -102,6 +105,7 @@ export class BridgeSession {
   resetWarmup(): void {
     if (this.state !== 'failed') return;
     this.warmup = undefined;
+    this.warmupError = undefined;
     this.state = 'cold';
   }
 

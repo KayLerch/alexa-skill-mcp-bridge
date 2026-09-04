@@ -1,9 +1,9 @@
 # Architecture
 
-The bridge lets a developer test an MCP server on an Echo as if it were an Alexa+ add-on. It reproduces the mechanics of an Alexa+ MCP client (initialize, tools/call, structured results, elicitation) with its own model judgment (Nova 2 Lite with the prompts in `packages/agent/prompts`).
+The bridge lets a developer test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on. It reproduces the mechanics of an Alexa+ MCP client (initialize, tools/call, structured results, elicitation) with its own model judgment (Nova 2 Lite with the prompts in `packages/agent/prompts`).
 
 ```
-Echo ── voice ──► Alexa NLU ── intent + slots ──► skill Lambda (packages/skill-lambda)
+Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► skill Lambda (packages/skill-lambda)
                                                      │ InvokeAgentRuntime(runtimeSessionId = hash(userId), AgentInvocation)
                                                      ▼
                                       AgentCore Runtime, one microVM per user (packages/agent)
@@ -13,7 +13,7 @@ Echo ── voice ──► Alexa NLU ── intent + slots ──► skill Lamb
                                         AgentCore Memory: exchanges, preferences
                                                      │ TurnOutput {status, speech, question?, endSession, visual: null}
                                                      ▼
-                                              Lambda renders SSML ──► Echo speaks
+                                              Lambda renders SSML ──► the device speaks
 ```
 
 ## The contract

@@ -10,8 +10,8 @@ Tools:
 ## Run
 
 ```bash
-npm run sample:start          # http://localhost:3000/mcp
-PORT=4000 npm run sample:start
+npm run sample:start          # http://localhost:3939/mcp
+PORT=4000 npm run sample:start                 # any free port; then set mcp.url to match
 MCP_BEARER_TOKEN=secret npm run sample:start   # requires "Authorization: Bearer secret"
 SAMPLE_SLOW_SECONDS=8 npm run sample:start     # get_weather takes 8 s; exercises the bridge's overrun path
 ```
@@ -22,7 +22,7 @@ The deployed agent runs in AWS and needs to reach your server. The quickest way 
 
 ```bash
 brew install cloudflared      # or see https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url http://localhost:3939
 ```
 
 Put the printed `https://….trycloudflare.com/mcp` URL into `bridge.config.ts` as `mcp.url`, then `npm run generate` and `npm run deploy`.

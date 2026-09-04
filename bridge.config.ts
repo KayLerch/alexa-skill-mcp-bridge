@@ -14,7 +14,7 @@ export default defineConfig({
     // Required. Your MCP server's Streamable HTTP endpoint. The default points at the
     // bundled sample server (`npm run sample:start`) so `npm run chat` works out of the box.
     // For device tests the URL must be reachable from AWS (see examples/sample-mcp-server/README.md).
-    url: 'http://localhost:3000/mcp',
+    url: 'http://localhost:3939/mcp',
 
     auth: {
       // 'none' | 'bearer' | 'apiKey' | 'oauthClientCredentials'

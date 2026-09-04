@@ -40,9 +40,26 @@ if (args.help) {
 const config = await loadConfigFile();
 const debug = args.debug || config.features.debug;
 const budgetMs = args.budget ? Number(args.budget) : config.turn.budgetMs;
+// Humans read this terminal: one readable line per log event instead of JSON.
 const logger = createLogger(
   { service: 'chat' },
-  { level: debug ? 'debug' : 'warn', write: (line) => stderr.write(line + '\n') },
+  {
+    level: debug ? 'debug' : 'warn',
+    write: (line) => {
+      const event = JSON.parse(line) as {
+        level: string;
+        msg: string;
+        errorMessage?: string;
+        tool?: string;
+      };
+      const detail = event.errorMessage
+        ? `: ${event.errorMessage}`
+        : event.tool
+          ? ` (${event.tool})`
+          : '';
+      stderr.write(`  [${event.level}] ${event.msg}${detail}\n`);
+    },
+  },
 );
 const identity = {
   actorId: hashId(args.user as string),
@@ -66,8 +83,17 @@ const bridge: Bridge = args.remote
       debug,
     });
 
-const rl = createInterface({ input: stdin, output: stdout });
+// Lines come through the async iterator so piped input (scripts, smoke tests) works as well
+// as a terminal: nothing typed before we ask is lost, and end of input ends the session.
+const rl = createInterface({ input: stdin, output: stdout, terminal: stdout.isTTY });
+const lines = rl[Symbol.asyncIterator]();
 let pendingQuestion: Question | undefined;
+
+async function ask(prompt: string): Promise<string | undefined> {
+  stdout.write(prompt);
+  const next = await lines.next();
+  return next.done ? undefined : next.value.trim();
+}
 
 stdout.write(
   `Bridge chat. MCP server: ${config.mcp.url}. Budget ${budgetMs} ms.${args.remote ? ' (remote)' : ''}\n`,
@@ -75,11 +101,26 @@ stdout.write(
 stdout.write('Type a request. "stop" cancels, "quit" exits.\n\n');
 
 await show(await bridge.turn({ type: 'warmup' }));
+const notReady = await bridge.waitReady?.(20_000);
+if (notReady) {
+  stderr.write(
+    `\nCould not connect to the MCP server at ${config.mcp.url}: ${notReady}\n\n` +
+      'What to check:\n' +
+      '  - Is the server running? For the bundled sample: npm run sample:start (in another terminal).\n' +
+      '  - Does mcp.url in bridge.config.ts match its address and port?\n' +
+      '  - Does the server need auth? Set mcp.auth and MCP_SECRET_VALUE for local runs.\n' +
+      '  - npm run doctor checks all of this and more.\n',
+  );
+  await bridge.close();
+  rl.close();
+  process.exit(1);
+}
+stdout.write('Connected. ');
 
 for (;;) {
-  const line = (await rl.question(pendingQuestion ? 'answer> ' : 'you> ')).trim();
+  const line = await ask(pendingQuestion ? 'answer> ' : 'you> ');
+  if (line === undefined || line === 'quit' || line === 'exit') break;
   if (!line) continue;
-  if (line === 'quit' || line === 'exit') break;
   if (line === 'stop' || line === 'cancel') {
     await show(await bridge.turn({ type: 'cancel' }));
     pendingQuestion = undefined;
@@ -96,9 +137,11 @@ for (;;) {
   await show(output, Date.now() - started);
 }
 
+stdout.write('\n');
 await bridge.turn({ type: 'cancel' });
 await bridge.close();
 rl.close();
+process.exit(0);
 
 async function show(output: TurnOutput, elapsedMs?: number): Promise<void> {
   pendingQuestion = output.status === 'question' ? output.question : undefined;

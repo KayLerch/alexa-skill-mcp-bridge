@@ -12,6 +12,8 @@ import { registerTools, SERVER_INSTRUCTIONS } from './tools.js';
  */
 
 const PATH = '/mcp';
+/** Off the beaten path on purpose: 3000 and 8080 are usually taken on a developer machine. */
+export const DEFAULT_PORT = 3939;
 
 export interface SampleServerOptions {
   /** 0 picks an ephemeral port (tests). */
@@ -119,9 +121,25 @@ export async function startSampleServer(
     });
   });
 
-  await new Promise<void>((resolve) => httpServer.listen(options.port ?? 3000, resolve));
+  const requestedPort = options.port ?? DEFAULT_PORT;
+  await new Promise<void>((resolve, reject) => {
+    httpServer.once('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        reject(
+          new Error(
+            `Port ${requestedPort} is already in use by another program. ` +
+              `Start the sample server on a free port, e.g. PORT=${requestedPort + 1} npm run sample:start, ` +
+              `and set mcp.url in bridge.config.ts to http://localhost:${requestedPort + 1}${PATH}.`,
+          ),
+        );
+      } else {
+        reject(err);
+      }
+    });
+    httpServer.listen(requestedPort, resolve);
+  });
   const address = httpServer.address();
-  const port = typeof address === 'object' && address ? address.port : (options.port ?? 3000);
+  const port = typeof address === 'object' && address ? address.port : requestedPort;
   const url = `http://localhost:${port}${PATH}`;
   log({
     msg: 'sample MCP server listening',
