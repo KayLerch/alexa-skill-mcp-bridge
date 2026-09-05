@@ -7,6 +7,7 @@ import { GetCallerIdentityCommand, STSClient } from '@aws-sdk/client-sts';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import {
   ConfigError,
+  alexaPlusVersionWarning,
   findConfigFile,
   loadConfigFile,
   type BridgeConfig,
@@ -84,7 +85,7 @@ await check('Dependencies installed', () => {
 });
 
 let config: BridgeConfig | undefined;
-await check('bridge.config.ts', async () => {
+await check('config (bridge.config.ts + .env)', async () => {
   try {
     config = await loadConfigFile();
     return {
@@ -96,7 +97,7 @@ await check('bridge.config.ts', async () => {
       return {
         ok: false,
         detail: err.message.replace(/\n\s*/g, ' '),
-        fix: 'fix the field named above in bridge.config.ts',
+        fix: 'fix the field named above in bridge.config.ts, or in .env if you set it there',
       };
     throw err;
   }
@@ -107,9 +108,12 @@ if (config) {
   await check('MCP server', async () => {
     try {
       const scan = await scanServer(cfg);
+      const versionWarning = alexaPlusVersionWarning(scan.protocolVersion);
       return {
         ok: true,
-        detail: `${scan.server.name} at ${cfg.mcp.url}, protocol ${scan.protocolVersion}, tools: ${scan.tools.map((t) => t.name).join(', ')}`,
+        detail:
+          `${scan.server.name} at ${cfg.mcp.url}, protocol ${scan.protocolVersion}, tools: ${scan.tools.map((t) => t.name).join(', ')}` +
+          (versionWarning ? `\n     warning: ${versionWarning}` : ''),
       };
     } catch (err) {
       if (err instanceof ScanError) {
@@ -208,7 +212,7 @@ if (config) {
         ? {
             ok: false,
             detail: `${cfg.mcp.url} is a local address; the deployed agent cannot reach it`,
-            fix: 'expose the server (e.g. cloudflared tunnel --url http://localhost:3939) and put the public https URL into mcp.url, then npm run generate',
+            fix: 'expose the server (e.g. cloudflared tunnel --url http://localhost:3939), put the public https URL into .env as BRIDGE_MCP_URL, then npm run generate',
           }
         : {
             ok: true,
@@ -248,22 +252,28 @@ if (config) {
           manifest: { apis: { custom: { endpoint: { uri: string } } } };
         }
       ).manifest.apis.custom.endpoint.uri;
-      return uri.includes('REPLACE')
-        ? {
-            ok: false,
-            detail: 'still the placeholder',
-            fix: 'run npm run deploy and paste the LambdaArn output into skill.json',
-          }
-        : { ok: true, detail: uri };
+      const fromEnv = process.env.BRIDGE_LAMBDA_ARN;
+      if (uri.includes('REPLACE') || uri.includes(':000000000000:')) {
+        return fromEnv
+          ? { ok: true, detail: `placeholder; npm run skill:deploy will write ${fromEnv}` }
+          : {
+              ok: false,
+              detail: 'still the placeholder and no BRIDGE_LAMBDA_ARN in .env',
+              fix: 'run npm run deploy (writes the ARN into .env), then npm run skill:deploy',
+            };
+      }
+      return { ok: true, detail: uri };
     });
 
-    await check('skill.id in bridge.config.ts', () =>
+    // Recommended, not required: the Lambda works without it, it is just open until it is set.
+    await check('skill.id (recommended)', () =>
       cfg.skill.id
         ? { ok: true, detail: cfg.skill.id }
         : {
-            ok: false,
-            detail: 'unset: the Lambda accepts requests from any skill until it is',
-            fix: 'after ask deploy prints the skill id, set skill.id and run npm run deploy again',
+            ok: true,
+            detail:
+              'unset: any Alexa Skill that knows your function ARN can invoke this Lambda. ' +
+              'Recommended once ask deploy prints the id: put it in .env as BRIDGE_SKILL_ID and deploy again',
           },
     );
   }

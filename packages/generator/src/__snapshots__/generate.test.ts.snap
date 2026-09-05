@@ -1,20 +1,19 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`generate (template utterances) > matches the snapshot for the sample server 1`] = `
+exports[`generate (template utterances) > matches the snapshot for the hotels and weather server 1`] = `
 {
   "_generated": {
     "by": "alexa-skill-mcp-bridge generator",
     "notice": "Generated file. Do not edit by hand; run \`npm run generate\`.",
-    "source": "<url>",
   },
   "examplePhrases": [
-    "search hotels check in on tomorrow",
+    "search hotels on tomorrow",
     "get weather city some city",
   ],
   "protocolVersion": "2025-11-25",
   "server": {
-    "instructions": "This server searches hotels and reports weather in a few European and US cities. Hotel search needs a destination, check-in and check-out dates, and the number of guests; if guests is missing the tool asks for it. Prices are per night in euros.",
-    "name": "sample-hotel-and-weather",
+    "instructions": "This server searches hotels and reports typical weather in sixty-six cities: twenty-four in the United States, eighteen European metropoles, and twenty-four across Canada, Latin America, Asia, the Middle East, Africa and Oceania. Hotel search needs a destination, check-in and check-out dates, and the number of guests; if guests is missing the tool asks for it. Prices are per night, in the local currency where travellers expect it and in US dollars elsewhere. Data is fixed and illustrative.",
+    "name": "hotels-and-weather",
     "version": "0.1.0",
   },
   "tools": [
@@ -80,7 +79,7 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
       ],
     },
     {
-      "description": "Current weather for a city: conditions plus high and low temperature in Celsius.",
+      "description": "Typical weather for one of sixty-six cities worldwide: conditions plus high and low in Celsius.",
       "elicitedArguments": [],
       "inputSchema": {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -110,12 +109,11 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
 }
 `;
 
-exports[`generate (template utterances) > matches the snapshot for the sample server 2`] = `
+exports[`generate (template utterances) > matches the snapshot for the hotels and weather server 2`] = `
 {
   "_generated": {
     "by": "alexa-skill-mcp-bridge generator",
     "notice": "Generated file. Do not edit by hand; run \`npm run generate\`.",
-    "source": "<url>",
   },
   "interactionModel": {
     "languageModel": {
@@ -128,16 +126,24 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
             "can you search hotels",
             "i want to search hotels",
             "please search hotels",
-            "search hotels check in on {checkIn}",
-            "search hotels check out on {checkOut}",
-            "search hotels guests {guests}",
-            "search hotels check in on {checkIn} check out on {checkOut} guests {guests}",
+            "help me search hotels",
+            "i'd like to search hotels",
+            "search hotels on {checkIn}",
+            "search hotels on {checkOut}",
+            "search hotels for {guests}",
+            "search hotels on {checkIn} on {checkOut}",
+            "search hotels on {checkOut} on {checkIn}",
+            "search hotels on {checkIn} for {guests}",
+            "search hotels for {guests} on {checkIn}",
+            "can you search hotels on {checkIn} for {guests}",
+            "search hotels on {checkOut} for {guests}",
+            "search hotels for {guests} on {checkOut}",
+            "i want to search hotels on {checkOut} for {guests}",
+            "search hotels on {checkIn} on {checkOut} for {guests}",
+            "search hotels for {guests} on {checkOut} on {checkIn}",
             "search hotels destination {destination}",
             "search hotels for {destination}",
             "search hotels {destination}",
-            "help me search hotels",
-            "search hotels now",
-            "i'd like to search hotels",
           ],
           "slots": [
             {
@@ -166,12 +172,11 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
             "can you get weather",
             "i want to get weather",
             "please get weather",
+            "help me get weather",
+            "i'd like to get weather",
             "get weather city {city}",
             "get weather for {city}",
             "get weather {city}",
-            "help me get weather",
-            "get weather now",
-            "i'd like to get weather",
           ],
           "slots": [
             {
@@ -258,6 +263,21 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
           ],
         },
         {
+          "name": "SpokenRequestIntent",
+          "samples": [
+            "{request}",
+            "ask {request}",
+            "tell me {request}",
+            "i want {request}",
+          ],
+          "slots": [
+            {
+              "name": "request",
+              "type": "SpokenRequestType",
+            },
+          ],
+        },
+        {
           "name": "AMAZON.HelpIntent",
         },
         {
@@ -273,8 +293,144 @@ exports[`generate (template utterances) > matches the snapshot for the sample se
           "name": "AMAZON.NavigateHomeIntent",
         },
       ],
-      "invocationName": "my bridge",
-      "types": [],
+      "invocationName": "bridge demo",
+      "types": [
+        {
+          "name": "SpokenRequestType",
+          "values": [
+            {
+              "name": {
+                "value": "can you get weather",
+              },
+            },
+            {
+              "name": {
+                "value": "can you search hotels",
+              },
+            },
+            {
+              "name": {
+                "value": "can you search hotels on something for something",
+              },
+            },
+            {
+              "name": {
+                "value": "get weather city something",
+              },
+            },
+            {
+              "name": {
+                "value": "get weather for something",
+              },
+            },
+            {
+              "name": {
+                "value": "get weather please",
+              },
+            },
+            {
+              "name": {
+                "value": "get weather something",
+              },
+            },
+            {
+              "name": {
+                "value": "help me get weather",
+              },
+            },
+            {
+              "name": {
+                "value": "help me search hotels",
+              },
+            },
+            {
+              "name": {
+                "value": "i want to get weather",
+              },
+            },
+            {
+              "name": {
+                "value": "i want to search hotels",
+              },
+            },
+            {
+              "name": {
+                "value": "i want to search hotels on something for something",
+              },
+            },
+            {
+              "name": {
+                "value": "i'd like to get weather",
+              },
+            },
+            {
+              "name": {
+                "value": "i'd like to search hotels",
+              },
+            },
+            {
+              "name": {
+                "value": "please get weather",
+              },
+            },
+            {
+              "name": {
+                "value": "please search hotels",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels destination something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels for something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels for something on something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels for something on something on something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels on something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels on something for something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels on something on something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels on something on something for something",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels please",
+              },
+            },
+            {
+              "name": {
+                "value": "search hotels something",
+              },
+            },
+          ],
+        },
+      ],
     },
   },
 }

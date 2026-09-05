@@ -16,5 +16,5 @@ new AlexaMcpBridgeStack(app, 'AlexaMcpBridgeStack', {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: config.aws.region,
   },
-  description: 'Alexa skill to MCP server bridge: skill Lambda, AgentCore runtime, memory, budget',
+  description: 'Alexa Skill to MCP server bridge: Alexa Skill Lambda, AgentCore runtime, memory',
 });

@@ -2,16 +2,19 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startSampleServer, type SampleServerHandle } from '@alexa-mcp-bridge/sample-mcp-server';
+import {
+  startHotelsWeatherServer,
+  type HotelsWeatherServerHandle,
+} from '@alexa-mcp-bridge/hotels-weather-mcp-server';
 import { parseConfig, toolManifestSchema } from '@alexa-mcp-bridge/core';
 import { generate, examplePhrase } from './generate.js';
 import { scanServer, ScanError } from './scan.js';
 
-let server: SampleServerHandle;
+let server: HotelsWeatherServerHandle;
 let dir: string;
 
 beforeAll(async () => {
-  server = await startSampleServer({ port: 0, log: () => undefined });
+  server = await startHotelsWeatherServer({ port: 0, log: () => undefined });
   dir = mkdtempSync(join(tmpdir(), 'bridge-gen-'));
 });
 afterAll(async () => {
@@ -23,12 +26,13 @@ const paths = () => ({
   manifest: join(dir, 'generated/tool-manifest.json'),
   interactionModelDir: join(dir, 'interactionModels/custom'),
   overridesDir: join(dir, 'overrides'),
+  trainingDir: join(dir, 'training'),
 });
 
 describe('scanServer', () => {
   it('reads server info, version, and tools', async () => {
     const scan = await scanServer(parseConfig({ mcp: { url: server.url } }));
-    expect(scan.server.name).toBe('sample-hotel-and-weather');
+    expect(scan.server.name).toBe('hotels-and-weather');
     expect(scan.server.instructions).toMatch(/hotels/);
     expect(scan.protocolVersion).toBe('2025-11-25');
     expect(scan.tools.map((t) => t.name)).toEqual(['search_hotels', 'get_weather']);
@@ -124,15 +128,11 @@ describe('generate (template utterances)', () => {
     rmSync(paths().overridesDir, { recursive: true, force: true });
   });
 
-  it('matches the snapshot for the sample server', async () => {
+  it('matches the snapshot for the hotels and weather server', async () => {
     const config = parseConfig({ mcp: { url: server.url } });
     const result = await generate({ config, paths: paths(), useModel: false });
-    expect({
-      ...result.manifest,
-      _generated: { ...result.manifest._generated, source: '<url>' },
-    }).toMatchSnapshot();
-    const model = result.models['en-US'];
-    expect({ ...model, _generated: { ...model?._generated, source: '<url>' } }).toMatchSnapshot();
+    expect(result.manifest).toMatchSnapshot();
+    expect(result.models['en-US']).toMatchSnapshot();
   });
 });
 

@@ -1,13 +1,16 @@
 import { join } from 'node:path';
 import * as cdk from 'aws-cdk-lib';
 import * as agentcore from 'aws-cdk-lib/aws-bedrockagentcore';
-import * as budgets from 'aws-cdk-lib/aws-budgets';
 import { Platform } from 'aws-cdk-lib/aws-ecr-assets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import { serializeConfig, type BridgeConfig } from '@alexa-mcp-bridge/core';
+import {
+  ALEXA_PLUS_PROTOCOL_VERSION,
+  serializeConfig,
+  type BridgeConfig,
+} from '@alexa-mcp-bridge/core';
 import type { Construct } from 'constructs';
 import { modelResourceArns } from './model-arns.js';
 
@@ -19,7 +22,8 @@ export interface AlexaMcpBridgeStackProps extends cdk.StackProps {
 
 /**
  * One stack, read from bridge.config.ts. Nothing here runs always-on: the runtime bills
- * while a session is active, memory and logs by volume, the Lambda per request.
+ * while a session is active, memory and logs by volume, the Lambda per request. There is
+ * no cost alarm; see docs/cost.md for what to watch and `npm run destroy` to stop it all.
  */
 export class AlexaMcpBridgeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AlexaMcpBridgeStackProps) {
@@ -111,8 +115,9 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
         gatewayName: 'alexa-mcp-bridge',
         description: 'MCP gateway for the Alexa MCP bridge',
         authorizerConfiguration: new agentcore.IamAuthorizer(),
+        // What the Gateway offers the agent, not what the developer's server must speak.
         protocolConfiguration: agentcore.GatewayProtocol.mcp({
-          supportedVersions: [agentcore.MCPProtocolVersion.of(config.mcp.protocolVersion)],
+          supportedVersions: [agentcore.MCPProtocolVersion.of(ALEXA_PLUS_PROTOCOL_VERSION)],
         }),
       });
       gateway.addMcpServerTarget('McpServer', {
@@ -131,7 +136,7 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       if (gatewayUrl) runtimeEnv.MCP_GATEWAY_URL = gatewayUrl;
     }
 
-    // Skill Lambda: thin ASK SDK handlers, bundled from source, arm64, 8 s.
+    // Alexa Skill Lambda: thin ASK SDK handlers, bundled from source, arm64, 8 s.
     const skillLogs = new logs.LogGroup(this, 'SkillLogs', {
       retention,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
@@ -165,37 +170,7 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
     });
     if (!config.skill.id) {
       cdk.Annotations.of(skill).addWarning(
-        'skill.id is not set: any Alexa skill can invoke this Lambda. After `ask deploy`, put the skill id into bridge.config.ts and run `npm run deploy` again.',
-      );
-    }
-
-    // Cost budget. Email notification only when aws.budgetEmail is set.
-    new budgets.CfnBudget(this, 'Budget', {
-      budget: {
-        budgetName: `alexa-mcp-bridge-${this.stackName}`,
-        budgetType: 'COST',
-        timeUnit: 'MONTHLY',
-        budgetLimit: { amount: config.aws.budgetUsd, unit: 'USD' },
-      },
-      ...(config.aws.budgetEmail
-        ? {
-            notificationsWithSubscribers: [
-              {
-                notification: {
-                  notificationType: 'ACTUAL',
-                  comparisonOperator: 'GREATER_THAN',
-                  threshold: 80,
-                  thresholdType: 'PERCENTAGE',
-                },
-                subscribers: [{ subscriptionType: 'EMAIL', address: config.aws.budgetEmail }],
-              },
-            ],
-          }
-        : {}),
-    });
-    if (!config.aws.budgetEmail) {
-      cdk.Annotations.of(this).addWarning(
-        `A ${config.aws.budgetUsd} USD monthly budget exists but nobody is notified: set aws.budgetEmail in bridge.config.ts.`,
+        'skill.id is not set: any Alexa Skill that knows the function ARN can invoke this Lambda. After `ask deploy`, put the skill id into .env as BRIDGE_SKILL_ID and run `npm run deploy` again.',
       );
     }
 

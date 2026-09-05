@@ -178,7 +178,7 @@ describe('launch', () => {
     const warm = fakeBridge(() => done(''));
     const response = await launchHandler(warm.bridge, config, manifest).handle(handlerInput());
     expect(response.outputSpeech).toMatchObject({
-      ssml: expect.stringContaining('Welcome to sample hotel and weather'),
+      ssml: expect.stringContaining('Welcome to hotels and weather'),
     });
     expect(response.shouldEndSession).toBe(false);
     const coldConfig = { ...config, turn: { budgetMs: 300 } };
@@ -304,7 +304,7 @@ describe('poll-first (D16)', () => {
 describe('greeting', () => {
   it('derives from the manifest unless configured', () => {
     expect(greeting(config, manifest)).toBe(
-      'Welcome to sample hotel and weather. For example, say "search hotels in Berlin" or "get weather for Hamburg". What would you like to do?',
+      'Welcome to hotels and weather. For example, say "search hotels in Berlin" or "get weather for Hamburg". What would you like to do?',
     );
     expect(
       greeting({ ...config, skill: { ...config.skill, greeting: 'Hi there.' } }, manifest),

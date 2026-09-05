@@ -3,7 +3,7 @@
 The bridge lets a developer test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on. It reproduces the mechanics of an Alexa+ MCP client (initialize, tools/call, structured results, elicitation) with its own model judgment (Nova 2 Lite with the prompts in `packages/agent/prompts`).
 
 ```
-Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► skill Lambda (packages/skill-lambda)
+Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► Alexa Skill Lambda (packages/skill-lambda)
                                                      │ InvokeAgentRuntime(runtimeSessionId = hash(userId), AgentInvocation)
                                                      ▼
                                       AgentCore Runtime, one microVM per user (packages/agent)
@@ -18,7 +18,7 @@ Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► s
 
 ## The contract
 
-`packages/core` owns every type that crosses a boundary. A frontend sends a `TurnInput` (`warmup`, `turn`, `answer`, `poll`, `cancel`) wrapped in an `AgentInvocation` (hashed actor and session ids, locale, budget) and gets a `TurnOutput` back. The Alexa skill is one frontend; the CLI harness is another; a web frontend would be a third without touching the agent.
+`packages/core` owns every type that crosses a boundary. A frontend sends a `TurnInput` (`warmup`, `turn`, `answer`, `poll`, `cancel`) wrapped in an `AgentInvocation` (hashed actor and session ids, locale, budget) and gets a `TurnOutput` back. The Alexa Skill is one frontend; the CLI harness is another; a web frontend would be a third without touching the agent.
 
 Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user id is the AgentCore runtime session id (64 hex characters, no dots) and the Memory actor id; the hashed Alexa session id is the Memory session id. Logs everywhere carry hashed ids only.
 
@@ -43,6 +43,15 @@ Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user i
 
 The deadline is `budgetMs - 500 ms` so the agent answers `pending` cleanly before the Lambda's abort at `budgetMs`. A run that passes its deadline keeps working; `/ping` reports `HealthyBusy` only then.
 
+## Voice rules
+
+Two paths produce speech and both obey `config.speech`. The model's answers are governed by
+`packages/agent/prompts/voice.md`, interpolated with the same numbers. The text the model never
+writes — elicitation questions, choice lists, spoken errors — is rendered deterministically in
+`packages/agent/src/elicitation/question.ts`, which caps how many options are read aloud, stays
+quiet about sets a listener already knows (months, weekdays), and runs the server's own message
+through the same markdown and URL cleanup as model output.
+
 ## Elicitation parking
 
 MCP 2025-11-25 delivers elicitation as a server-to-client request on the still-open `tools/call` stream. The Alexa turn is over long before the user answers, so the promise waits in the microVM:
@@ -56,7 +65,7 @@ MCP 2025-11-25 delivers elicitation as a server-to-client request on the still-o
 
 URL-mode elicitation is declined with a spoken explanation.
 
-Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK's 60 s default request timeout on both sides (the agent's `callTool` uses 10 minutes; the server's `elicitInput` must be raised too), and idle timeouts in tunnels and proxies (the sample server pings every 15 s).
+Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK's 60 s default request timeout on both sides (the agent's `callTool` uses 10 minutes; the server's `elicitInput` must be raised too), and idle timeouts in tunnels and proxies (the example servers pings every 15 s).
 
 ## Memory
 
@@ -68,7 +77,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-The execution plan's section 2 lists every decision the brief left open (D1 to D31) with its rationale and a "revisit if" condition. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D37) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).
@@ -77,7 +86,7 @@ The execution plan's section 2 lists every decision the brief left open (D1 to D
 
 ## Verified against live behavior
 
-Recorded on 2026-09-03 with `@strands-agents/sdk` 1.16.0, `@modelcontextprotocol/sdk` 1.30.0, `aws-cdk-lib` 2.268.0. The spikes under `spikes/` are re-runnable.
+Recorded on 2026-09-03 with `@strands-agents/sdk` 1.16.0, `@modelcontextprotocol/sdk` 1.30.0, `aws-cdk-lib` 2.268.0. The spikes under [`spikes/`](../spikes/) are re-runnable, and the dated detail behind this summary is the verification log in [decisions.md](decisions.md).
 
 | Item                                                        | Outcome                                                                                                                                                                                                                                                                                                                                       |
 | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

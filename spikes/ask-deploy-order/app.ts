@@ -35,7 +35,7 @@ fn.addPermission('AlexaSkillsKit', {
 });
 if (!skillId) {
   cdk.Annotations.of(fn).addWarning(
-    'SKILL_ID unset: the Alexa trigger permission is open to any skill.',
+    'SKILL_ID unset: the Alexa trigger permission is open to any Alexa Skill.',
   );
 }
 

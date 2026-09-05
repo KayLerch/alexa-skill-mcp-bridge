@@ -3,29 +3,38 @@ import { randomUUID } from 'node:crypto';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
-import { registerTools, SERVER_INSTRUCTIONS } from './tools.js';
+import { createConsoleLog } from './console-log.js';
+import { attachWireLog, type Log } from './wire.js';
 
 /**
- * Sample MCP server: Streamable HTTP, stateful (one session per client), protocol 2025-11-25.
- * Stateful mode is required: the elicitation reply has to be routed back to the
- * pending tools/call request, which stateless mode cannot do.
+ * The plumbing every example MCP server needs, so each one is only its data and its tools.
+ * Streamable HTTP, stateful (one session per client): stateless mode cannot route an
+ * elicitation reply back to the pending tools/call, and elicitation is the point of the bridge.
  */
+
+export { createConsoleLog, jsonLog, type ConsoleLogOptions } from './console-log.js';
+export { attachWireLog, type Log, type LogEvent, type WireEvent } from './wire.js';
 
 const PATH = '/mcp';
 /** Off the beaten path on purpose: 3000 and 8080 are usually taken on a developer machine. */
 export const DEFAULT_PORT = 3939;
 
-export interface SampleServerOptions {
+export interface McpServerOptions {
+  /** Server name and version reported at initialize. */
+  name: string;
+  version: string;
+  /** The server's `instructions` string. The agent injects it into its system prompt. */
+  instructions: string;
+  /** Registers the tools on a freshly built server, once per client session. */
+  registerTools: (server: McpServer, log: Log) => void;
   /** 0 picks an ephemeral port (tests). */
   port?: number;
   /** When set, requests must carry "Authorization: Bearer <token>". */
   bearerToken?: string;
-  /** Delay get_weather by this many seconds to exercise the bridge's overrun path. */
-  slowSeconds?: number;
-  log?: (event: Record<string, unknown>) => void;
+  log?: Log;
 }
 
-export interface SampleServerHandle {
+export interface McpServerHandle {
   url: string;
   port: number;
   close: () => Promise<void>;
@@ -43,19 +52,17 @@ async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   return raw.length ? JSON.parse(raw) : undefined;
 }
 
-export async function startSampleServer(
-  options: SampleServerOptions = {},
-): Promise<SampleServerHandle> {
-  const log = options.log ?? ((event) => console.error(JSON.stringify(event)));
+export async function startMcpServer(options: McpServerOptions): Promise<McpServerHandle> {
+  const log = options.log ?? createConsoleLog();
   const sessions = new Map<string, Session>();
   const bearerToken = options.bearerToken;
 
   const buildServer = (): McpServer => {
     const server = new McpServer(
-      { name: 'sample-hotel-and-weather', version: '0.1.0' },
-      { instructions: SERVER_INSTRUCTIONS },
+      { name: options.name, version: options.version },
+      { instructions: options.instructions },
     );
-    registerTools(server, { slowSeconds: options.slowSeconds ?? 0, log });
+    options.registerTools(server, log);
     return server;
   };
 
@@ -98,11 +105,11 @@ export async function startSampleServer(
       sessionIdGenerator: () => randomUUID(),
       onsessioninitialized: (id) => {
         sessions.set(id, { server, transport });
-        log({ msg: 'session initialized', sessionId: id });
+        log({ msg: 'session initialized', session: id });
       },
       onsessionclosed: (id) => {
         sessions.delete(id);
-        log({ msg: 'session closed', sessionId: id });
+        log({ msg: 'session closed', session: id });
       },
     });
     transport.onclose = () => {
@@ -110,6 +117,8 @@ export async function startSampleServer(
     };
 
     await server.connect(transport);
+    // After connect: the wire log wraps the onmessage handler that connect installed.
+    attachWireLog(transport, log);
     await transport.handleRequest(req, res, body);
   };
 
@@ -128,7 +137,7 @@ export async function startSampleServer(
         reject(
           new Error(
             `Port ${requestedPort} is already in use by another program. ` +
-              `Start the sample server on a free port, e.g. PORT=${requestedPort + 1} npm run sample:start, ` +
+              `Start the server on a free port, e.g. PORT=${requestedPort + 1} npm run sample:start, ` +
               `and set mcp.url in bridge.config.ts to http://localhost:${requestedPort + 1}${PATH}.`,
           ),
         );
@@ -142,10 +151,9 @@ export async function startSampleServer(
   const port = typeof address === 'object' && address ? address.port : requestedPort;
   const url = `http://localhost:${port}${PATH}`;
   log({
-    msg: 'sample MCP server listening',
+    msg: `${options.name} listening`,
     url,
     auth: bearerToken ? 'bearer' : 'none',
-    slowSeconds: options.slowSeconds ?? 0,
   });
 
   return {

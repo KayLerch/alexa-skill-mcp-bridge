@@ -15,6 +15,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run check:leaks -- --all
       - run: npm run lint
       - run: npm run build
       - run: npm test

@@ -6,7 +6,9 @@ packages/skill-lambda/generated
 skill-package/interactionModels
 spikes/*/results
 package-lock.json
-# Owner-authored documents; keep their formatting as written
-CLAUDE.md
-EXECUTION-PLAN.md
-alexa-skill-mcp-bridge-brief.md
+# Owner-authored and frozen documents; keep their formatting as written
+AGENTS.md
+docs/history
+
+# Not code: prettier has no parser for a dotenv file.
+.env.example

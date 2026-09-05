@@ -1,6 +1,6 @@
 # Verification spikes
 
-Each directory is a small, re-runnable probe for one item in the brief's section 12. Spikes live outside the npm workspaces, install their own dependencies, and use Node 22's built-in type stripping (`node spike.ts`). Outcomes are recorded in `EXECUTION-PLAN.md` section 16 until `docs/architecture.md` exists.
+Each directory is a small, re-runnable probe for one of the ten assumptions that had to be checked against live behavior before the design could rely on them. Spikes live outside the npm workspaces, install their own dependencies, and use Node 22's built-in type stripping (`node spike.ts`). Outcomes go to the verification log in [`docs/decisions.md`](../docs/decisions.md), summarized in [`docs/architecture.md`](../docs/architecture.md).
 
 | Spike                      | Brief items      | Needs AWS                | What it creates                                               | Cost                                                                                                                                                                                              |
 | -------------------------- | ---------------- | ------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -9,7 +9,7 @@ Each directory is a small, re-runnable probe for one item in the brief's section
 | `tunnel-idle` (S3)         | 7                | No (needs `cloudflared`) | A quick tunnel                                                | Free                                                                                                                                                                                              |
 | `nova-latency` (S4)        | 8                | Bedrock only             | Nothing                                                       | Nova 2 Lite tokens: about $0.001 per run                                                                                                                                                          |
 | `cdk-synth-gateway` (S5)   | 9                | No                       | Nothing (synth only)                                          | Free                                                                                                                                                                                              |
-| `ask-deploy-order` (S6)    | 10               | Yes, deploys             | A hello-world Lambda and a development-stage Alexa skill      | Free tier                                                                                                                                                                                         |
+| `ask-deploy-order` (S6)    | 10               | Yes, deploys             | A hello-world Lambda and a development-stage Alexa Skill      | Free tier                                                                                                                                                                                         |
 
 ## Prerequisites
 

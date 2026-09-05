@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * The Turn contract: the boundary between any frontend (Alexa skill, CLI, a future web UI)
+ * The Turn contract: the boundary between any frontend (Alexa Skill, CLI, a future web UI)
  * and the agent. Keep it small and stable.
  */
 

@@ -42,7 +42,7 @@ const tools = [
   },
 ];
 const system = buildSystemPrompt({
-  serverName: 'sample-hotel-and-weather',
+  serverName: 'hotels-and-weather',
   serverInstructions: 'This server searches hotels and reports weather.',
   toolList: formatToolList(tools),
   locale: 'en-US',

@@ -8,6 +8,6 @@
   "references": [
     { "path": "../core" },
     { "path": "../agent" },
-    { "path": "../../examples/sample-mcp-server" }
+    { "path": "../../examples/hotels-weather-mcp-server" }
   ]
 }

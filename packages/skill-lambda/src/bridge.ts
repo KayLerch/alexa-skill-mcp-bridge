@@ -17,7 +17,7 @@ import {
 import { isAwaitingResult } from './session-attrs.js';
 
 /**
- * The skill's client for the agent. Hashes Alexa ids, builds the envelope, calls
+ * The Alexa Skill's client for the agent. Hashes Alexa ids, builds the envelope, calls
  * InvokeAgentRuntime inside the turn budget, and turns an abort into 'pending'.
  * When a result is outstanding it polls first and speaks that result ahead of the new
  * input (plan D16); the poll's time comes out of the main call's budget.

@@ -4,7 +4,7 @@ Nothing in the stack runs always-on. The idle cost of a deployed bridge is a few
 
 ## One turn, worked example
 
-A turn is one Alexa request: "find hotels in Berlin from the fifth to the seventh of October". Measured with the sample server and Nova 2 Lite, reasoning off:
+A turn is one Alexa request: "find hotels in Berlin from the fifth to the seventh of October". Measured with the hotels-and-weather example server and Nova 2 Lite, reasoning off; the national parks example has the same shape, one tool call and two model calls per turn:
 
 | Item                                                            | Amount                          | Price (us-east-1)                      | Cost       |
 | --------------------------------------------------------------- | ------------------------------- | -------------------------------------- | ---------- |
@@ -29,8 +29,19 @@ Order of magnitude: a tenth of a cent per turn, dominated by runtime memory whil
 
 ## Defaults chosen for cost
 
-Nova 2 Lite, reasoning off, 400 output tokens, 20-minute idle timeout, 7-day log retention, AWS Budgets alarm at 5 USD a month.
+Nova 2 Lite, reasoning off, 400 output tokens, 20-minute idle timeout, 7-day log retention.
+
+## Nothing will alarm you
+
+The stack has no cost alarm: an alarm that notifies needs an email address, and this repo keeps that kind of value out of tracked files. Watch [Billing and Cost Management](https://console.aws.amazon.com/costmanagement/home) while you test, or add a budget yourself once, outside the stack:
+
+```bash
+aws budgets create-budget --account-id <your-account-id> --budget \
+  '{"BudgetName":"alexa-mcp-bridge","BudgetLimit":{"Amount":"5","Unit":"USD"},"TimeUnit":"MONTHLY","BudgetType":"COST"}'
+```
+
+The reliable control is `npm run destroy`: with the stack gone, the cost is zero.
 
 ## Tear down
 
-`npm run destroy` removes the stack and deletes this app's images from the CDK asset repository. Memory records and logs expire on their own. The Alexa skill stays in your developer account at no cost; delete it with `ask smapi delete-skill --skill-id <id>`.
+`npm run destroy` removes the stack and deletes this app's images from the CDK asset repository. Memory records and logs expire on their own. The Alexa Skill stays in your developer account at no cost; delete it with `ask smapi delete-skill --skill-id <id>`.

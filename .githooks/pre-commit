@@ -1,0 +1,13 @@
+#!/bin/sh
+# Refuses a commit that carries your AWS account id, Alexa Skill id, MCP endpoint, or a token.
+# Enable once per clone:  git config core.hooksPath .githooks
+# Skip a single commit:   git commit --no-verify
+if ! command -v node >/dev/null 2>&1; then
+  echo "check:leaks skipped: node is not on PATH for this git client."
+  exit 0
+fi
+if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)"; then
+  echo "check:leaks skipped: needs Node 22 (this git client has $(node -v))."
+  exit 0
+fi
+exec node "$(git rev-parse --show-toplevel)/scripts/check-leaks.ts"

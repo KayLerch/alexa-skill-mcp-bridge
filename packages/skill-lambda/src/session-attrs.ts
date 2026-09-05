@@ -2,7 +2,7 @@ import type { HandlerInput } from 'ask-sdk-core';
 import type { Question } from '@alexa-mcp-bridge/core';
 
 /**
- * Typed accessors for the two things the skill keeps in Alexa session attributes:
+ * Typed accessors for the two things the Alexa Skill keeps in Alexa session attributes:
  * the question the user is answering, and whether a result is still being worked on.
  */
 export interface PendingQuestion {

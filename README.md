@@ -1,22 +1,28 @@
-# alexa-skill-mcp-bridge
+# Alexa Skill MCP Bridge
 
-Test your MCP server as if it were an Alexa+ add-on, before you have access to Amazon's Alexa+ add-on tooling. In your terminal, in the Alexa developer console's simulator, or on a physical Alexa+ device.
+Demo your MCP server on a physical Alexa+ device, through an Alexa Skill that stands in for an Alexa+ add-on.
 
-You put your MCP server URL into one config file. A generator turns the server's tools into an Alexa interaction model. One CDK stack deploys an agent on Amazon Bedrock AgentCore Runtime (Strands Agents, Amazon Nova 2 Lite) that does what the Alexa+ orchestrator would do: picks the tool, fills arguments, handles elicitation, turns tool results into short spoken answers, and keeps conversation context. An Alexa skill connects that agent to your Alexa+ device.
+An add-on is how an MCP server is meant to reach Alexa+, and that tooling is not open to the public yet. Alexa Skills are open to every developer today, so this bridge puts one where the add-on would be. The Alexa Skill wraps your MCP server, and behind it an agent emulates the work the Alexa+ orchestrator does for an add-on: it picks the MCP tool, fills the arguments, handles elicitation, turns the tool result into a short spoken answer, and carries the conversation's context to the next turn. From your server's side there is nothing unusual to see, just an MCP client over Streamable HTTP that declares `elicitation` and calls the tools you advertise.
 
-**This bridge reproduces the mechanics of an Alexa+ MCP client, not Alexa's own model judgment.** Tool choice, argument filling, and phrasing come from Nova 2 Lite with the prompts in this repo; Alexa+ will pick and phrase differently. What you can verify here: that your server speaks MCP 2025-11-25 over Streamable HTTP, that its tool descriptions lead a model to the right call, that elicitation works with a spoken answer that arrives a minute later, and how your results sound.
+This project exists mainly for the Alexa+ track of the [Amazon Devpost hackathon](https://amazonappdev2026.devpost.com/), where a submission is an MCP-server-backed Alexa+ experience and has to be demoed. Until Alexa+ add-on tooling opens up, an Alexa Skill is how you put your server in front of Alexa+ and record it: in your terminal, in the Alexa developer console's simulator, or on a physical Alexa+ device signed in to your Amazon developer account.
+
+You put your MCP server URL into one config file. A generator turns your server's tools into an Alexa Skill interaction model so Alexa's NLU can route to them. One CDK stack deploys the agent that plays the orchestrator's part on Amazon Bedrock AgentCore Runtime (Strands Agents, Amazon Nova 2 Lite), and the Alexa Skill Lambda in front of it stays thin.
+
+**This bridge reproduces the mechanics of an Alexa+ MCP client, not Alexa's own model judgment.** Tool choice, argument filling, and phrasing come from Nova 2 Lite with the prompts in this repo; Alexa+ will pick and phrase differently. What you can verify here: that your MCP server speaks Streamable HTTP at a version Alexa+ accepts, that its tool descriptions lead a model to the right call, that elicitation works with a spoken answer that arrives a minute later, and how your results sound.
 
 **Tear down:** `npm run destroy` removes everything the cloud track created. See [docs/cost.md](docs/cost.md).
 
 ## Pick a track
 
-| Track                                                                | What you get                                                                                                           | Needs AWS?                                                            | Needs a device?                                                                           |
-| -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [A. Local](#track-a-local-no-deployment)                             | Chat with an MCP server through the real agent in your terminal. The bundled sample server works; your own is optional | Credentials and Bedrock model access only (the model runs in Bedrock) | No                                                                                        |
-| [B. Cloud](#track-b-deploy-to-the-cloud)                             | The agent runs on AgentCore Runtime; you chat with it from your terminal                                               | Yes, one CDK stack                                                    | No                                                                                        |
-| [C. Skill](#track-c-the-alexa-skill-in-the-simulator-or-on-a-device) | The Alexa skill end to end, in the browser simulator or on a device                                                    | Yes                                                                   | No: the developer console's simulator runs the skill in the browser. A device is optional |
+| Track                                                                      | What you get                                                                                                           | Needs AWS?                                                            | Needs a device?                                                                                 |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [A. Local](#track-a-local-no-deployment)                                   | Chat with an MCP server through the real agent in your terminal. The bundled sample server works; your own is optional | Credentials and Bedrock model access only (the model runs in Bedrock) | No                                                                                              |
+| [B. Cloud](#track-b-deploy-to-the-cloud)                                   | The agent runs on AgentCore Runtime; you chat with it from your terminal                                               | Yes, one CDK stack                                                    | No                                                                                              |
+| [C. Alexa Skill](#track-c-the-alexa-skill-in-the-simulator-or-on-a-device) | The Alexa Skill end to end, in the browser simulator or on a device                                                    | Yes                                                                   | No: the developer console's simulator runs the Alexa Skill in the browser. A device is optional |
 
 Each track builds on the previous one. `npm run doctor -- --track local|cloud|skill` checks every prerequisite of a track and prints the exact command to fix what is missing. Run it whenever something fails.
+
+Prefer to be walked through it? Point your coding agent at [docs/onboarding.md](docs/onboarding.md) (`/onboard` in Claude Code) and it will take you through the steps below, ask before anything that costs money, and verify each step with `npm run doctor` instead of assuming.
 
 ## Prerequisites for every track
 
@@ -37,7 +43,11 @@ Without nvm: `brew install node@22` on macOS, or the installer from https://node
 git clone https://github.com/<you>/alexa-skill-mcp-bridge.git
 cd alexa-skill-mcp-bridge
 npm install
+cp .env.example .env                     # your settings; git-ignored
+git config core.hooksPath .githooks      # blocks commits that carry your URL, ARN, or Alexa Skill id
 ```
+
+`bridge.config.ts` holds the settings of the bridge and is meant to stay as it ships. What is yours goes in `.env`: your MCP URL, your Alexa Skill id, your secret name. See [docs/config.md](docs/config.md) and, before you push a fork anywhere public, [the note at the bottom of this README](#security-privacy-and-what-to-keep-out-of-git).
 
 **AWS credentials with Bedrock model access.** Even the local track calls the model in Bedrock; nothing else in AWS is touched until track B.
 
@@ -49,16 +59,18 @@ aws sts get-caller-identity    # prints your account: credentials work
 
 Then enable **Amazon Nova 2 Lite** under Model access in the [Bedrock console for us-east-1](https://console.aws.amazon.com/bedrock/home?region=us-east-1#/modelaccess). `npm run check-model-access` confirms it with one tiny model call.
 
-**An MCP server.** Yours, or the bundled sample (two tools, one of them elicits). Requirements for yours are [below](#requirements-your-server-must-meet).
+**An MCP server.** Yours, or a bundled example. The default one answers questions about fourteen US national parks and asks back when a request is underdetermined, which exercises the whole flow including elicitation. Requirements for yours are [below](#requirements-your-server-must-meet).
 
 ## Track A: local, no deployment
 
-You do not need an MCP server of your own to start. The bundled sample has two tools, one of which asks the user a question back, so the whole flow including elicitation is exercised.
+You do not need an MCP server of your own to start. The bundled national parks example has two tools whose answers depend on a park, a month and an activity, so it asks back when a request is underdetermined and the whole flow including elicitation is exercised.
 
-Terminal 1, if you use the sample server:
+Terminal 1, if you use a bundled example:
 
 ```bash
-npm run sample:start           # http://localhost:3939/mcp
+npm run sample:start           # national parks, on http://localhost:3939/mcp
+npm run sample:start -- --list # the examples that ship with the repo
+EXAMPLE=hotels-weather npm run sample:start   # the hotels-and-weather one instead
 ```
 
 Terminal 2:
@@ -68,9 +80,11 @@ npm run doctor                 # checks Node, dependencies, config, the MCP serv
 npm run chat                   # talks to the server through the real agent, in-process
 ```
 
-Try: "find hotels in Berlin from the fifth to the seventh of October" (the tool asks how many guests; answer "two"), then "what is the weather in Hamburg", then "stop".
+Try: "which national park should I visit in June" (it asks what you want to do; answer "stargazing"), then "what is the best park for fishing", then "tell me about Glacier" (it asks which month), then "stop".
 
-To use your own server instead: set `mcp.url` in `bridge.config.ts` (and `mcp.auth` if it needs a token, see [docs/config.md](docs/config.md)), then `npm run doctor` and `npm run chat` again. `npm run chat -- --debug` shows tool calls and timings; `-- --budget 3000` simulates a tighter Alexa deadline.
+Heading for a device later? Run it as `npm run chat -- --record`: everything you say is kept in `skill-package/training/`, and `npm run generate` turns those phrasings into sample utterances for the Alexa Skill, so it understands the way you actually ask. Details in [docs/customizing.md](docs/customizing.md).
+
+To use your own server instead: put its URL in `.env` as `BRIDGE_MCP_URL` (and `BRIDGE_MCP_AUTH_TYPE` plus `BRIDGE_MCP_SECRET_NAME` if it needs a token, see [docs/config.md](docs/config.md)), then `npm run doctor` and `npm run chat` again. `npm run chat -- --debug` shows tool calls and timings; `-- --budget 3000` simulates a tighter Alexa deadline.
 
 If the agent picks the wrong tool or fills arguments badly, that is what your tool descriptions look like to a model: fix them on the server and try again.
 
@@ -87,12 +101,12 @@ Additional prerequisites:
   cloudflared tunnel --url http://localhost:3939     # prints https://<random>.trycloudflare.com
   ```
 
-  Put `https://<random>.trycloudflare.com/mcp` into `mcp.url`. Quick tunnels change their URL every start; a named tunnel or a real host is better for anything longer than a session.
+  Put `https://<random>.trycloudflare.com/mcp` into `.env` as `BRIDGE_MCP_URL`. Quick tunnels change their URL every start; a named tunnel or a real host is better for anything longer than a session.
 
 Then:
 
 ```bash
-npm run generate                       # manifest and interaction model from your server
+npm run generate                       # manifest and interaction model from your server, plus what you recorded in chat
 npm run doctor -- --track cloud        # Docker, bootstrap, public URL, plus everything from track A
 npm run deploy                         # cdk deploy; prints outputs and what starts costing money
 npm run chat -- --remote               # the same chat, through the deployed runtime
@@ -100,11 +114,13 @@ npm run chat -- --remote               # the same chat, through the deployed run
 
 The first `--remote` turn provisions the runtime and may take a while; the ones after it are fast. The stack costs a few cents a month idle; see [docs/cost.md](docs/cost.md).
 
-## Track C: the Alexa skill, in the simulator or on a device
+`npm run generate` builds the Alexa interaction model from your tools: one intent per tool with sample utterances for every combination of its arguments, a catch-all for phrasings it did not predict, and everything you said in `npm run chat -- --record`. If Alexa still mishears a request your server should handle, [docs/customizing.md](docs/customizing.md) shows how to add utterances, synonyms and intents without touching a generated file.
+
+## Track C: the Alexa Skill, in the simulator or on a device
 
 Additional prerequisites:
 
-- **An Amazon developer account** at https://developer.amazon.com. A physical Alexa+ device (or Alexa+ screen device) is optional: the developer console's Test simulator runs the deployed skill in the browser. If you do use a device, sign it in to the same Amazon account.
+- **An Amazon developer account** at https://developer.amazon.com. A physical Alexa+ device (or Alexa+ screen device) is optional: the developer console's Test simulator runs against the deployed Alexa Skill in the browser. If you do use a physical Alexa device, sign it in to the same Amazon account.
 - **The ASK CLI**, logged in:
 
   ```bash
@@ -115,47 +131,47 @@ Additional prerequisites:
 
 Then, from the repo root:
 
-1. Take the `LambdaArn` printed by `npm run deploy` and put it into `skill-package/skill.json` at `apis.custom.endpoint.uri`.
-2. `npm run doctor -- --track skill`
-3. `ask deploy` creates the skill with the generated interaction model and prints the skill id (`amzn1.ask.skill.…`).
-4. Put that id into `bridge.config.ts` as `skill.id` and run `npm run deploy` again. Until then the Lambda accepts requests from any skill.
-5. In the [Alexa developer console](https://developer.amazon.com/alexa/console/ask), open the skill, go to Test, and set testing to Development.
-6. Talk to it, either way:
-   - **In the browser**: type or hold the microphone in the Test simulator: "open my bridge" (or whatever `skill.invocationName` says).
-   - **On a device**: "Alexa, open my bridge".
+1. `npm run doctor -- --track skill`
+2. `npm run skill:deploy` creates the Alexa Skill with the generated interaction model. It takes the Lambda ARN that `npm run deploy` wrote into `.env` (`BRIDGE_LAMBDA_ARN`), puts it into `skill-package/skill.json`, runs `ask deploy` from the repo root, and records the new Alexa Skill id in `.env` as `BRIDGE_SKILL_ID`. The `skill.json` edit stays local: it carries your AWS account id, and the pre-commit hook stops you from committing it. If you would rather not use the script, paste the ARN into `skill.json` at `apis.custom.endpoint.uri` yourself and run `ask deploy` from the repo root.
+3. **Optional but recommended:** run `npm run deploy` once more. With `BRIDGE_SKILL_ID` in `.env` it locks the Lambda to your Alexa Skill; until then any Alexa Skill that knows your function ARN can invoke it.
+4. In the [Alexa developer console](https://developer.amazon.com/alexa/console/ask), open the Alexa Skill named 'bridge demo', go to Test, and set testing to Development.
+5. Talk to it, either way:
+   - **In the browser**: type `open bridge demo` in the Test simulator, or hold the microphone and say it.
+   - **On a device**: "Alexa, open bridge demo" (if that does not work, try "Alexa, open bridge demo skill", which is how Alexa disambiguates)
 
    The first launch after a while may say it is still starting up; open it again.
 
-Say a request the interaction model knows ("search hotels in Berlin") or use free text ("ask my bridge to find hotels in Berlin"). When the tool asks a question, answer with a number, a date, yes or no, or "the answer is …" for free text.
+Say a request the interaction model covers ("what is the best park for fishing") or anything else; a phrasing the tool intents do not recognise still reaches the agent through the catch-all. When the tool asks a question, answer with a word from its choices, a number, a date, yes or no, or "the answer is …" for free text. If Alexa keeps mishearing something your server should handle, see [docs/customizing.md](docs/customizing.md).
 
-When you are done: `npm run destroy`. The skill stays in your developer account at no cost; `ask smapi delete-skill --skill-id <id>` removes it.
+When you are done: `npm run destroy`. The Alexa Skill stays in your Amazon developer account at no cost; `ask smapi delete-skill --skill-id <id>` removes it.
 
 ## When something fails
 
 - `npm run doctor -- --track <track>` first. It names the missing piece and the command that fixes it.
 - Every script refuses to run on the wrong Node version and says how to switch.
-- The sample server tells you when its port is taken and which `PORT=` to use instead.
+- The example servers tell you when their port is taken and which `PORT=` to use instead.
 - `npm run chat` explains why it could not reach the MCP server instead of failing on the first turn.
 - [docs/troubleshooting.md](docs/troubleshooting.md) covers cold starts, "still working" loops, dropped elicitation streams, model access, and the Alexa free-text limitation.
 
 ## Commands
 
-| Command                                         | What it does                                                                                                        |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `npm run doctor -- --track local\|cloud\|skill` | Prerequisite check with fixes.                                                                                      |
-| `npm run sample:start`                          | Sample MCP server on port 3939 (`PORT=…` to change; then set `mcp.url`).                                            |
-| `npm run chat`                                  | REPL through the in-process agent. `-- --debug`, `-- --remote`, `-- --budget <ms>`.                                 |
-| `npm run generate`                              | Regenerate the manifest and interaction model. `-- --no-model` for deterministic utterances without a Bedrock call. |
-| `npm run check-model-access`                    | One test call per configured model.                                                                                 |
-| `npm run agent:dev`                             | Build and run the agent container locally on 8080.                                                                  |
-| `npm run synth`                                 | `cdk synth`, no AWS calls.                                                                                          |
-| `npm run deploy` / `npm run destroy`            | The stack.                                                                                                          |
-| `npm test`, `npm run lint`, `npm run build`     | Tests need no AWS credentials; `npm run test:live` runs the round trip with the real model.                         |
+| Command                                         | What it does                                                                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run doctor -- --track local\|cloud\|skill` | Prerequisite check with fixes.                                                                                                              |
+| `npm run sample:start`                          | An example MCP server on port 3939. `EXAMPLE=<name>` picks one, `-- --list` shows them, `PORT=…` moves it. Logs every request and reply.    |
+| `npm run chat`                                  | REPL through the in-process agent. `-- --debug`, `-- --remote`, `-- --budget <ms>`, `-- --record` (what you say becomes sample utterances). |
+| `npm run generate`                              | Regenerate the manifest and interaction model. `-- --no-model` for deterministic utterances without a Bedrock call.                         |
+| `npm run check-model-access`                    | One test call per configured model.                                                                                                         |
+| `npm run agent:dev`                             | Build and run the agent container locally on 8080.                                                                                          |
+| `npm run synth`                                 | `cdk synth`, no AWS calls.                                                                                                                  |
+| `npm run deploy` / `npm run destroy`            | The stack.                                                                                                                                  |
+| `npm run check:leaks`                           | What the pre-commit hook runs: staged files, or `-- --all` for everything a `git add -A` would commit.                                      |
+| `npm test`, `npm run lint`, `npm run build`     | Tests need no AWS credentials; `npm run test:live` runs the round trip with the real model.                                                 |
 
 ## What happens on a turn
 
 ```
-Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► skill Lambda (thin)
+Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► Alexa Skill Lambda (thin)
                                                              │ InvokeAgentRuntime, 6.5 s budget
                                                              ▼
                                               AgentCore Runtime: one microVM per user
@@ -167,24 +183,56 @@ Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► s
                                                      Lambda renders SSML ──► the device speaks
 ```
 
-Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field. Details in [docs/architecture.md](docs/architecture.md).
+Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the Alexa Skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field. Details in [docs/architecture.md](docs/architecture.md).
 
 ## Requirements your server must meet
 
-- MCP protocol **2025-11-25 or later** over **Streamable HTTP**. The bridge declares the `elicitation` capability at `initialize` and refuses older servers.
+- **Streamable HTTP.** The bridge declares the `elicitation` capability at `initialize` and speaks whatever
+  protocol version the MCP SDK negotiates, so older servers work here. An Alexa+ add-on needs
+  **2025-11-25 or later**, the latest known floor, so anything below it gets a warning from
+  `npm run generate`, `npm run doctor`, and the agent log.
 - Elicitation in form mode with flat primitive properties (string, number, integer, boolean, enum). URL-mode elicitation is declined with a spoken explanation.
-- If a tool elicits, the server's `elicitInput` timeout must exceed the MCP SDK's 60 s default, and it should send a `ping` every 15 s or so to keep tunnels from cutting the stream. The sample server shows both.
+- If a tool elicits, the server's `elicitInput` timeout must exceed the MCP SDK's 60 s default, and it should send a `ping` every 15 s or so to keep tunnels from cutting the stream. The example servers show both.
+- **Set `relatedRequestId` on the elicitation** to the tool call's request id, so the question travels on the stream the client is already waiting on. Without it the SDK uses a side channel the client may not have opened yet, and the message is dropped with no error: the call then hangs until it times out. Measured, and the example servers show it.
 
 ## Docs
 
 - [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine, and what was verified against live AWS.
 - [docs/config.md](docs/config.md): every field, default, and effect.
+- [docs/onboarding.md](docs/onboarding.md): the setup procedure an agent follows to walk you through this README.
+- [docs/customizing.md](docs/customizing.md): when Alexa does not understand a phrasing your server should handle — utterances, synonyms, extra intents, and letting `npm run chat -- --record` write them for you.
 - [docs/cost.md](docs/cost.md): a worked example per turn and what costs money when.
 - [docs/troubleshooting.md](docs/troubleshooting.md).
-- [CONTRIBUTING.md](CONTRIBUTING.md) and [CLAUDE.md](CLAUDE.md): layout, style, and the rules for generated files.
+- [docs/decisions.md](docs/decisions.md): every decision with its rationale and what would reverse it, plus the dated verification log.
+- [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): layout, style, naming, and the rules for generated files. `AGENTS.md` is the instruction file for whichever coding agent you use; `CLAUDE.md` is a symlink to it.
+- [docs/history/](docs/history/): the original brief and execution plan, frozen. Provenance, not instruction.
 
 ## Out of scope for v1
 
 Widgets and visual output (`visual` is always null; `_meta.ui.resourceUri` is preserved for later), a web frontend (the CLI harness and the `Turn` contract are its foundation), OAuth authorization-code account linking, other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
+
+## Security, privacy, and what to keep out of git
+
+This is a development bridge, and it is meant to be forked in public. Here is the full list of what that means, what the repo does about it, and what is left to you.
+
+**Things that must not reach a commit.** `git config core.hooksPath .githooks` (from the prerequisites) runs `npm run check:leaks` before every commit and refuses one that carries any of these. Run it yourself any time with `npm run check:leaks -- --all`; override a false positive with `git commit --no-verify`. Before you push, run it once more with `-- --all`. The generated interaction model and tool manifest are meant to be committed: they are deterministic and carry nothing that identifies you. `npm run destroy` puts the placeholder ARN back into `skill-package/skill.json` and drops `BRIDGE_LAMBDA_ARN` from `.env`, so a torn-down clone is committable again.
+
+- **Your MCP endpoint** belongs in `.env` as `BRIDGE_MCP_URL`, never in `bridge.config.ts`.
+- **Your Lambda ARN** goes into `skill-package/skill.json` for `ask deploy` (track C, step 1) and carries your AWS account id. Keep that edit local; the repo ships a placeholder.
+- **Your Alexa Skill id** belongs in `.env` as `BRIDGE_SKILL_ID`.
+- **Never put a token in `mcp.url`.** Use `mcp.auth` with a Secrets Manager secret name; the value stays in Secrets Manager, or in `.env` as `MCP_SECRET_VALUE` for local runs.
+- **The generated manifest and interaction model describe your server**: tool names, descriptions, and input schemas. If that surface is not public, add `packages/skill-lambda/generated/` and `skill-package/interactionModels/` to `.gitignore` in your fork and regenerate after cloning.
+
+**The Alexa Skill Lambda is open until you set your Alexa Skill id.** The Alexa service principal is shared by every Alexa Skill in the world, so until `BRIDGE_SKILL_ID` is set and you have deployed again, any Alexa Skill whose developer knows your function ARN can invoke your Lambda: your Bedrock spend, your agent, your MCP server. This is how most Alexa Skill Lambdas start out and it is fine while your ARN is private. Track C, step 4 closes it; do it before you share anything that names the ARN.
+
+**Your MCP server is trusted.** Its `instructions` go into the agent's system prompt and its tool results go to the model, so a hostile or compromised server can steer what the Alexa Skill says. Point the bridge at servers you control.
+
+**Debug mode logs what people say.** `features.debug` (and the `LOG_LEVEL=debug` it sets on the runtime) puts tool arguments in CloudWatch and in every response. Arguments are whatever the user said: names, dates, destinations. Development only.
+
+**Voice data leaves the device.** Utterances go to Bedrock for the model call. With `memory.shortTerm` or `memory.longTerm` on, they are also stored in AgentCore Memory for 30 days, keyed by a SHA-256 of the Alexa user id: raw Alexa ids never leave the Lambda. Set both to `false` to store nothing. `skill.json` declares `usesPersonalInfo: false`, which holds for a development Alexa Skill you never distribute; revisit it before certification.
+
+**The merged config travels as an environment variable.** `BRIDGE_CONFIG` on the Lambda and on the runtime holds your MCP URL and every other setting, visible to anyone with read access to your AWS account, and it appears in the CloudFormation template. Nothing secret is in there by design; keep it that way.
+
+**Smaller things, on purpose.** The Docker build context excludes `.env` (`.dockerignore`), but `npm run agent:dev` passes the config to `docker run` on the command line, where `ps` can see it. The Secrets Manager grant matches `<your-secret-name>-*`, which is how AWS name suffixes work. Neither matters on a development machine; both are worth knowing if you adapt this for anything else.
 
 License: Apache-2.0. Owner: Kay Lerch.

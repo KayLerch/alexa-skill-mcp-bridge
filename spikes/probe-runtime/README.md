@@ -1,6 +1,6 @@
 # S2: AgentCore Runtime probe
 
-Deploys a minimal arm64 Node container to AgentCore Runtime and drives it through the sequences in `EXECUTION-PLAN.md` section 4.1. This answers whether a promise parked in the microVM survives between invocations, what `HealthyBusy` does, how long a cold start takes, and whether session ids can be reused after a reclaim.
+Deploys a minimal arm64 Node container to AgentCore Runtime and drives it through the sequences in [`docs/history/execution-plan.md`](../../docs/history/execution-plan.md) section 4.1. This answers whether a promise parked in the microVM survives between invocations, what `HealthyBusy` does, how long a cold start takes, and whether session ids can be reused after a reclaim.
 
 ## What it creates
 

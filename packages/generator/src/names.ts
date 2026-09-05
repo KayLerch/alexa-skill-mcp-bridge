@@ -1,4 +1,4 @@
-/** Naming conventions from the plan (section 12): intent PascalCase(tool) + Intent, slot camelCase(argument). */
+/** Naming conventions: intent is PascalCase(tool) + 'Intent', slot is camelCase(argument). */
 
 export function words(name: string): string[] {
   return name

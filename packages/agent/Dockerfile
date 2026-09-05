@@ -15,7 +15,8 @@ COPY packages/cli/package.json packages/cli/
 COPY packages/generator/package.json packages/generator/
 COPY packages/skill-lambda/package.json packages/skill-lambda/
 COPY infra/package.json infra/
-COPY examples/sample-mcp-server/package.json examples/sample-mcp-server/
+# .dockerignore leaves only each example's package.json, so a new example needs no line here.
+COPY examples/ examples/
 
 FROM manifests AS build
 RUN npm ci --no-audit --no-fund --include-workspace-root --workspace packages/core --workspace packages/agent

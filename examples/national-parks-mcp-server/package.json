@@ -1,8 +1,8 @@
 {
-  "name": "@alexa-mcp-bridge/sample-mcp-server",
+  "name": "@alexa-mcp-bridge/national-parks-mcp-server",
   "version": "0.1.0",
   "private": true,
-  "description": "Streamable HTTP MCP server (2025-11-25) with one tool that elicits input. For testing the bridge.",
+  "description": "Streamable HTTP MCP server over a committed extract of public NPS data. Answers depend on park, month and activity, and elicit what is missing. For testing the bridge.",
   "type": "module",
   "main": "./dist/app.js",
   "scripts": {
@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "zod": "^4.5.4"
+    "zod": "^4.5.4",
+    "@alexa-mcp-bridge/mcp-server-harness": "*"
   },
   "types": "./dist/app.d.ts",
   "exports": {
@@ -21,6 +22,6 @@
     }
   },
   "bin": {
-    "sample-mcp-server": "./dist/server.js"
+    "national-parks-mcp-server": "./dist/server.js"
   }
 }

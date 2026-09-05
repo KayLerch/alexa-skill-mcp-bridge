@@ -1,8 +1,11 @@
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, stderr } from 'node:process';
 import { parseArgs } from 'node:util';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import {
   createLogger,
+  findConfigFile,
   hashId,
   loadConfigFile,
   type AnswerHint,
@@ -15,13 +18,14 @@ import { createRemoteBridge } from './remote.js';
 /**
  * npm run chat: a REPL over the Turn contract. In-process by default (the fastest dev loop),
  * --remote through the deployed runtime. Questions are answered at an "answer>" prompt,
- * a pending result is polled the way the skill Lambda would on the next request.
+ * a pending result is polled the way the Alexa Skill Lambda would on the next request.
  */
 
 const { values: args } = parseArgs({
   options: {
     remote: { type: 'boolean', default: false },
     debug: { type: 'boolean', default: false },
+    record: { type: 'boolean', default: false },
     budget: { type: 'string' },
     user: { type: 'string', default: 'local-user' },
     help: { type: 'boolean', default: false },
@@ -32,6 +36,7 @@ if (args.help) {
     'npm run chat [-- --remote] [--debug] [--budget <ms>] [--user <name>]\n' +
       '  --remote  talk to the deployed AgentCore runtime instead of running in-process\n' +
       '  --debug   show tool calls and timings\n' +
+      '  --record  append what you say, and the tool chosen for it, to skill-package/training/<locale>.chat.jsonl for npm run generate\n' +
       '  --budget  simulate the Alexa deadline (default: turn.budgetMs from bridge.config.ts)\n',
   );
   process.exit(0);
@@ -67,20 +72,23 @@ const identity = {
   locale: config.skill.locales[0] as string,
 };
 
+// Recording needs the tool calls to label what was said, so it collects debug output even
+// when nothing prints it.
+const collect = debug || Boolean(args.record);
 const bridge: Bridge = args.remote
   ? createRemoteBridge({
       identity,
       budgetMs,
-      debug,
+      debug: collect,
       region: config.aws.region,
       stillWorkingMessage: config.skill.stillWorkingMessage,
     })
   : createLocalBridge({
-      config: { ...config, features: { ...config.features, debug } },
+      config: { ...config, features: { ...config.features, debug: collect } },
       identity,
       logger,
       budgetMs,
-      debug,
+      debug: collect,
     });
 
 // Lines come through the async iterator so piped input (scripts, smoke tests) works as well
@@ -107,8 +115,8 @@ if (notReady) {
     `\nCould not connect to the MCP server at ${config.mcp.url}: ${notReady}\n\n` +
       'What to check:\n' +
       '  - Is the server running? For the bundled sample: npm run sample:start (in another terminal).\n' +
-      '  - Does mcp.url in bridge.config.ts match its address and port?\n' +
-      '  - Does the server need auth? Set mcp.auth and MCP_SECRET_VALUE for local runs.\n' +
+      '  - Does mcp.url (bridge.config.ts, or BRIDGE_MCP_URL in .env) match its address and port?\n' +
+      '  - Does the server need auth? Set BRIDGE_MCP_AUTH_TYPE, BRIDGE_MCP_SECRET_NAME and MCP_SECRET_VALUE in .env.\n' +
       '  - npm run doctor checks all of this and more.\n',
   );
   await bridge.close();
@@ -127,6 +135,7 @@ for (;;) {
     continue;
   }
   const started = Date.now();
+  const wasAnswer = pendingQuestion;
   const output = pendingQuestion
     ? await bridge.turn({
         type: 'answer',
@@ -134,6 +143,14 @@ for (;;) {
         answer: answerHint(line, pendingQuestion),
       })
     : await bridge.turn({ type: 'turn', utterance: { text: line } });
+  if (args.record) {
+    recordTraining(
+      line,
+      wasAnswer
+        ? { kind: 'answer', expects: wasAnswer.expects }
+        : { kind: 'turn', tool: output.debug?.toolCalls[0]?.name },
+    );
+  }
   await show(output, Date.now() - started);
 }
 
@@ -162,7 +179,7 @@ async function show(output: TurnOutput, elapsedMs?: number): Promise<void> {
     );
   }
   if (output.status === 'pending') {
-    // The skill Lambda polls on the next request; here we poll on the user's behalf.
+    // The Alexa Skill Lambda polls on the next request; here we poll on the user's behalf.
     await new Promise((r) => setTimeout(r, 1000));
     const polled = await bridge.turn({ type: 'poll' });
     if (polled.status !== 'done' || polled.speech) await show(polled);
@@ -178,4 +195,24 @@ function answerHint(text: string, question: Question): AnswerHint {
   }
   if (/^(no|nope)$/i.test(text)) return { yesNo: false, text };
   return { text };
+}
+
+/**
+ * One JSON line per turn: what was said, and what the agent did with it. The generator turns
+ * these into sample utterances (see packages/generator/src/training.ts). Recording is opt-in
+ * and the file is yours to prune; it lives next to the overrides and survives regeneration.
+ */
+function recordTraining(
+  text: string,
+  what: { kind: 'turn'; tool?: string | undefined } | { kind: 'answer'; expects: string },
+): void {
+  const locale = config.skill.locales[0] ?? 'en-US';
+  const file = join(
+    dirname(findConfigFile() ?? process.cwd()),
+    'skill-package',
+    'training',
+    `${locale}.chat.jsonl`,
+  );
+  mkdirSync(dirname(file), { recursive: true });
+  appendFileSync(file, JSON.stringify({ text, ...what, at: new Date().toISOString() }) + '\n');
 }

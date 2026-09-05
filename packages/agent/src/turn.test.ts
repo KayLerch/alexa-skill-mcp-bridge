@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startSampleServer, type SampleServerHandle } from '@alexa-mcp-bridge/sample-mcp-server';
+import {
+  startHotelsWeatherServer,
+  type HotelsWeatherServerHandle,
+} from '@alexa-mcp-bridge/hotels-weather-mcp-server';
 import {
   createLogger,
   hashId,
@@ -17,11 +20,11 @@ import { ScriptedModel, type ScriptStep } from './testing/scripted-model.js';
  * question, pending and poll, cancel, stale answer, new request while a question is pending (D7).
  */
 const logger = createLogger({ service: 'test' }, { write: () => undefined });
-let server: SampleServerHandle;
+let server: HotelsWeatherServerHandle;
 const serverEvents: Record<string, unknown>[] = [];
 
 beforeAll(async () => {
-  server = await startSampleServer({ port: 0, log: (event) => serverEvents.push(event) });
+  server = await startHotelsWeatherServer({ port: 0, log: (event) => serverEvents.push(event) });
 });
 afterAll(async () => {
   await server.close();
@@ -66,7 +69,7 @@ describe('warmup', () => {
     expect(['warming', 'ready']).toContain(session.state);
     expect(await session.ready({ actorId: 'a', locale: 'en-US' }, 5000)).toBe('ready');
     expect(session.state).toBe('ready');
-    expect(session.serverName).toBe('sample-hotel-and-weather');
+    expect(session.serverName).toBe('hotels-and-weather');
     await session.close();
   });
 
@@ -186,7 +189,7 @@ describe('cancel and topic change', () => {
 describe('overrun and poll', () => {
   it('returns pending at the deadline, keeps working, and poll fetches the result', async () => {
     // The scripted model is instant; make the tool slow instead through the sample server's option.
-    const slow = await startSampleServer({ port: 0, slowSeconds: 2, log: () => undefined });
+    const slow = await startHotelsWeatherServer({ port: 0, slowSeconds: 2, log: () => undefined });
     try {
       const { session: slowSession, send: slowSend } = harness(
         [
@@ -218,7 +221,7 @@ describe('overrun and poll', () => {
   }, 30_000);
 
   it('cancel during an overrun aborts the run', async () => {
-    const slow = await startSampleServer({ port: 0, slowSeconds: 3, log: () => undefined });
+    const slow = await startHotelsWeatherServer({ port: 0, slowSeconds: 3, log: () => undefined });
     try {
       const { session, send } = harness(
         [{ toolUse: { name: 'get_weather', input: { city: 'Berlin' } } }, { text: 'never spoken' }],

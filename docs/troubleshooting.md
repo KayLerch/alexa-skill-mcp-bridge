@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## "I'm still starting up" every time I open the skill
+## "I'm still starting up" every time I open the Alexa Skill
 
 The launch hit a cold runtime: provisioning the microVM plus MCP `initialize` took longer than `turn.budgetMs`. The runtime keeps warming up after the Lambda gives up, so the second launch within `runtime.idleTimeoutMinutes` should greet you. If every launch is cold:
 
@@ -16,7 +16,7 @@ A turn runs past the budget on every request. Look at the `run finished` log lin
 Elicitation parks the `tools/call` stream between turns. Anything on the path can cut it:
 
 - **The MCP SDK's default request timeout is 60 seconds** on the server side (`elicitInput`) and on the client side (`callTool`). The bridge's client waits up to 10 minutes; your server must pass a longer `timeout` to `elicitInput` too. The sample server uses 10 minutes.
-- **Tunnels and proxies** (cloudflared quick tunnels, ALBs, API Gateway) drop idle streams. The sample server sends an MCP `ping` every 15 seconds while it waits; do the same in yours. If it still drops, use a named cloudflared tunnel or a host with a longer idle timeout.
+- **Tunnels and proxies** (cloudflared quick tunnels, ALBs, API Gateway) drop idle streams. The example servers send an MCP `ping` every 15 seconds while it waits; do the same in yours. If it still drops, use a named cloudflared tunnel or a host with a longer idle timeout.
 - **`elicitation.answerTimeoutSeconds`** (default 120) cancels the question on the bridge side; the server sees `action: cancel`.
 - **`runtime.idleTimeoutMinutes`**: if the user walks away, the microVM and the parked promise are reclaimed together.
 
@@ -24,7 +24,7 @@ The runtime log says which one happened: `answer timeout`, `mcp transport closed
 
 ## Free-text answers are not understood
 
-Alexa only delivers free text through a carrier phrase. When the bridge asks a `text` question, answer with "the answer is …" or "it's …". Numbers and dates work bare. This is a limit of custom skills, not of the bridge; Alexa+ add-ons receive the transcript directly.
+Alexa only delivers free text through a carrier phrase. When the bridge asks a `text` question, answer with "the answer is …" or "it's …". Numbers and dates work bare. This is a limit of custom Alexa Skills, not of the bridge; Alexa+ add-ons receive the transcript directly.
 
 ## The generated interaction model fails validation
 
@@ -36,7 +36,7 @@ Enable Amazon Nova 2 Lite in the Bedrock console for us-east-1 (Model access), t
 
 ## The deploy warns that the Lambda permission is open
 
-Until `skill.id` is set in `bridge.config.ts`, any skill could invoke the Lambda (the ASK SDK still checks the application id when `skill.id` is set). After `ask deploy` prints your skill id, set it and run `npm run deploy` again.
+Until `skill.id` is set, any Alexa Skill could invoke the Lambda (the ASK SDK also checks the application id once it is set). `npm run skill:deploy` writes your Alexa Skill id into `.env` as `BRIDGE_SKILL_ID`; run `npm run deploy` again to apply the lock.
 
 ## "runtimeSessionId" errors
 
@@ -46,6 +46,10 @@ The runtime session id must be at least 33 characters and contain no dots. The b
 
 An npm 10 resolver bug triggered by some peer-dependency sets. The repo pins versions that install cleanly; if you upgraded a dependency, try `npm install --legacy-peer-deps` to confirm, then pick a version that installs without it.
 
-## The sample server says its port is in use
+## An example server says its port is in use
 
-Another program holds the port. `PORT=3940 npm run sample:start`, then set `mcp.url` in `bridge.config.ts` to `http://localhost:3940/mcp`.
+Another program holds the port. `PORT=3940 npm run sample:start`, then set `BRIDGE_MCP_URL=http://localhost:3940/mcp` in `.env`.
+
+## A commit was refused: "values that should not be in a public repo"
+
+`npm run check:leaks` runs before every commit once you set `git config core.hooksPath .githooks`. It found your AWS account id, Alexa Skill id, MCP endpoint, a tunnel host, or credentials inside a URL in a staged file. Move the value to `.env` (see [config.md](config.md)), unstage the file, and commit again. `skill-package/skill.json` is the one file that legitimately holds your Lambda ARN locally (`npm run skill:deploy` writes it there, `npm run destroy` puts the placeholder back): keep that edit out of commits. If the hit really is a placeholder or an example, `git commit --no-verify` goes through.

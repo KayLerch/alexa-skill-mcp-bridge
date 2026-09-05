@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { assertProtocolVersion, type BridgeConfig } from '@alexa-mcp-bridge/core';
+import { requireProtocolVersion, type BridgeConfig } from '@alexa-mcp-bridge/core';
 import { resolveScanAuth } from './auth.js';
 
 /** What the generator needs from the server: identity, instructions, and the tool list. */
@@ -39,10 +39,7 @@ export async function scanServer(config: BridgeConfig): Promise<ScanResult> {
   }
 
   try {
-    const protocolVersion = assertProtocolVersion(
-      transport.protocolVersion,
-      config.mcp.protocolVersion,
-    );
+    const protocolVersion = requireProtocolVersion(transport.protocolVersion);
     const server = client.getServerVersion();
     const instructions = client.getInstructions();
     const { tools } = await client.listTools();

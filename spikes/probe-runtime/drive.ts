@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-bedrock-agentcore';
 
 /**
- * S2 driver. Runs the sequences from EXECUTION-PLAN.md section 4.1 against the probe runtime.
+ * S2 driver. Runs the sequences from docs/history/execution-plan.md section 4.1 against the probe runtime.
  * Usage: node drive.ts --sequence 1|2|3|4|5|6|7|8|all [--runtime-arn arn] [--tunnel-url https://…/mcp]
  * The runtime ARN defaults to cdk-outputs.json written by `npx cdk deploy --outputs-file cdk-outputs.json`.
  */

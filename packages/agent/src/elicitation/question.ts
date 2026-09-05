@@ -1,10 +1,20 @@
 import type { ElicitRequestParams } from '@modelcontextprotocol/sdk/types.js';
 import type { QuestionExpects } from '@alexa-mcp-bridge/core';
+import { cleanSpeech } from '../speech.js';
 
 /**
  * Elicitation params → the questions a voice can ask, one property at a time (plan D5).
- * Deterministic: the server's message is spoken as-is; enum choices are appended.
+ * Deterministic, and the voice rules live here rather than in a prompt because the model never
+ * sees this text: the server's message is cleaned up and spoken, and choices are offered as
+ * examples rather than read out as a menu.
  */
+
+/** Voice rules from config.speech. */
+export interface SpeechStyle {
+  maxChoicesSpoken: number;
+}
+
+const DEFAULT_STYLE: SpeechStyle = { maxChoicesSpoken: 3 };
 
 export type PropertySchema = Record<string, unknown> & { type?: string };
 
@@ -20,7 +30,10 @@ export interface QuestionSpec {
 export type ElicitationPlan =
   { mode: 'form'; questions: QuestionSpec[] } | { mode: 'url'; url: string; message: string };
 
-export function planElicitation(params: ElicitRequestParams): ElicitationPlan {
+export function planElicitation(
+  params: ElicitRequestParams,
+  style: SpeechStyle = DEFAULT_STYLE,
+): ElicitationPlan {
   if (params.mode === 'url') {
     return { mode: 'url', url: params.url, message: params.message };
   }
@@ -43,7 +56,16 @@ export function planElicitation(params: ElicitRequestParams): ElicitationPlan {
       expects,
       ...(choices ? { choices } : {}),
       required: required.has(property),
-      message: questionMessage(params.message, property, schema, expects, choices, multi, index),
+      message: questionMessage(
+        params.message,
+        property,
+        schema,
+        expects,
+        choices,
+        multi,
+        index,
+        style,
+      ),
     };
   });
   return { mode: 'form', questions };
@@ -116,18 +138,25 @@ function questionMessage(
   choices: string[] | undefined,
   multi: boolean,
   index: number,
+  style: SpeechStyle,
 ): string {
   const label = (schema.title as string | undefined) ?? humanize(property);
+  // The server wrote this for a reader, not a listener: strip markdown, links and emoji.
+  const spoken = cleanSpeech(message);
   let text: string;
   if (!multi) {
-    text = message.trim();
+    text = spoken;
   } else if (index === 0) {
-    text = `${message.trim()} First, ${propertyQuestion(label, expects)}`;
+    text = `${spoken} First, ${propertyQuestion(label, expects)}`;
   } else {
     text = capitalize(propertyQuestion(label, expects));
   }
   if (choices?.length) {
-    text += ` ${spokenChoices(choices)}`;
+    // A server that already offers the options in its own sentence should not be echoed.
+    const offer = alreadyOffers(text, choices)
+      ? ''
+      : spokenChoices(choices, style.maxChoicesSpoken);
+    if (offer) text += ` ${offer}`;
   } else if (expects === 'yesNo' && !/\byes\b.*\bno\b/i.test(text)) {
     text += ' Yes or no?';
   }
@@ -149,11 +178,51 @@ function propertyQuestion(label: string, expects: QuestionExpects): string {
   }
 }
 
-export function spokenChoices(choices: string[]): string {
+/** Two or more of the choices already named in the question is an offer, not a coincidence. */
+function alreadyOffers(message: string, choices: string[]): boolean {
+  const lower = message.toLowerCase();
+  return choices.filter((c) => lower.includes(c.trim().toLowerCase())).length >= 2;
+}
+
+const MONTHS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+];
+const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+/** Sets a listener already knows. Reading them out teaches nothing and costs seconds. */
+function isKnownSet(choices: string[]): boolean {
+  const lower = choices.map((c) => c.trim().toLowerCase());
+  const all = (set: string[]) => lower.length >= 4 && lower.every((c) => set.includes(c));
+  return all(MONTHS) || all(WEEKDAYS);
+}
+
+/**
+ * What to say after the question. Empty when the choices speak for themselves, the whole list
+ * when it is short enough to hold in your head, and a few examples when it is not: the answer
+ * mapper matches anything the schema allows, so the list was never a menu.
+ */
+export function spokenChoices(choices: string[], max = 3): string {
+  if (isKnownSet(choices)) return '';
   if (choices.length === 1) return `The option is ${choices[0]}.`;
-  if (choices.length === 2) return `The options are ${choices[0]} or ${choices[1]}.`;
-  const head = choices.slice(0, -1).join(', ');
-  return `The options are ${head}, or ${choices[choices.length - 1]}.`;
+  if (choices.length <= max) {
+    if (choices.length === 2) return `The options are ${choices[0]} or ${choices[1]}.`;
+    const head = choices.slice(0, -1).join(', ');
+    return `The options are ${head}, or ${choices[choices.length - 1]}.`;
+  }
+  const examples = choices.slice(0, max);
+  const head = examples.slice(0, -1).join(', ');
+  return `For example ${head}, or ${examples[examples.length - 1]}.`;
 }
 
 export function humanize(property: string): string {

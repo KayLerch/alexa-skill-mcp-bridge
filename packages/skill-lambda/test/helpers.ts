@@ -13,7 +13,7 @@ export const config = parseConfig({
 export const manifest: ToolManifest = {
   _generated: { by: 'test', notice: 'test' },
   protocolVersion: '2025-11-25',
-  server: { name: 'sample-hotel-and-weather' },
+  server: { name: 'hotels-and-weather' },
   tools: [
     {
       name: 'search_hotels',

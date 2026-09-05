@@ -110,12 +110,25 @@ export function enumTypeName(toolName: string, argument: string): string {
   return `${pascalCase(toolName)}${pascalCase(argument)}Type`;
 }
 
+/** Alexa rejects an entity-resolution id with whitespace; the spoken value stays as written. */
+export function slotValueId(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
 function enumType(toolName: string, argument: string, schema: Property): CustomSlotType {
   return {
     name: enumTypeName(toolName, argument),
     values: enumValues(schema).map(({ value, id }) => {
       const spoken = spokenWords(value) || value.toLowerCase();
-      return spoken === value ? { value, id } : { value: spoken, id, synonyms: [value] };
+      const safeId = slotValueId(id);
+      return spoken === value
+        ? { value, id: safeId }
+        : { value: spoken, id: safeId, synonyms: [value] };
     }),
   };
 }

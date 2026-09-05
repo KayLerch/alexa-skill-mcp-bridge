@@ -1,5 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startSampleServer, type SampleServerHandle } from '@alexa-mcp-bridge/sample-mcp-server';
+import {
+  startHotelsWeatherServer,
+  type HotelsWeatherServerHandle,
+} from '@alexa-mcp-bridge/hotels-weather-mcp-server';
 import { ScriptedModel, createModel } from '@alexa-mcp-bridge/agent';
 import { createLogger, hashId, parseConfig } from '@alexa-mcp-bridge/core';
 import { createLocalBridge } from '../src/bridge.js';
@@ -14,9 +17,9 @@ const logger = createLogger(
   { level: 'debug', write: live ? (line) => process.stderr.write(line + '\n') : () => undefined },
 );
 
-let server: SampleServerHandle;
+let server: HotelsWeatherServerHandle;
 beforeAll(async () => {
-  server = await startSampleServer({ port: 0, log: () => undefined });
+  server = await startHotelsWeatherServer({ port: 0, log: () => undefined });
 });
 afterAll(async () => {
   await server.close();
@@ -41,7 +44,7 @@ describe('hotel search with the guests elicitation', () => {
             },
           },
           {
-            text: 'I found three hotels in Berlin. The top rated is Hotel Adlon at three hundred twenty euros a night. Want to hear more?',
+            text: 'I found three hotels in Berlin. The top rated is Hotel Brandenburg Palais at three hundred twenty euros a night. Want to hear more?',
           },
         ]);
     const bridge = createLocalBridge({
@@ -71,7 +74,7 @@ describe('hotel search with the guests elicitation', () => {
         answer: { text: 'two' },
       });
       expect(second.status).toBe('done');
-      expect(second.speech.toLowerCase()).toContain('adlon');
+      expect(second.speech.toLowerCase()).toContain('brandenburg');
       expect(second.visual).toBeNull();
       expect(second.debug?.toolCalls).toEqual([
         expect.objectContaining({ name: 'search_hotels', status: 'success' }),
@@ -81,7 +84,7 @@ describe('hotel search with the guests elicitation', () => {
         const toolResultTurn = model.calls.at(-1)?.at(-1);
         const json = JSON.stringify(toolResultTurn?.toJSON());
         expect(json).toContain('"guests":2');
-        expect(json).toContain('Hotel Adlon');
+        expect(json).toContain('Hotel Brandenburg Palais');
       }
     } finally {
       await bridge.close();

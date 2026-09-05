@@ -5,11 +5,15 @@ cdk.out/
 cdk-outputs.json
 .env
 .env.*
+!.env.example
 *.log
 .DS_Store
 coverage/
-skill-package/.ask/
 spikes/*/cdk.out/
 spikes/*/node_modules/
 spikes/*/results/
 .ask/
+
+# Agent tooling: share the commands, keep personal settings out.
+.claude/settings.local.json
+.claude/*.local.json

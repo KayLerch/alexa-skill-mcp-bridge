@@ -1,10 +1,10 @@
 # S6: ASK deploy order
 
-Tests the cleaner setup order the brief asks about: obtain the skill id first (SMAPI create with no endpoint), then one CDK deploy with a tightened Lambda permission, then set the endpoint.
+Tests whether a cleaner setup order exists than the two-deploy one the README documents: obtain the Alexa Skill id first (SMAPI create with no endpoint), then one CDK deploy with a tightened Lambda permission, then set the endpoint.
 
 ## What it creates
 
-- A development-stage custom skill in your Alexa developer account (no cost).
+- A development-stage custom Alexa Skill in your Alexa developer account (no cost).
 - A hello-world Lambda with the Alexa Skills Kit trigger permission (free tier).
 
 ## Run

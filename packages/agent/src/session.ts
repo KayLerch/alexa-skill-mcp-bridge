@@ -12,7 +12,7 @@ import { TurnRun } from './turn-run.js';
 
 /**
  * One BridgeSession per container, one container per user. Holds the MCP client, the agent,
- * the question queue, and the run in progress. State names follow the plan's table (6.2).
+ * the question queue, and the run in progress. State names follow the table in docs/architecture.md.
  */
 
 export type SessionState =
@@ -59,6 +59,7 @@ export class BridgeSession {
     this.logger = options.logger;
     this.queue = new QuestionQueue({
       answerTimeoutMs: options.config.elicitation.answerTimeoutSeconds * 1000,
+      speech: { maxChoicesSpoken: options.config.speech.maxChoicesSpoken },
       logger: options.logger,
     });
   }
@@ -153,7 +154,6 @@ export class BridgeSession {
       url: gatewayUrl ?? config.mcp.url,
       auth,
       ...(gatewayUrl ? { fetch: sigV4Fetch(config.aws.region) } : {}),
-      minProtocolVersion: config.mcp.protocolVersion,
       callTimeoutMs: TOOL_CALL_TIMEOUT_MS,
       onElicitation: (params) => this.queue.elicit(params),
       logger,
@@ -175,6 +175,8 @@ export class BridgeSession {
       locale: identity.locale,
       today,
       memoryContext,
+      maxSentences: config.speech.maxSentences,
+      maxChoicesSpoken: config.speech.maxChoicesSpoken,
     });
     this.mcp = mcp;
     this.agent = buildAgent({

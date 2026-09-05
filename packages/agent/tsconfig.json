@@ -5,5 +5,5 @@
     "outDir": "dist"
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }, { "path": "../../examples/sample-mcp-server" }]
+  "references": [{ "path": "../core" }, { "path": "../../examples/hotels-weather-mcp-server" }]
 }

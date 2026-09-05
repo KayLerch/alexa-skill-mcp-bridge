@@ -14,6 +14,6 @@
     "@aws-sdk/client-bedrock-agentcore": "^3.1125.0"
   },
   "devDependencies": {
-    "@alexa-mcp-bridge/sample-mcp-server": "0.1.0"
+    "@alexa-mcp-bridge/hotels-weather-mcp-server": "0.1.0"
   }
 }

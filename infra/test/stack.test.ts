@@ -83,14 +83,12 @@ describe('AlexaMcpBridgeStack', () => {
     });
   });
 
-  it('creates a cost budget and sets log retention everywhere', () => {
-    const { template } = synth({ aws: { budgetUsd: 7, logRetentionDays: 7 } });
-    template.hasResourceProperties('AWS::Budgets::Budget', {
-      Budget: { BudgetLimit: { Amount: 7, Unit: 'USD' }, BudgetType: 'COST', TimeUnit: 'MONTHLY' },
-    });
+  it('sets log retention on every log group and creates no cost alarm', () => {
+    const { template } = synth({ aws: { logRetentionDays: 7 } });
     for (const group of Object.values(template.findResources('AWS::Logs::LogGroup'))) {
       expect((group.Properties as { RetentionInDays?: number }).RetentionInDays).toBe(7);
     }
+    expect(Object.keys(template.findResources('AWS::Budgets::Budget'))).toHaveLength(0);
   });
 
   it('grants the runtime the model, memory, and secret it needs', () => {

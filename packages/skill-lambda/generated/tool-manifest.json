@@ -1,107 +1,605 @@
 {
   "_generated": {
     "by": "alexa-skill-mcp-bridge generator",
-    "notice": "Generated file. Do not edit by hand; run `npm run generate`.",
-    "source": "http://localhost:3939/mcp"
+    "notice": "Generated file. Do not edit by hand; run `npm run generate`."
   },
   "protocolVersion": "2025-11-25",
   "server": {
-    "name": "sample-hotel-and-weather",
+    "name": "national-parks",
     "version": "0.1.0",
-    "instructions": "This server searches hotels and reports weather in a few European and US cities. Hotel search needs a destination, check-in and check-out dates, and the number of guests; if guests is missing the tool asks for it. Prices are per night in euros."
+    "instructions": "This server answers questions about fourteen US national parks from a fixed extract of public National Park Service data: which activities each park offers, what is open in which month, and what each park is known for. Ask about a named park, or ask which park suits an activity, a month, or a state. The answer depends on all three, so a tool asks for what is missing when the question would otherwise be underdetermined. Unofficial demo, not affiliated with the National Park Service."
   },
   "tools": [
     {
-      "name": "search_hotels",
-      "description": "Find hotels in a destination city for a date range. Returns up to three matches sorted by rating. Asks for the number of guests when it is not provided.",
-      "intent": "SearchHotelsIntent",
+      "name": "plan_park_visit",
+      "description": "What a named national park is like in a given month: what is open, what is limited, and what the park is known for. Asks which month when none is given, because access changes through the year.",
+      "intent": "PlanParkVisitIntent",
       "slots": [
         {
-          "argument": "checkIn",
-          "slot": "checkIn",
-          "slotType": "AMAZON.DATE",
-          "required": true
+          "argument": "park",
+          "slot": "park",
+          "slotType": "ParkType",
+          "required": true,
+          "customType": {
+            "name": "ParkType",
+            "values": [
+              {
+                "value": "yosemite",
+                "id": "yosemite",
+                "synonyms": [
+                  "Yosemite"
+                ]
+              },
+              {
+                "value": "yellowstone",
+                "id": "yellowstone",
+                "synonyms": [
+                  "Yellowstone"
+                ]
+              },
+              {
+                "value": "glacier",
+                "id": "glacier",
+                "synonyms": [
+                  "Glacier"
+                ]
+              },
+              {
+                "value": "grand canyon",
+                "id": "grand_canyon",
+                "synonyms": [
+                  "Grand Canyon"
+                ]
+              },
+              {
+                "value": "everglades",
+                "id": "everglades",
+                "synonyms": [
+                  "Everglades"
+                ]
+              },
+              {
+                "value": "katmai",
+                "id": "katmai",
+                "synonyms": [
+                  "Katmai"
+                ]
+              },
+              {
+                "value": "great basin",
+                "id": "great_basin",
+                "synonyms": [
+                  "Great Basin"
+                ]
+              },
+              {
+                "value": "acadia",
+                "id": "acadia",
+                "synonyms": [
+                  "Acadia"
+                ]
+              },
+              {
+                "value": "zion",
+                "id": "zion",
+                "synonyms": [
+                  "Zion"
+                ]
+              },
+              {
+                "value": "rocky mountain",
+                "id": "rocky_mountain",
+                "synonyms": [
+                  "Rocky Mountain"
+                ]
+              },
+              {
+                "value": "olympic",
+                "id": "olympic",
+                "synonyms": [
+                  "Olympic"
+                ]
+              },
+              {
+                "value": "joshua tree",
+                "id": "joshua_tree",
+                "synonyms": [
+                  "Joshua Tree"
+                ]
+              },
+              {
+                "value": "great smoky mountains",
+                "id": "great_smoky_mountains",
+                "synonyms": [
+                  "Great Smoky Mountains"
+                ]
+              },
+              {
+                "value": "bryce canyon",
+                "id": "bryce_canyon",
+                "synonyms": [
+                  "Bryce Canyon"
+                ]
+              }
+            ]
+          }
         },
         {
-          "argument": "checkOut",
-          "slot": "checkOut",
-          "slotType": "AMAZON.DATE",
-          "required": true
-        },
-        {
-          "argument": "guests",
-          "slot": "guests",
-          "slotType": "AMAZON.NUMBER",
-          "required": false
-        },
-        {
-          "argument": "destination",
-          "slot": "destination",
-          "slotType": "AMAZON.SearchQuery",
-          "required": true
+          "argument": "month",
+          "slot": "month",
+          "slotType": "MonthType",
+          "required": false,
+          "customType": {
+            "name": "MonthType",
+            "values": [
+              {
+                "value": "january",
+                "id": "january",
+                "synonyms": [
+                  "January"
+                ]
+              },
+              {
+                "value": "february",
+                "id": "february",
+                "synonyms": [
+                  "February"
+                ]
+              },
+              {
+                "value": "march",
+                "id": "march",
+                "synonyms": [
+                  "March"
+                ]
+              },
+              {
+                "value": "april",
+                "id": "april",
+                "synonyms": [
+                  "April"
+                ]
+              },
+              {
+                "value": "may",
+                "id": "may",
+                "synonyms": [
+                  "May"
+                ]
+              },
+              {
+                "value": "june",
+                "id": "june",
+                "synonyms": [
+                  "June"
+                ]
+              },
+              {
+                "value": "july",
+                "id": "july",
+                "synonyms": [
+                  "July"
+                ]
+              },
+              {
+                "value": "august",
+                "id": "august",
+                "synonyms": [
+                  "August"
+                ]
+              },
+              {
+                "value": "september",
+                "id": "september",
+                "synonyms": [
+                  "September"
+                ]
+              },
+              {
+                "value": "october",
+                "id": "october",
+                "synonyms": [
+                  "October"
+                ]
+              },
+              {
+                "value": "november",
+                "id": "november",
+                "synonyms": [
+                  "November"
+                ]
+              },
+              {
+                "value": "december",
+                "id": "december",
+                "synonyms": [
+                  "December"
+                ]
+              }
+            ]
+          }
         }
       ],
       "elicitedArguments": [],
       "inputSchema": {
         "type": "object",
         "properties": {
-          "destination": {
+          "park": {
             "type": "string",
-            "description": "City to search in, e.g. Berlin"
+            "enum": [
+              "Yosemite",
+              "Yellowstone",
+              "Glacier",
+              "Grand Canyon",
+              "Everglades",
+              "Katmai",
+              "Great Basin",
+              "Acadia",
+              "Zion",
+              "Rocky Mountain",
+              "Olympic",
+              "Joshua Tree",
+              "Great Smoky Mountains",
+              "Bryce Canyon"
+            ],
+            "description": "The national park, by name"
           },
-          "checkIn": {
+          "month": {
+            "description": "Month of the visit",
             "type": "string",
-            "description": "Check-in date, ISO 8601 (YYYY-MM-DD)"
-          },
-          "checkOut": {
-            "type": "string",
-            "description": "Check-out date, ISO 8601 (YYYY-MM-DD)"
-          },
-          "guests": {
-            "description": "Number of guests, 1 to 6",
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 6
+            "enum": [
+              "January",
+              "February",
+              "March",
+              "April",
+              "May",
+              "June",
+              "July",
+              "August",
+              "September",
+              "October",
+              "November",
+              "December"
+            ]
           }
         },
         "required": [
-          "destination",
-          "checkIn",
-          "checkOut"
+          "park"
         ],
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
     },
     {
-      "name": "get_weather",
-      "description": "Current weather for a city: conditions plus high and low temperature in Celsius.",
-      "intent": "GetWeatherIntent",
+      "name": "find_park",
+      "description": "Which national park suits an activity, a month, a state, or any combination of them. Answers outright when an activity is given; asks what the visitor wants to do when it is missing, because a month or a state alone leaves several parks in the running.",
+      "intent": "FindParkIntent",
       "slots": [
         {
-          "argument": "city",
-          "slot": "city",
-          "slotType": "AMAZON.SearchQuery",
-          "required": true
+          "argument": "activity",
+          "slot": "activity",
+          "slotType": "ActivityType",
+          "required": false,
+          "customType": {
+            "name": "ActivityType",
+            "values": [
+              {
+                "value": "hiking",
+                "id": "hiking"
+              },
+              {
+                "value": "wildlife watching",
+                "id": "wildlife_watching"
+              },
+              {
+                "value": "fishing",
+                "id": "fishing"
+              },
+              {
+                "value": "stargazing",
+                "id": "stargazing"
+              },
+              {
+                "value": "paddling",
+                "id": "paddling"
+              },
+              {
+                "value": "scenic driving",
+                "id": "scenic_driving"
+              },
+              {
+                "value": "camping",
+                "id": "camping"
+              },
+              {
+                "value": "biking",
+                "id": "biking"
+              },
+              {
+                "value": "climbing",
+                "id": "climbing"
+              },
+              {
+                "value": "winter sports",
+                "id": "winter_sports"
+              },
+              {
+                "value": "ranger programs",
+                "id": "ranger_programs"
+              }
+            ]
+          }
+        },
+        {
+          "argument": "month",
+          "slot": "month",
+          "slotType": "MonthType",
+          "required": false,
+          "customType": {
+            "name": "MonthType",
+            "values": [
+              {
+                "value": "january",
+                "id": "january",
+                "synonyms": [
+                  "January"
+                ]
+              },
+              {
+                "value": "february",
+                "id": "february",
+                "synonyms": [
+                  "February"
+                ]
+              },
+              {
+                "value": "march",
+                "id": "march",
+                "synonyms": [
+                  "March"
+                ]
+              },
+              {
+                "value": "april",
+                "id": "april",
+                "synonyms": [
+                  "April"
+                ]
+              },
+              {
+                "value": "may",
+                "id": "may",
+                "synonyms": [
+                  "May"
+                ]
+              },
+              {
+                "value": "june",
+                "id": "june",
+                "synonyms": [
+                  "June"
+                ]
+              },
+              {
+                "value": "july",
+                "id": "july",
+                "synonyms": [
+                  "July"
+                ]
+              },
+              {
+                "value": "august",
+                "id": "august",
+                "synonyms": [
+                  "August"
+                ]
+              },
+              {
+                "value": "september",
+                "id": "september",
+                "synonyms": [
+                  "September"
+                ]
+              },
+              {
+                "value": "october",
+                "id": "october",
+                "synonyms": [
+                  "October"
+                ]
+              },
+              {
+                "value": "november",
+                "id": "november",
+                "synonyms": [
+                  "November"
+                ]
+              },
+              {
+                "value": "december",
+                "id": "december",
+                "synonyms": [
+                  "December"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "argument": "state",
+          "slot": "state",
+          "slotType": "StateType",
+          "required": false,
+          "customType": {
+            "name": "StateType",
+            "values": [
+              {
+                "value": "alaska",
+                "id": "alaska",
+                "synonyms": [
+                  "Alaska"
+                ]
+              },
+              {
+                "value": "arizona",
+                "id": "arizona",
+                "synonyms": [
+                  "Arizona"
+                ]
+              },
+              {
+                "value": "california",
+                "id": "california",
+                "synonyms": [
+                  "California"
+                ]
+              },
+              {
+                "value": "colorado",
+                "id": "colorado",
+                "synonyms": [
+                  "Colorado"
+                ]
+              },
+              {
+                "value": "florida",
+                "id": "florida",
+                "synonyms": [
+                  "Florida"
+                ]
+              },
+              {
+                "value": "idaho",
+                "id": "idaho",
+                "synonyms": [
+                  "Idaho"
+                ]
+              },
+              {
+                "value": "maine",
+                "id": "maine",
+                "synonyms": [
+                  "Maine"
+                ]
+              },
+              {
+                "value": "montana",
+                "id": "montana",
+                "synonyms": [
+                  "Montana"
+                ]
+              },
+              {
+                "value": "nevada",
+                "id": "nevada",
+                "synonyms": [
+                  "Nevada"
+                ]
+              },
+              {
+                "value": "north carolina",
+                "id": "north_carolina",
+                "synonyms": [
+                  "North Carolina"
+                ]
+              },
+              {
+                "value": "tennessee",
+                "id": "tennessee",
+                "synonyms": [
+                  "Tennessee"
+                ]
+              },
+              {
+                "value": "utah",
+                "id": "utah",
+                "synonyms": [
+                  "Utah"
+                ]
+              },
+              {
+                "value": "washington",
+                "id": "washington",
+                "synonyms": [
+                  "Washington"
+                ]
+              },
+              {
+                "value": "wyoming",
+                "id": "wyoming",
+                "synonyms": [
+                  "Wyoming"
+                ]
+              }
+            ]
+          }
         }
       ],
       "elicitedArguments": [],
       "inputSchema": {
         "type": "object",
         "properties": {
-          "city": {
+          "activity": {
+            "description": "What the visitor wants to do",
             "type": "string",
-            "description": "City name, e.g. Hamburg"
+            "enum": [
+              "hiking",
+              "wildlife watching",
+              "fishing",
+              "stargazing",
+              "paddling",
+              "scenic driving",
+              "camping",
+              "biking",
+              "climbing",
+              "winter sports",
+              "ranger programs"
+            ]
+          },
+          "month": {
+            "description": "Month of the visit",
+            "type": "string",
+            "enum": [
+              "January",
+              "February",
+              "March",
+              "April",
+              "May",
+              "June",
+              "July",
+              "August",
+              "September",
+              "October",
+              "November",
+              "December"
+            ]
+          },
+          "state": {
+            "description": "US state to look in",
+            "type": "string",
+            "enum": [
+              "Alaska",
+              "Arizona",
+              "California",
+              "Colorado",
+              "Florida",
+              "Idaho",
+              "Maine",
+              "Montana",
+              "Nevada",
+              "North Carolina",
+              "Tennessee",
+              "Utah",
+              "Washington",
+              "Wyoming"
+            ]
           }
         },
-        "required": [
-          "city"
-        ],
         "$schema": "http://json-schema.org/draft-07/schema#"
       }
     }
   ],
   "examplePhrases": [
-    "search hotels check in on tomorrow",
-    "get weather city some city"
+    "what is yosemite like in january",
+    "what is the best national park for hiking"
   ]
 }

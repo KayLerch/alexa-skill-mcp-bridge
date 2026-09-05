@@ -10,8 +10,8 @@ export default defineConfig({
     alias: {
       '@alexa-mcp-bridge/core': src('core'),
       '@alexa-mcp-bridge/agent': src('agent'),
-      '@alexa-mcp-bridge/sample-mcp-server': fileURLToPath(
-        new URL('./examples/sample-mcp-server/src/app.ts', import.meta.url),
+      '@alexa-mcp-bridge/hotels-weather-mcp-server': fileURLToPath(
+        new URL('./examples/hotels-weather-mcp-server/src/app.ts', import.meta.url),
       ),
     },
   },

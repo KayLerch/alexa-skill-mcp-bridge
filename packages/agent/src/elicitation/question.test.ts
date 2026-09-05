@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { choiceValueFor, choicesFor, expectsFor, planElicitation } from './question.js';
+import {
+  choiceValueFor,
+  choicesFor,
+  expectsFor,
+  planElicitation,
+  spokenChoices,
+} from './question.js';
 
 const form = (
   properties: Record<string, unknown>,
@@ -111,5 +117,62 @@ describe('choices', () => {
     const multi = { type: 'array', items: { type: 'string', enum: ['a', 'b'] } };
     expect(expectsFor(multi)).toBe('choice');
     expect(choiceValueFor(multi, 'b')).toBe('b');
+  });
+});
+
+describe('voice rules for choices', () => {
+  const elicit = (values: string[], message = 'Pick one.') =>
+    planElicitation(
+      {
+        mode: 'form',
+        message,
+        requestedSchema: {
+          type: 'object',
+          properties: { pick: { type: 'string', enum: values } },
+          required: ['pick'],
+        },
+      } as never,
+      { maxChoicesSpoken: 3 },
+    );
+
+  it('reads a short list in full', () => {
+    expect(spokenChoices(['hiking', 'fishing'], 3)).toBe('The options are hiking or fishing.');
+    expect(spokenChoices(['a', 'b', 'c'], 3)).toBe('The options are a, b, or c.');
+  });
+
+  it('offers examples instead of reading a long list', () => {
+    const eleven = ['hiking', 'wildlife watching', 'fishing', 'stargazing', 'paddling', 'biking'];
+    expect(spokenChoices(eleven, 3)).toBe('For example hiking, wildlife watching, or fishing.');
+  });
+
+  it('says nothing extra for a set the listener already knows', () => {
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    expect(spokenChoices(months, 3)).toBe('');
+    const plan = elicit(months, 'Which month are you thinking of?');
+    if (plan.mode !== 'form') throw new Error('expected a form');
+    expect(plan.questions[0]?.message).toBe('Which month are you thinking of?');
+    // The value list is still there for the answer mapper, only the speech is shorter.
+    expect(plan.questions[0]?.choices).toHaveLength(12);
+  });
+
+  it('cleans up a server message written for a screen', () => {
+    const plan = elicit(['a', 'b'], 'Pick one. See **the guide** at https://example.com/help 🙂');
+    if (plan.mode !== 'form') throw new Error('expected a form');
+    expect(plan.questions[0]?.message).toBe(
+      'Pick one. See the guide at a link The options are a or b.',
+    );
   });
 });

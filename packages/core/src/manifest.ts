@@ -1,15 +1,17 @@
 import { z } from 'zod';
 
 /**
- * The tool manifest: generated from the MCP server, read by the skill Lambda.
+ * The tool manifest: generated from the MCP server, read by the Alexa Skill Lambda.
  * It maps Alexa intents and slots back onto MCP tools and arguments. Data only.
  */
 
+/**
+ * No source URL and no timestamp: these files are committed, and the endpoint they were
+ * generated from is the developer's business, not the repo's (see the README's security note).
+ */
 export const generatedMarkerSchema = z.object({
   by: z.string(),
   notice: z.string(),
-  /** Where the data came from (the MCP server URL). Deterministic, no timestamps. */
-  source: z.string().optional(),
 });
 export type GeneratedMarker = z.infer<typeof generatedMarkerSchema>;
 
@@ -48,6 +50,8 @@ export const manifestToolSchema = z.object({
   elicitedArguments: z.array(z.string()),
   /** Snapshot of the tool's input schema at generate time. */
   inputSchema: z.record(z.string(), z.unknown()),
+  /** Set on an extra intent from skill-package/overrides that routes to this tool. */
+  aliasOf: z.string().optional(),
 });
 export type ManifestTool = z.infer<typeof manifestToolSchema>;
 

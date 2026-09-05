@@ -9,7 +9,7 @@ import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { Logger } from '@alexa-mcp-bridge/core';
 import type { McpAuth } from './auth.js';
 import { parseToolResult, type McpToolResult } from './result.js';
-import { assertProtocolVersion } from './version.js';
+import { alexaPlusVersionWarning, requireProtocolVersion } from './version.js';
 
 /**
  * Thin wrapper over the MCP SDK client. It owns the session with the developer's server:
@@ -40,7 +40,6 @@ export type ElicitationHandler = (params: ElicitRequestParams) => Promise<Elicit
 export interface BridgeMcpClientOptions {
   url: string;
   auth: McpAuth;
-  minProtocolVersion: string;
   /** Upper bound for one tools/call, including time parked on an elicitation. */
   callTimeoutMs: number;
   onElicitation: ElicitationHandler;
@@ -77,7 +76,10 @@ export class BridgeMcpClient {
 
   async listTools(): Promise<McpToolDefinition[]> {
     if (this.tools) return this.tools;
-    const client = await this.ensureClient();
+    return this.listToolsOn(await this.ensureClient());
+  }
+
+  private async listToolsOn(client: Client): Promise<McpToolDefinition[]> {
     const result = await client.listTools();
     this.tools = result.tools.map((t) => ({
       name: t.name,
@@ -129,12 +131,16 @@ export class BridgeMcpClient {
     };
 
     await client.connect(transport);
-    const protocolVersion = assertProtocolVersion(
-      transport.protocolVersion,
-      this.options.minProtocolVersion,
-    );
+    // One round trip before any tool call, always. A server that elicits without setting
+    // relatedRequestId sends the question on the standalone SSE stream, which the client opens
+    // moments after connect; a tool called in that window has its question dropped silently and
+    // hangs until the elicitation times out. Listing tools closes the window, and the result is
+    // cached, so warm-up pays for it once and a reconnect is safe too (see docs/decisions.md).
+    this.tools = undefined;
+    const protocolVersion = requireProtocolVersion(transport.protocolVersion);
     const server = client.getServerVersion();
     this.client = client;
+    await this.listToolsOn(client);
     this.info = {
       name: server?.name ?? 'mcp-server',
       ...(server?.version ? { version: server.version } : {}),
@@ -142,6 +148,8 @@ export class BridgeMcpClient {
       protocolVersion,
     };
     logger.info('mcp connected', { server: this.info.name, protocolVersion });
+    const versionWarning = alexaPlusVersionWarning(protocolVersion);
+    if (versionWarning) logger.warn(versionWarning, { protocolVersion });
     return this.info;
   }
 

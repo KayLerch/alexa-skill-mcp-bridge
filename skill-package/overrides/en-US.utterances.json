@@ -1,5 +1,24 @@
 {
-  "_comment": "Developer additions merged into the generated model on every `npm run generate`. Keys are intent names; values are sample utterances following Alexa's rules (lowercase words, known {slots}, one AMAZON.SearchQuery slot alone with a carrier phrase).",
+  "_comment": "Developer additions merged into the generated model on every `npm run generate`. Keys are intent names; values are sample utterances following Alexa's rules (lowercase words, known {slots}, one AMAZON.SearchQuery slot alone with a carrier phrase). Intents that the current MCP server does not have are ignored with a note, so overrides for several example servers can live here together.",
+  "FindParkIntent": [
+    "what is the best national park for {activity}",
+    "what is the best national park in {month}",
+    "which park is good for {activity}",
+    "where should i go for {activity} in {month}",
+    "best park in {month} for {activity}",
+    "where can i go {activity}",
+    "a park in {state} for {activity}",
+    "somewhere to go in {state} in {month}",
+    "what is worth visiting in {month}"
+  ],
+  "PlanParkVisitIntent": [
+    "what is {park} like in {month}",
+    "tell me about {park}",
+    "is {park} open in {month}",
+    "should i visit {park} in {month}",
+    "what can i do in {park}",
+    "how is {park} in {month}"
+  ],
   "SearchHotelsIntent": ["find me a place to stay in {destination}", "hotels in {destination}"],
   "GetWeatherIntent": ["weather in {city}", "how is the weather in {city}"]
 }

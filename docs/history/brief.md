@@ -1,6 +1,16 @@
-# Brief for Claude Code: `alexa-skill-mcp-bridge`
+# Brief: `alexa-skill-mcp-bridge`
 
-Read this whole document before writing code. Section 12 lists things that must be verified against live AWS behavior on day one; do those first.
+> **Frozen on 2026-09-05.** This is a document the project was built from, kept for provenance.
+> It is not maintained and parts of it no longer match the code. Current truth lives in
+> [README.md](../../README.md), [docs/architecture.md](../architecture.md),
+> [docs/config.md](../config.md) and [docs/decisions.md](../decisions.md).
+
+Written 2026-09-02 as the requirements handed to a coding agent, before any code existed. Known to be
+out of date where the build learned better: reasoning effort defaults to `off`, not `low` (D20); there is
+no `runtime.memoryMb` field (D22); the agent uses the raw MCP SDK client rather than Strands' `McpClient`
+(D21); developer-specific settings come from `.env` rather than edits to `bridge.config.ts` (D36); and the
+device is an Alexa+ device, not an Echo. Section 12's day-one list and its outcomes are in
+[docs/decisions.md](../decisions.md).
 
 ---
 
@@ -18,7 +28,7 @@ Owner: Kay Lerch (personal GitHub account). License: Apache-2.0. Locale: en-US o
 
 ## 2. Hard requirements
 
-1. **MCP 2025-11-25 or later, Streamable HTTP.** The bridge is the MCP client. It must declare the `elicitation` capability at `initialize`, otherwise servers never send elicitation requests. Elicitation arrives as a server-to-client request on the open `tools/call` stream (form mode). The client must hold that stream open across Alexa turns; see section 5.3.
+1. **Streamable HTTP, no protocol floor of our own.** The bridge is the MCP client. It must declare the `elicitation` capability at `initialize`, otherwise servers never send elicitation requests. Elicitation arrives as a server-to-client request on the open `tools/call` stream (form mode). The client must hold that stream open across Alexa turns; see section 5.3. The bridge accepts whatever version the MCP SDK negotiates: the SDK is the only technical limit, and no config field overrides it. Alexa+ add-ons need **2025-11-25 or later**, so a server below that is warned about (naming the negotiated version and 2025-11-25 as the latest known floor) and then used anyway, because testing an older server against the bridge is a legitimate thing to do.
 2. **TypeScript and Node.js end to end**: Lambda, agent container, generator, CLI, CDK, sample server. Node 22 LTS. npm workspaces (no pnpm/yarn, fewer moving parts for contributors).
 3. **Region us-east-1.** All resources in one CDK stack. The Alexa Skill is deployed separately with the ASK CLI and references the Lambda ARN from the stack output.
 4. **8-second Alexa turn limit.** The Lambda budgets **6.5 s** for the agent call. Everything is designed around that.
@@ -52,18 +62,18 @@ Alexa NLU  ──(intent + slots)──►  Skill Lambda (ASK SDK, thin)
 
 Components:
 
-- **Skill Lambda** (`packages/skill-lambda`): Alexa endpoint. Maps ASK requests onto the bridge's `Turn` interface and renders the result. Contains no MCP or LLM logic.
+- **Alexa Skill Lambda** (`packages/skill-lambda`): Alexa endpoint. Maps ASK requests onto the bridge's `Turn` interface and renders the result. Contains no MCP or LLM logic.
 - **Agent** (`packages/agent`): the container that runs on AgentCore Runtime. Owns the MCP session, the agent loop, elicitation parking, memory, and prompts. This is where the sophisticated logic lives.
 - **Core** (`packages/core`): the shared, frontend-agnostic contract (`TurnInput`, `TurnOutput`, `Question`, config types, ID hashing).
 - **Generator** (`packages/generator`): scans the MCP server and generates the interaction model and the tool manifest.
 - **CLI** (`packages/cli`): local test harness.
 - **Infra** (`infra/`): CDK app, one stack.
-- **Skill package** (`skill-package/`): ASK CLI project (`skill.json`, generated interaction model).
+- **Alexa Skill package** (`skill-package/`): ASK CLI project (`skill.json`, generated interaction model).
 - **Sample MCP server** (`examples/sample-mcp-server`): for testing without a developer's server.
 
 AgentCore Gateway is **optional and off by default** (feature toggle). It adds a hop, per-call billing, and credential setup, and on 2025-11-25 it does not remove the need for the client to hold the elicitation stream. Its value comes later (durable session store, tool aggregation, version translation). Implement the CDK toggle and the client switch; do not make it the primary path.
 
-There is **no DynamoDB in v1**. Alexa session attributes carry per-session state on the skill side; AgentCore Memory carries conversation context; the microVM carries in-flight elicitation state. If a concrete need for a table appears, add an on-demand table, not before.
+There is **no DynamoDB in v1**. Alexa session attributes carry per-session state on the Alexa Skill side; AgentCore Memory carries conversation context; the microVM carries in-flight elicitation state. If a concrete need for a table appears, add an on-demand table, not before.
 
 ---
 
@@ -141,7 +151,7 @@ Identity: frontends pass their raw `userId` and `sessionId`; `core` exposes `has
 - `/ping` returns `{"status":"Healthy"}`. A parked elicitation must **not** flip it to `HealthyBusy` (see 5.3). Only a turn still running past the deadline (5.4) may report busy, and only while it runs.
 - One `BridgeSession` object per container (one container = one user). It holds: the Strands `Agent`, the `McpClient`, the pending-question queue, the last unfinished turn, and the Memory adapter.
 - Strands Agents TypeScript SDK (`@strands-agents/sdk`) with `BedrockModel`. Default model `us.amazon.nova-2-lite-v1:0`, reasoning effort at the lowest setting (config). Alternative documented in config: Claude Haiku 4.5 via its `us.` inference profile.
-- `McpClient` from Strands with a Streamable HTTP transport from `@modelcontextprotocol/sdk`. The client must advertise `capabilities.elicitation = {}` and use protocol version 2025-11-25 or later. Use Strands' `ElicitationCallback` if it gives access to the request and lets us resolve it asynchronously; otherwise use the `client` accessor and `setRequestHandler(ElicitRequestSchema, …)` on the raw MCP client. Confirm on day one (section 12).
+- `McpClient` from Strands with a Streamable HTTP transport from `@modelcontextprotocol/sdk`. The client must advertise `capabilities.elicitation = {}`; the negotiated protocol version is read after `initialize`, reported, and only warned about below 2025-11-25. Use Strands' `ElicitationCallback` if it gives access to the request and lets us resolve it asynchronously; otherwise use the `client` accessor and `setRequestHandler(ElicitRequestSchema, …)` on the raw MCP client. Confirm on day one (section 12).
 - Auth to the MCP server: none, bearer token, or API key header from config (secret fetched from Secrets Manager at startup). OAuth client-credentials via the MCP SDK's auth provider if config asks for it. Authorization-code account linking is out of scope.
 - **Warm-up**: on `{type:'warmup'}` respond immediately once the process is up, then run MCP `initialize` + `tools/list` + memory hydration in the background. A `turn` that arrives before that finishes awaits it.
 - **Memory**: thin adapter over `@aws-sdk/client-bedrock-agentcore` (CreateEvent, ListEvents, RetrieveMemoryRecords) implementing Strands' `MemoryStore`/conversation manager interface. Short-term: every user/assistant turn is an event under `(actorId, sessionId)`. On cold start, rehydrate the last N events for this actor into the agent's message history. Long-term (user preferences / summary strategy) is a config toggle, default on, with the cost note in docs.
@@ -174,7 +184,7 @@ Known hazard to document: idle timeouts on the path between the runtime and the 
 - Any other turn that exceeds the budget: the agent keeps working in the background (mark busy only while it runs), stores the finished `TurnOutput` as `lastResult`, and the Lambda speaks the configured "still working" line and keeps the session open. The next request of any kind first sends `{type:'poll'}`; if a result is waiting, it is spoken before handling the new input.
 - Runtime lifecycle config: `idleTimeoutMinutes` default **20**, `maxLifetimeHours` 8. Runtime session ID is `hash(userId)`, stable across Alexa sessions, so a user who returns within the idle timeout gets a warm session. Rationale for docs: runtime CPU is billed only while active; memory is billed for peak footprint while the session exists (128 MB floor), so a 256 MB container idling for 20 minutes costs about a tenth of a cent.
 
-### 5.5 Skill Lambda (`packages/skill-lambda`)
+### 5.5 Alexa Skill Lambda (`packages/skill-lambda`)
 
 ASK SDK for Node (`ask-sdk-core`). Every handler must read as: build `TurnInput` → call `bridge.turn()` → render `TurnOutput`. No handler contains MCP or model logic.
 
@@ -187,13 +197,13 @@ Handlers:
 - Standard: Help, Stop/Cancel (`cancel` to the agent, then goodbye), Fallback (send as `turn` with `text` unset and let the agent ask what the user meant), `SessionEndedRequest` (`cancel`).
 - Rendering: `speech` → SSML `<speak>` with light escaping; `reprompt` set whenever `endSession` is false.
 
-Alexa invokes the Lambda through the Alexa Skills Kit trigger; CDK adds the resource-based permission for `alexa-appkit.amazon.com` with the skill ID as event source token when `skill.id` is set in config. See deploy order in section 8.
+Alexa invokes the Lambda through the Alexa Skills Kit trigger; CDK adds the resource-based permission for `alexa-appkit.amazon.com` with the Alexa Skill ID as event source token when `skill.id` is set in config. See deploy order in section 8.
 
 ### 5.6 Generator (`packages/generator`)
 
 `npm run generate` must be deterministic except for the utterance step, and must be re-runnable.
 
-1. Connect to `mcp.url` with the same client settings as the agent; `initialize`, `tools/list`. Fail with a clear message if the server is unreachable, needs auth that isn't configured, or negotiates a protocol version older than 2025-11-25.
+1. Connect to `mcp.url` with the same client settings as the agent; `initialize`, `tools/list`. Fail with a clear message if the server is unreachable or needs auth that isn't configured; warn, but continue, when it negotiates a protocol version older than 2025-11-25.
 2. Write `packages/skill-lambda/generated/tool-manifest.json`: for each tool, the intent name (`PascalCase(tool.name) + "Intent"`), the argument→slot mapping, and the tool's schema snapshot.
 3. Map JSON Schema properties to slot types: `format: date` or names like `checkIn`/`date` → `AMAZON.DATE`; `integer`/`number` → `AMAZON.NUMBER`; `boolean` → custom `YesNoType`; `enum` → custom slot type named after the property with the enum values (entity resolution on); everything else → `AMAZON.SearchQuery`. Enforce Alexa's rules: at most one `AMAZON.SearchQuery` slot per intent, and a sample utterance containing a SearchQuery slot needs a carrier phrase and no other slots; when a tool has more than one free-text argument, keep the primary one as a slot and let the agent elicit the rest.
 4. Sample utterances: 8–15 per tool generated by Nova 2 Lite from tool name, description, and schema, with a deterministic template fallback when no AWS credentials are present. Merge `skill-package/overrides/en-US.utterances.json` if it exists (developer-authored additions survive regeneration).
@@ -224,11 +234,10 @@ export default defineConfig({
     auth: { type: 'none' | 'bearer' | 'apiKey' | 'oauthClientCredentials',
             secretName?: string,              // Secrets Manager secret holding the token / client secret
             headerName?: string },
-    protocolVersion: '2025-11-25',
   },
   skill: {
-    invocationName: 'my bridge',
-    id: undefined,                            // set after `ask deploy`, then `cdk deploy` again tightens the Lambda permission
+    invocationName: 'bridge demo',
+    id: undefined,                            // set via .env after `ask deploy`; the next `cdk deploy` tightens the Lambda permission
     locales: ['en-US'],
     greeting: undefined,                      // default derived from server name + example phrases
     coldStartMessage: "I'm still starting up. Give me a moment and open me again.",
@@ -244,11 +253,13 @@ export default defineConfig({
   elicitation: { answerTimeoutSeconds: 120 },
   memory: { shortTerm: true, longTerm: true, hydrateLastEvents: 20 },
   features: { gateway: false, debug: false },
-  aws: { region: 'us-east-1', budgetUsd: 5, budgetEmail: undefined, logRetentionDays: 7 },
+  aws: { region: 'us-east-1', logRetentionDays: 7 },
 });
 ```
 
 Secrets: config holds names, never values. The developer creates the secret with one documented `aws secretsmanager create-secret` command; the CDK stack grants read access to the runtime role.
+
+The repo is public and every clone edits this file, so the handful of fields that identify a developer rather than the project (`mcp.url`, `mcp.auth.type`, `mcp.auth.secretName`, `skill.id`, `aws.region`) also come from a git-ignored `.env` that overrides `bridge.config.ts`. `npm run check:leaks`, wired to a pre-commit hook and to CI, refuses a commit that carries an AWS account id, an Alexa Skill id, an endpoint, or a token.
 
 ---
 
@@ -258,17 +269,16 @@ One stack, `AlexaMcpBridgeStack`, reading `bridge.config.ts`. Use the stable `aw
 
 Resources:
 
-- **Skill Lambda**: `NodejsFunction`, Node 22, arm64, timeout 8 s, memory 512 MB, bundled with esbuild, env vars for runtime ARN and config. Permission for `alexa-appkit.amazon.com`, with `eventSourceToken = skill.id` when set; when unset, print a loud warning in the deploy output and README that the permission is open until the skill ID is configured.
+- **Alexa Skill Lambda**: `NodejsFunction`, Node 22, arm64, timeout 8 s, memory 512 MB, bundled with esbuild, env vars for runtime ARN and config. Permission for `alexa-appkit.amazon.com`, with `eventSourceToken = skill.id` when set; when unset, print a loud warning in the deploy output and README that the permission is open until the Alexa Skill ID is configured.
 - **Agent image**: `DockerImageAsset` (platform linux/arm64) → ECR. **AgentCore Runtime** from that image, with `lifecycleConfiguration` set **explicitly** from config (a past CDK default rendered a 60-second idle timeout), environment from config, execution role with `bedrock:InvokeModel*` on the configured model profiles, Memory data-plane permissions, Secrets Manager read on the configured secret, CloudWatch logs.
 - **AgentCore Memory**: short-term always; long-term strategy when `memory.longTerm`.
 - **Gateway + MCP server target** only when `features.gateway`; sessions and response streaming enabled (required for elicitation); NoAuth or the configured credential provider; the agent then points at the gateway URL with SigV4.
-- **AWS Budgets** cost budget at `aws.budgetUsd` with email notification when `budgetEmail` is set (warn in output if not).
 - Log groups with `logRetentionDays`.
 - Outputs: Lambda ARN (for `skill.json`), runtime ARN, memory ID, gateway URL if enabled.
 - Deployment role needs `iam:CreateServiceLinkedRole` for AgentCore; document it.
 - Bedrock model access must be enabled in the account for the chosen models; document the console step and give a `scripts/check-model-access.ts` that calls `InvokeModel` once and reports.
 
-`npm run deploy` = `cdk deploy` with a pre-flight that validates config and checks model access. `npm run destroy` = `cdk destroy` plus deletion of the ECR images and a reminder about the Alexa skill (`ask smapi delete-skill`).
+`npm run deploy` = `cdk deploy` with a pre-flight that validates config and checks model access. `npm run destroy` = `cdk destroy` plus deletion of the ECR images and a reminder about the Alexa Skill (`ask smapi delete-skill`).
 
 ---
 
@@ -282,12 +292,12 @@ Keep it to about ten numbered steps, each one command or one action, with contex
 4. `npm run generate` → review the generated interaction model, add overrides if wanted.
 5. `npm run chat` → talk to your server locally; fix tool descriptions if the agent picks badly.
 6. `npm run deploy` → note the Lambda ARN in the output. Cost callout printed here: what starts costing money and when.
-7. Put the Lambda ARN into `skill-package/skill.json`; `cd skill-package && ask deploy` → note the skill ID.
-8. Put the skill ID into `bridge.config.ts`; `npm run deploy` again (tightens the Lambda permission).
+7. Put the Lambda ARN into `skill-package/skill.json`; `cd skill-package && ask deploy` → note the Alexa Skill ID.
+8. Put the Alexa Skill ID into `.env` as `BRIDGE_SKILL_ID`; `npm run deploy` again (tightens the Lambda permission).
 9. Enable testing in the Alexa developer console (development stage); say "Alexa, open <invocation name>" on a device on the same Amazon account. First launch may hit the cold-start message; open it again.
-10. When done: `npm run destroy`. Explain what lingers if you don't (idle sessions expire on their own; Memory records and logs are pennies; the skill stays in your developer account).
+10. When done: `npm run destroy`. Explain what lingers if you don't (idle sessions expire on their own; Memory records and logs are pennies; the Alexa Skill stays in your developer account).
 
-If a cleaner order exists that avoids the second `cdk deploy` (for example creating the skill first without an endpoint to obtain the ID), use it and document it instead.
+If a cleaner order exists that avoids the second `cdk deploy` (for example creating the Alexa Skill first without an endpoint to obtain the ID), use it and document it instead.
 
 ---
 
@@ -295,7 +305,7 @@ If a cleaner order exists that avoids the second `cdk deploy` (for example creat
 
 - The stack accrues no meaningful cost at idle: no always-on compute, no provisioned capacity, on-demand everything.
 - What costs money, and where the docs say so: model tokens per turn (`docs/cost.md` with a worked example per turn); runtime CPU while active and memory while a session exists; Memory events and long-term extraction (a model call per session when enabled); Gateway per call when enabled; CloudWatch logs.
-- Defaults chosen for cost: Nova 2 Lite, 512 MB container, 20-minute idle, 7-day log retention, budget alarm at $5.
+- Defaults chosen for cost: Nova 2 Lite, 512 MB container, 20-minute idle, 7-day log retention. No budget alarm: an AWS Budgets alarm that emails needs an address in config, which is the kind of value this repo keeps out of tracked files (2026-09-04, owner).
 - `npm run deploy` prints a short cost note at the end. `npm run destroy` is documented on the README's first screen.
 
 ---
@@ -303,7 +313,7 @@ If a cleaner order exists that avoids the second `cdk deploy` (for example creat
 ## 10. Code style rules (from the project owner, apply throughout)
 
 - Clean and understandable. Short, useful comments where they help; no narration of the obvious.
-- Not overwhelming. The sophisticated work (MCP session, elicitation parking, memory, prompt assembly, answer mapping) sits at the back, in `packages/agent`. Frontend code (skill handlers) stays thin.
+- Not overwhelming. The sophisticated work (MCP session, elicitation parking, memory, prompt assembly, answer mapping) sits at the back, in `packages/agent`. Frontend code (Alexa Skill handlers) stays thin.
 - Abstraction must not produce a black box. The main flow of a turn should be readable from the outside: `packages/agent/src/turn.ts` (or equivalent) reads top to bottom as the story of one turn, delegating to well-named modules. Someone reading `skill-lambda` should understand what happens without opening `agent`, and someone reading `turn.ts` should understand the elicitation mechanism without reading the MCP client wrapper.
 - One file per concern; small modules; explicit types at boundaries; zod validation at every input edge (config, invocation payloads, MCP results).
 - No generated code for handlers. Generated artifacts are data (JSON) with a header saying so.
@@ -367,8 +377,8 @@ Each of these is either uncertain or reported inconsistently. Write a throwaway 
 1. Repo scaffold, workspaces, config schema, `core` types, sample MCP server, CI skeleton.
 2. Agent package running in-process via the CLI harness against the sample server: turn, tool call, spoken result. Then elicitation parking in-process.
 3. Generator: manifest + interaction model + utterances; tests.
-4. Container + CDK stack (Lambda, Runtime, Memory, budget); day-one verification items 2–6 and 9.
-5. Skill Lambda handlers; `skill-package`; deploy flow end to end on a device; verification items 1, 7, 8, 10.
+4. Container + CDK stack (Lambda, Runtime, Memory); day-one verification items 2–6 and 9.
+5. Alexa Skill Lambda handlers; `skill-package`; deploy flow end to end on a device; verification items 1, 7, 8, 10.
 6. Memory hydration, long-term toggle, Gateway toggle.
 7. Docs pass: README quick start, cost, troubleshooting, architecture with recorded verification results.
 

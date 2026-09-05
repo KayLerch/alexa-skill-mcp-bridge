@@ -7,6 +7,8 @@
     { "path": "packages/cli" },
     { "path": "packages/skill-lambda" },
     { "path": "infra" },
-    { "path": "examples/sample-mcp-server" }
+    { "path": "examples/mcp-server-harness" },
+    { "path": "examples/hotels-weather-mcp-server" },
+    { "path": "examples/national-parks-mcp-server" }
   ]
 }

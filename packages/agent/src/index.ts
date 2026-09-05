@@ -15,9 +15,10 @@ export { mapAnswer, parseSpokenNumber, type MappedAnswer } from './elicitation/a
 export { BridgeMcpClient, type McpServerInfo, type McpToolDefinition } from './mcp/client.js';
 export { resolveMcpAuth, type McpAuth, type SecretResolver } from './mcp/auth.js';
 export {
-  MIN_PROTOCOL_VERSION,
+  ALEXA_PLUS_PROTOCOL_VERSION,
   ProtocolVersionError,
-  assertProtocolVersion,
+  requireProtocolVersion,
+  alexaPlusVersionWarning,
 } from './mcp/version.js';
 export { noopMemory, type MemoryAdapter } from './memory/store.js';
 export { createMemoryAdapter } from './memory/index.js';

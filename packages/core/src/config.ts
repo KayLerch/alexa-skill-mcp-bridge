@@ -7,6 +7,10 @@ import { pathToFileURL } from 'node:url';
  * The bridge config schema. Every field except mcp.url has a safe default.
  * Every consumer (generator, Lambda, agent, CDK) validates through parseConfig().
  * Secrets never live here: config holds a Secrets Manager secret name only.
+ *
+ * The few fields that identify you rather than the setup (your endpoint, your secret
+ * name, your Alexa Skill id) can come from a git-ignored .env instead, so bridge.config.ts
+ * stays committable as it ships. See ENV_OVERRIDES below and docs/config.md.
  */
 
 export const mcpAuthSchema = z
@@ -32,8 +36,6 @@ export const mcpAuthSchema = z
   });
 export type McpAuthConfig = z.output<typeof mcpAuthSchema>;
 
-const MIN_PROTOCOL_VERSION = '2025-11-25';
-
 export const bridgeConfigSchema = z.object({
   mcp: z.object({
     url: z.url({
@@ -41,16 +43,10 @@ export const bridgeConfigSchema = z.object({
         'set mcp.url to your MCP server’s Streamable HTTP endpoint, e.g. https://example.com/mcp',
     }),
     auth: mcpAuthSchema.prefault({}),
-    /** Minimum protocol version the client requires. Servers below it are refused. */
-    protocolVersion: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/, 'must look like 2025-11-25')
-      .refine((v) => v >= MIN_PROTOCOL_VERSION, `must be ${MIN_PROTOCOL_VERSION} or later`)
-      .default(MIN_PROTOCOL_VERSION),
   }),
   skill: z
     .object({
-      invocationName: z.string().min(2).default('my bridge'),
+      invocationName: z.string().min(2).default('bridge demo'),
       /** Set after `ask deploy`; tightens the Lambda permission on the next `npm run deploy`. */
       id: z
         .string()
@@ -97,6 +93,18 @@ export const bridgeConfigSchema = z.object({
       budgetMs: z.number().int().min(1000).max(7500).default(6500),
     })
     .prefault({}),
+  /** Voice rules that both the prompt and the deterministic renderers obey. */
+  speech: z
+    .object({
+      /** How long a spoken answer may be. Interpolated into the voice prompt. */
+      maxSentences: z.number().int().min(1).max(5).default(3),
+      /**
+       * How many options a question may read aloud. Beyond this the question names a few as
+       * examples; the answer mapper still accepts any value the schema allows.
+       */
+      maxChoicesSpoken: z.number().int().min(1).max(10).default(3),
+    })
+    .prefault({}),
   elicitation: z
     .object({
       /** A parked question is cancelled after this long without an answer. */
@@ -117,13 +125,22 @@ export const bridgeConfigSchema = z.object({
       gateway: z.boolean().default(false),
       /** Include tool calls and timings in TurnOutput.debug and log tool arguments. */
       debug: z.boolean().default(false),
+      /**
+       * Generate one Alexa intent per MCP tool, with typed slots and entity resolution (D38).
+       * Off: one catch-all intent hands the whole phrase to the agent, and the interaction
+       * model stops changing when your tools change.
+       */
+      toolIntents: z.boolean().default(true),
+      /**
+       * Add a catch-all intent beside the tool intents, so a request the tool intents do not
+       * recognise still reaches the agent as text instead of dying in AMAZON.FallbackIntent.
+       */
+      catchAll: z.boolean().default(true),
     })
     .prefault({}),
   aws: z
     .object({
       region: z.string().min(1).default('us-east-1'),
-      budgetUsd: z.number().positive().default(5),
-      budgetEmail: z.email().optional(),
       logRetentionDays: z.number().int().positive().default(7),
     })
     .prefault({}),
@@ -154,6 +171,52 @@ export function parseConfig(raw: unknown): BridgeConfig {
 
 export const CONFIG_FILE_NAME = 'bridge.config.ts';
 export const CONFIG_ENV_VAR = 'BRIDGE_CONFIG';
+export const ENV_FILE_NAME = '.env';
+
+/**
+ * Environment variables that override bridge.config.ts, and the field each one sets.
+ * Deliberately short: only what is yours rather than the project's, so nobody has to
+ * edit (and then accidentally commit) the tracked config file. The secret *value* is
+ * not here; that stays MCP_SECRET_VALUE for local runs and Secrets Manager in AWS.
+ */
+export const ENV_OVERRIDES: Readonly<Record<string, readonly string[]>> = {
+  BRIDGE_MCP_URL: ['mcp', 'url'],
+  BRIDGE_MCP_AUTH_TYPE: ['mcp', 'auth', 'type'],
+  BRIDGE_MCP_SECRET_NAME: ['mcp', 'auth', 'secretName'],
+  BRIDGE_SKILL_ID: ['skill', 'id'],
+  BRIDGE_AWS_REGION: ['aws', 'region'],
+};
+
+/** Apply ENV_OVERRIDES to raw config before it is validated, so zod checks the merged result. */
+export function applyEnvOverrides(raw: unknown, env: NodeJS.ProcessEnv = process.env): unknown {
+  if (typeof raw !== 'object' || raw === null) return raw;
+  let merged = raw as Record<string, unknown>;
+  for (const [name, path] of Object.entries(ENV_OVERRIDES)) {
+    const value = env[name]?.trim();
+    if (value) merged = setPath(merged, path, value);
+  }
+  return merged;
+}
+
+function setPath(
+  target: Record<string, unknown>,
+  path: readonly string[],
+  value: string,
+): Record<string, unknown> {
+  const [head, ...rest] = path;
+  if (head === undefined) return target;
+  if (rest.length === 0) return { ...target, [head]: value };
+  const child = target[head];
+  const branch =
+    typeof child === 'object' && child !== null ? (child as Record<string, unknown>) : {};
+  return { ...target, [head]: setPath({ ...branch }, rest, value) };
+}
+
+/** Load .env next to bridge.config.ts. Real environment variables win over the file (Node's rule). */
+export function loadEnvFile(dir: string): void {
+  const file = join(dir, ENV_FILE_NAME);
+  if (existsSync(file)) process.loadEnvFile(file);
+}
 
 /** Walk up from `from` until a bridge.config.ts is found. */
 export function findConfigFile(from: string = process.cwd()): string | undefined {
@@ -168,8 +231,10 @@ export function findConfigFile(from: string = process.cwd()): string | undefined
 }
 
 /**
- * Load and validate bridge.config.ts. Used by the generator, the CLI, the CDK app, and scripts.
- * Node 22 strips the types on import; the file must use erasable syntax only.
+ * Load and validate bridge.config.ts, with .env applied on top. Used by the generator, the
+ * CLI, the CDK app, and scripts. Node 22 strips the types on import; the file must use
+ * erasable syntax only. The Lambda and the container do not come through here: they read the
+ * already-merged config from BRIDGE_CONFIG.
  */
 export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
   const file = path ?? process.env.BRIDGE_CONFIG_PATH ?? findConfigFile();
@@ -178,11 +243,12 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
       `${CONFIG_FILE_NAME} not found in ${process.cwd()} or any parent directory.`,
     );
   }
+  loadEnvFile(dirname(resolve(file)));
   const mod = (await import(pathToFileURL(resolve(file)).href)) as { default?: unknown };
   if (mod.default === undefined) {
     throw new ConfigError(`${file} must export the result of defineConfig() as default.`);
   }
-  return parseConfig(mod.default);
+  return parseConfig(applyEnvOverrides(mod.default));
 }
 
 /** Load config from the BRIDGE_CONFIG env var. Used by the Lambda and the container. */

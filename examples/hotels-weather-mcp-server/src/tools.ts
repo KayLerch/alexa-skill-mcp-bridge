@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { HOTELS, WEATHER } from './data.js';
+import type { Log } from '@alexa-mcp-bridge/mcp-server-harness';
 
 /** Timeouts around the elicitation: the client may take minutes to bring a spoken answer back. */
 const ELICITATION_TIMEOUT_MS = 10 * 60 * 1000;
@@ -9,13 +10,24 @@ const ELICITATION_TIMEOUT_MS = 10 * 60 * 1000;
 const KEEPALIVE_PING_MS = 15 * 1000;
 
 export const SERVER_INSTRUCTIONS =
-  'This server searches hotels and reports weather in a few European and US cities. ' +
-  'Hotel search needs a destination, check-in and check-out dates, and the number of guests; ' +
-  'if guests is missing the tool asks for it. Prices are per night in euros.';
+  'This server searches hotels and reports typical weather in sixty-six cities: twenty-four in ' +
+  'the United States, eighteen European metropoles, and twenty-four across Canada, Latin ' +
+  'America, Asia, the Middle East, Africa and Oceania. Hotel search needs a destination, ' +
+  'check-in and check-out dates, and the number of guests; if guests is missing the tool asks ' +
+  'for it. Prices are per night, in the local currency where travellers expect it and in US ' +
+  'dollars elsewhere. Data is fixed and illustrative.';
+
+/** "São Paulo", "sao paulo" and "SAO PAULO" are the same city to a listener. */
+const fold = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
 
 export interface ToolOptions {
   slowSeconds: number;
-  log: (event: Record<string, unknown>) => void;
+  log: Log;
 }
 
 export function registerTools(server: McpServer, options: ToolOptions): void {
@@ -37,7 +49,7 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
       let guestCount = guests;
 
       if (guestCount === undefined) {
-        const answer = await elicitGuests(server, extra.signal, options.log);
+        const answer = await elicitGuests(server, extra, options.log);
         if (answer === undefined) {
           return text(
             'Hotel search cancelled because the number of guests was not provided.',
@@ -48,9 +60,7 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
       }
 
       const matches = HOTELS.filter(
-        (h) =>
-          h.destination.toLowerCase() === destination.trim().toLowerCase() &&
-          h.maxGuests >= guestCount,
+        (h) => fold(h.destination) === fold(destination) && h.maxGuests >= guestCount,
       )
         .sort((a, b) => b.rating - a.rating)
         .slice(0, 3);
@@ -63,7 +73,7 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
         results: matches.map((h) => ({
           name: h.name,
           pricePerNight: h.pricePerNight,
-          currency: 'EUR',
+          currency: h.currency,
           rating: h.rating,
         })),
       };
@@ -72,7 +82,9 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
         matches.length === 0
           ? `No hotels found in ${destination} for ${guestCount} guests.`
           : `${matches.length} hotels in ${destination} from ${checkIn} to ${checkOut} for ${guestCount} guests: ` +
-            matches.map((h) => `${h.name} (${h.pricePerNight} EUR/night, ${h.rating})`).join(', ');
+            matches
+              .map((h) => `${h.name} (${h.pricePerNight} ${h.currency} a night, rated ${h.rating})`)
+              .join(', ');
 
       return { content: [{ type: 'text', text: summary }], structuredContent };
     },
@@ -83,7 +95,7 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
     {
       title: 'Get weather',
       description:
-        'Current weather for a city: conditions plus high and low temperature in Celsius.',
+        'Typical weather for one of sixty-six cities worldwide: conditions plus high and low in Celsius.',
       inputSchema: {
         city: z.string().describe('City name, e.g. Hamburg'),
       },
@@ -93,10 +105,12 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
         // SAMPLE_SLOW_SECONDS lets device tests exercise the bridge's overrun path.
         await new Promise((r) => setTimeout(r, options.slowSeconds * 1000));
       }
-      const entry = WEATHER[city.trim().toLowerCase()];
+      const entry = WEATHER[fold(city)];
       if (!entry) {
+        // Sixty-six names are not a spoken list; offer a few and let the caller try again.
+        const examples = Object.keys(WEATHER).slice(0, 4).join(', ');
         return text(
-          `No weather data for ${city}. Known cities: ${Object.keys(WEATHER).join(', ')}.`,
+          `No weather data for ${city}. I know sixty-six cities, for example ${examples}.`,
           true,
         );
       }
@@ -119,9 +133,10 @@ export function registerTools(server: McpServer, options: ToolOptions): void {
  */
 async function elicitGuests(
   server: McpServer,
-  signal: AbortSignal,
+  extra: { signal: AbortSignal; sessionId?: string; requestId: string | number },
   log: ToolOptions['log'],
 ): Promise<number | undefined> {
+  const { signal, sessionId: session } = extra;
   const keepalive = setInterval(() => {
     server.server.ping().catch(() => undefined);
   }, KEEPALIVE_PING_MS);
@@ -145,11 +160,17 @@ async function elicitGuests(
           required: ['guests'],
         },
       },
-      { timeout: ELICITATION_TIMEOUT_MS, signal },
+      {
+        timeout: ELICITATION_TIMEOUT_MS,
+        signal,
+        // Ride the open tools/call stream; the standalone SSE stream may not exist yet and the
+        // SDK drops the message silently when it does not (see docs/decisions.md).
+        relatedRequestId: extra.requestId,
+      },
     );
 
     if (result.action !== 'accept') {
-      log({ msg: 'elicitation ended without an answer', action: result.action });
+      log({ msg: 'elicitation ended without an answer', session, action: result.action });
       return undefined;
     }
     const guests = Number(result.content?.guests);
@@ -158,6 +179,7 @@ async function elicitGuests(
     // The client cancelled the tool call while the question was open, or the wait timed out.
     log({
       msg: 'elicitation aborted',
+      session,
       reason: signal.aborted ? 'tool call cancelled' : String(err),
     });
     return undefined;

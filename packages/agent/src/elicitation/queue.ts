@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ElicitRequestParams, ElicitResult } from '@modelcontextprotocol/sdk/types.js';
 import type { Logger, Question, QuestionExpects } from '@alexa-mcp-bridge/core';
-import { planElicitation, type QuestionSpec } from './question.js';
+import { planElicitation, type QuestionSpec, type SpeechStyle } from './question.js';
 
 /**
  * The parking lot. An elicitation (or an ask_user call) arrives while a tool call is in
@@ -40,6 +40,8 @@ export interface AskUserSpec {
 
 export interface QueueOptions {
   answerTimeoutMs: number;
+  /** Voice rules from config.speech; the renderer decides how many options to read aloud. */
+  speech?: SpeechStyle;
   logger: Logger;
   makeId?: () => string;
 }
@@ -67,7 +69,7 @@ export class QuestionQueue {
 
   /** Entry point for the MCP elicitation callback. Resolves when the user has answered every property. */
   elicit(params: ElicitRequestParams): Promise<ElicitResult> {
-    const plan = planElicitation(params);
+    const plan = planElicitation(params, this.options.speech);
     if (plan.mode === 'url') {
       // Voice cannot open a link. Decline so the tool call ends cleanly; a web frontend would open it.
       this.options.logger.warn('url-mode elicitation declined', { url: plan.url });

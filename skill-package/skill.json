@@ -4,13 +4,13 @@
     "publishingInformation": {
       "locales": {
         "en-US": {
-          "name": "my bridge",
+          "name": "bridge demo",
           "summary": "Talks to an MCP server through the alexa-skill-mcp-bridge.",
-          "description": "Development skill created by alexa-skill-mcp-bridge. It forwards each turn to an agent on Amazon Bedrock AgentCore Runtime, which calls the tools of an MCP server and speaks the results.",
+          "description": "Development Alexa Skill created by alexa-skill-mcp-bridge. It stands in for an Alexa+ add-on: each turn goes to an agent on Amazon Bedrock AgentCore Runtime, which calls the tools of an MCP server and speaks the results.",
           "examplePhrases": [
-            "Alexa, open my bridge",
-            "Alexa, ask my bridge to search hotels",
-            "Alexa, ask my bridge for the weather"
+            "Alexa, open bridge demo",
+            "Alexa, ask bridge demo which park is best for fishing",
+            "Alexa, ask bridge demo about Yosemite in June"
           ],
           "keywords": ["mcp", "bridge", "developer"]
         }

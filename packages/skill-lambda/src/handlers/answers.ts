@@ -13,6 +13,7 @@ const ANSWER_INTENTS = new Set([
   'AMAZON.NoIntent',
   'DateAnswerIntent',
   'NumberAnswerIntent',
+  'ChoiceAnswerIntent',
   'FreeTextAnswerIntent',
 ]);
 
@@ -55,6 +56,11 @@ export function answerHintFor(input: HandlerInput, intentName: string): AnswerHi
     case 'NumberAnswerIntent': {
       const value = slotValue(getSlot(input.requestEnvelope, 'number'), 'AMAZON.NUMBER');
       return value ? { slots: { number: value } } : {};
+    }
+    case 'ChoiceAnswerIntent': {
+      // One word from any enum in any tool: the agent matches it against the pending question.
+      const value = slotValue(getSlot(input.requestEnvelope, 'choice'), 'AnswerChoiceType');
+      return value ? { slots: { choice: value }, text: value.resolvedValue ?? value.value } : {};
     }
     default: {
       const value = slotValue(getSlot(input.requestEnvelope, 'answer'), 'AMAZON.SearchQuery');

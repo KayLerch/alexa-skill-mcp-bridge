@@ -1,5 +1,12 @@
 # Build context for packages/agent/Dockerfile is the repo root. Keep only what the image needs:
 # the root manifests, core and agent sources, and every workspace's package.json (npm ci wants them).
+
+# Your settings: not in the image, and not staged into cdk.out with the build context.
+.env
+.env.*
+bridge.config.ts
+**/*.pem
+
 **/node_modules
 **/dist
 **/cdk.out
@@ -17,7 +24,7 @@ scripts
 infra/**
 !infra/package.json
 examples/**
-!examples/sample-mcp-server/package.json
+!examples/*/package.json
 packages/cli/**
 !packages/cli/package.json
 packages/generator/**

@@ -16,6 +16,8 @@
   ],
   "scripts": {
     "doctor": "node scripts/check-node.mjs && tsc -b && node scripts/doctor.ts",
+    "check:leaks": "node scripts/check-leaks.ts",
+    "precheck:leaks": "node scripts/check-node.mjs",
     "build": "tsc -b",
     "prebuild": "node scripts/check-node.mjs",
     "typecheck:tooling": "tsc -p tsconfig.tooling.json",
@@ -26,7 +28,7 @@
     "pretest": "node scripts/check-node.mjs",
     "test:live": "BRIDGE_TEST_LIVE=1 vitest run packages/cli",
     "pretest:live": "node scripts/check-node.mjs",
-    "sample:start": "tsc -b examples/sample-mcp-server && node examples/sample-mcp-server/dist/server.js",
+    "sample:start": "tsc -b && node scripts/start-example.ts",
     "presample:start": "node scripts/check-node.mjs",
     "chat": "tsc -b && node packages/cli/dist/src/chat.js",
     "prechat": "node scripts/check-node.mjs",
@@ -39,6 +41,8 @@
     "deploy": "tsc -b && node scripts/deploy.ts",
     "predeploy": "node scripts/check-node.mjs",
     "destroy": "tsc -b && node scripts/destroy.ts",
+    "skill:deploy": "tsc -b && node scripts/skill-deploy.ts",
+    "preskill:deploy": "node scripts/check-node.mjs",
     "predestroy": "node scripts/check-node.mjs",
     "check-model-access": "tsc -b && node scripts/check-model-access.ts",
     "precheck-model-access": "node scripts/check-node.mjs"

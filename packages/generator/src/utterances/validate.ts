@@ -30,6 +30,14 @@ export function validUtterance(utterance: string, slots: ManifestSlot[]): boolea
   return bare.length > 0 || used.length > 0;
 }
 
+/** The slots an utterance uses, as a stable key: "activity+month", or "" for none. */
+export function slotKey(utterance: string): string {
+  return [...utterance.matchAll(/\{([^{}]*)\}/g)]
+    .map((m) => m[1] as string)
+    .sort()
+    .join('+');
+}
+
 export function dedupe(utterances: string[]): string[] {
   const seen = new Set<string>();
   const out: string[] = [];

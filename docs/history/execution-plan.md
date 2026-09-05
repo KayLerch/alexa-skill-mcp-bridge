@@ -1,8 +1,15 @@
 # Execution plan: `alexa-skill-mcp-bridge`
 
-Status: v1 draft, 2026-09-03. Owner: Kay Lerch.
+> **Frozen on 2026-09-05.** This is a document the project was built from, kept for provenance.
+> It is not maintained and parts of it no longer match the code. Current truth lives in
+> [README.md](../../README.md), [docs/architecture.md](../architecture.md),
+> [docs/config.md](../config.md) and [docs/decisions.md](../decisions.md).
 
-The [brief](alexa-skill-mcp-bridge-brief.md) is the source of truth for *what* gets built. This document is the *how* and *in which order*. Tick boxes as work lands. Verification outcomes and design decisions go to `docs/architecture.md` once it exists; until then, append them to section 16 here.
+Written 2026-09-03 as the build order for the [brief](brief.md), with per-phase checkboxes and rough
+effort figures for one developer. Its two lasting outputs, the decision table and the verification log,
+now live in [docs/decisions.md](../decisions.md) and are maintained there; the phases and checkboxes
+below are a snapshot of how the work was sequenced, not a status board. Ports, names and defaults in it
+have moved on (the sample server listens on 3939; the device is an Alexa+ device).
 
 Reading guide:
 
@@ -18,7 +25,7 @@ Reading guide:
 | 2 | Agent in-process plus CLI harness | 2 to 3 days |
 | 3 | Generator | 1 to 1.5 days |
 | 4 | Container plus CDK stack | 1 to 2 days |
-| 5 | Skill Lambda, skill package, device end to end | 1.5 to 2 days |
+| 5 | Alexa Skill Lambda, Alexa Skill package, device end to end | 1.5 to 2 days |
 | 6 | Memory hydration, long-term toggle, Gateway toggle | 1 to 1.5 days |
 | 7 | Docs and release pass | 1 day |
 
@@ -29,8 +36,8 @@ Reading guide:
 | Topic | Value |
 |---|---|
 | Language and runtime | TypeScript end to end, Node 22 LTS, npm workspaces |
-| MCP | Spec 2025-11-25 or later, Streamable HTTP, client declares `elicitation` at `initialize` |
-| Region and infra | us-east-1, one CDK stack, Alexa skill deployed separately with ASK CLI |
+| MCP | Streamable HTTP, client declares `elicitation` at `initialize`, no protocol floor of our own; below 2025-11-25 the bridge warns (Alexa+ add-on floor) but runs (D34) |
+| Region and infra | us-east-1, one CDK stack, Alexa Skill deployed separately with ASK CLI |
 | Turn budget | 6500 ms for the agent call inside Alexa's 8 s limit |
 | Model | `us.amazon.nova-2-lite-v1:0`, lowest reasoning effort; Claude Haiku 4.5 profile as documented alternative |
 | Agent stack | AgentCore Runtime (arm64 container), Strands Agents TS SDK, AgentCore Memory |
@@ -38,7 +45,7 @@ Reading guide:
 | Gateway | Optional, off by default, CDK and client toggle exist |
 | Runtime lifecycle | Idle 20 min, max lifetime 8 h, 512 MB container |
 | Config | One `bridge.config.ts`, zod-validated in every consumer, secrets by name only |
-| Cost | Nothing always-on, budget alarm at 5 USD, 7-day log retention, costs documented where they occur |
+| Cost | Nothing always-on, 7-day log retention, costs documented where they occur (no budget alarm, D35) |
 | Frontends | Alexa is one frontend; `packages/core` Turn contract is the boundary; `visual: null` reserved |
 | Locale | en-US only, never hardcoded |
 | License | Apache-2.0 |
@@ -79,11 +86,15 @@ The brief leaves these open. Each is a default; the "revisit if" column says wha
 | D26 | The agent's `tools/call` timeout is 10 minutes; the per-answer timeout (`elicitation.answerTimeoutSeconds`) is enforced by the queue | A form with several properties parks the same tool call across several spoken answers | Servers commonly time out earlier (then document per server) |
 | D27 | The sample server exports `startSampleServer({port: 0})`; the agent's state machine tests and the CLI round trip run against it in-process | One real MCP server in tests instead of a mock, no port clashes | Never |
 | D28 | A tool result handed to the model carries one content block: `json` (structuredContent) when present and not an error, else `text` | Nova 2 Lite collapses its context on a result that mixes `json` and `text` (measured: 545 input tokens instead of 1712, empty answer or a rambling one that hits the token cap); `json` only or `text` only both answer in about 25 tokens | Nova handles mixed content, or another model needs the text alongside |
-| D29 | `ask-resources.json` lives at the repo root with `skillMetadata.src: ./skill-package`; `ask deploy` runs from the root, not from `skill-package/` | ASK CLI v2 zips the `src` folder as the skill package; running from inside it would put `ask-resources.json` and `.ask/` into the upload. `overrides/` inside `skill-package/` is a known risk for the same reason, to be checked at the first `ask deploy` | SMAPI rejects the upload because of `overrides/` (then move it to `skill-overrides/`) |
+| D29 | `ask-resources.json` lives at the repo root with `skillMetadata.src: ./skill-package`; `ask deploy` runs from the root, not from `skill-package/` | ASK CLI v2 zips the `src` folder as the Alexa Skill package; running from inside it would put `ask-resources.json` and `.ask/` into the upload. `overrides/` inside `skill-package/` is a known risk for the same reason, to be checked at the first `ask deploy` | SMAPI rejects the upload because of `overrides/` (then move it to `skill-overrides/`) |
 | D30 | AgentCore Memory is integrated through the bridge's own `MemoryAdapter` (one event per exchange, rehydration into the agent's message history at warm-up, preferences into the system prompt), not through Strands' `MemoryStore` | Strands' `MemoryStore` is a retrieval-injection abstraction with its own tools and extraction; the bridge needs deterministic replay of recent history and a small preference block | Strands ships an AgentCore Memory store with history replay |
 | D31 | Long-term memory namespaces are explicit: `/users/{actorId}/preferences` and `/users/{actorId}/sessions/{sessionId}` | The CDK built-in strategies default to `/strategies/{memoryStrategyId}/actors/{actorId}`, and the runtime does not know the strategy id | Never |
 | D32 | The sample server listens on 3939 by default (`PORT=` overrides), and `bridge.config.ts` ships with that URL | 3000 is the most collision-prone port on a developer machine; the owner's first run hit `EADDRINUSE` (a Docker container held it) with a raw stack trace. The server now names the conflict and the fix | Never |
 | D33 | Onboarding guards: `.npmrc engine-strict`, a plain-JS Node check before every npm script, `npm run doctor -- --track local\|cloud\|skill`, and `npm run chat` explaining a failed MCP connection before the first turn | The owner's first run failed three times (wrong Node, taken port, a wrong script path) with nothing saying what was missing. The README is organized by track with install commands per prerequisite | A prerequisite check produces false failures |
+| D34 | No configurable MCP protocol floor. The SDK decides what it can negotiate; `ALEXA_PLUS_PROTOCOL_VERSION` (2025-11-25) is advisory only, and the generator, `npm run doctor`, and the agent log a warning naming the negotiated version when a server falls below it | A floor the bridge cannot justify technically only blocks legitimate testing: most public MCP servers still negotiate 2025-06-18 or 2025-03-26, and the bridge works against them. The Alexa+ requirement is real but it belongs in a warning, not in a refusal | The bridge stops working against a version the SDK still accepts (then fail on that version specifically, with the reason) |
+| D35 | No AWS Budgets alarm. `docs/cost.md` and the deploy output say what accrues and how to stop it; nothing emails you | A budget that notifies needs an email address, and an address in tracked config is exactly the value this repo keeps out of commits. The alarm without a subscriber was decoration | The stack ever gains a resource that can run away on its own |
+| D36 | The five fields that identify a developer rather than the project (`mcp.url`, `mcp.auth.type`, `mcp.auth.secretName`, `skill.id`, `aws.region`) can come from a git-ignored `.env`, applied in `loadConfigFile` before zod runs. `bridge.config.ts` ships ready to commit and nobody needs to edit it | The repo is public: every clone that edits the tracked config file risks committing its own endpoint, Alexa Skill id, or account. Real environment variables still win over `.env`, so CI and one-off runs are unaffected; the Lambda and the container are unaffected because they read the merged `BRIDGE_CONFIG` | A sixth field turns out to be developer-specific (add it to `ENV_OVERRIDES`, its `.env.example` line, and docs/config.md) |
+| D37 | Generated artifacts carry no source URL (`_generated` is `by` and `notice` only), and `npm run check:leaks` (pre-commit hook plus CI) refuses a commit carrying an AWS account id, an Alexa Skill id, a non-local endpoint, a tunnel host, or credentials in a URL | `npm run generate` used to write `mcp.url` into two tracked files, so a `.env` alone would not have kept an endpoint out of a commit. The check is the backstop for the values that reach tracked files by other routes (`skill-package/skill.json` takes a real Lambda ARN by design) | A rule produces false positives often enough that people commit with `--no-verify` by habit |
 
 ---
 
@@ -121,7 +132,7 @@ Goal: settle every item in brief section 12 with evidence before building on it.
 | S3 `spikes/tunnel-idle` | 7 | Sample server behind `cloudflared tunnel --url`, a local MCP client calls the eliciting tool, waits 30 s and then 90 s before answering. Runs with and without the server-side 15 s `ping`. |
 | S4 `spikes/nova-latency` | 8 (baseline) | Raw Bedrock Converse call with a system prompt of realistic size, two tool definitions, one tool round trip, lowest reasoning setting. Records p50 and p95 over 20 runs. The full measurement through the harness happens in Phase 2. |
 | S5 `spikes/cdk-synth-gateway` | 9 (Gateway part) | Synth-only: `Gateway` plus MCP `GatewayTarget` with NoAuth from `aws-cdk-lib/aws-bedrockagentcore`. Confirms the construct surface and property names. |
-| S6 `spikes/ask-deploy-order` | 10 | Hello-world Lambda with the `alexa-appkit.amazon.com` permission and `eventSourceToken`. Tries the candidate cleaner order: `ask smapi create-skill-for-vendor` with a manifest lacking an endpoint to obtain the skill ID first, then one CDK deploy, then `ask deploy` with the ARN. Records whether SMAPI accepts a custom skill without an endpoint. |
+| S6 `spikes/ask-deploy-order` | 10 | Hello-world Lambda with the `alexa-appkit.amazon.com` permission and `eventSourceToken`. Tries the candidate cleaner order: `ask smapi create-skill-for-vendor` with a manifest lacking an endpoint to obtain the Alexa Skill ID first, then one CDK deploy, then `ask deploy` with the ARN. Records whether SMAPI accepts a custom Alexa Skill without an endpoint. |
 
 S2 driver sequences:
 
@@ -142,13 +153,13 @@ S2 driver sequences:
 | 2a | Heartbeat shows gaps: the VM is paused between invocations while `Healthy` | Report `HealthyBusy` while a question is pending (brief prefers `Healthy`; document why) |
 | 2b | `HealthyBusy` blocks new invocations for the same session | Elicitation parking in v1 is at risk. Escalate to the owner with the measurements. Candidate directions, in order: keep `Healthy` and shorten the answer window; hold the invocation open from a second Lambda invoked asynchronously (`Event` invocation type) that waits for the turn to finish; scope elicitation to the Gateway path if Gateway sessions hold the stream server-side |
 | 3 | Reusing a session ID after reclaim errors | Session ID becomes `hash(userId + dayBucket)`; document the reduced warm-hit rate |
-| 4 | Aborted first invocation kills provisioning | Add a "warmer" Lambda invoked asynchronously by the skill Lambda on LaunchRequest; it calls `InvokeAgentRuntime` with a long timeout and no abort. No idle cost |
+| 4 | Aborted first invocation kills provisioning | Add a "warmer" Lambda invoked asynchronously by the Alexa Skill Lambda on LaunchRequest; it calls `InvokeAgentRuntime` with a long timeout and no abort. No idle cost |
 | 5 | Cold start above 6 s after image tuning | Warmer Lambda from item 4 becomes the default path and the cold-start message is expected on the first launch of a day |
 | 6 | 64-char hex rejected | Shorten or re-encode the hash in `core.hashId()`; the contract stays |
 | 7 | Tunnel cuts idle streams | Server-side `ping` every 15 s (D14) plus a troubleshooting entry; if pings do not help, document the tunnel timeout and recommend a named tunnel |
 | 8 | Baseline above 4 s p95 | Shrink the system prompt, inject tool names with one-line descriptions only, cap output tokens, then measure Haiku 4.5 |
 | 9 | L2 constructs lack `lifecycleConfiguration` or image-from-asset | Use the L1 `CfnRuntime` for those properties; keep the L2 elsewhere |
-| 10 | SMAPI refuses a manifest without an endpoint | Keep the two-deploy order from the brief and make `npm run deploy` detect the missing skill ID and print the exact next step |
+| 10 | SMAPI refuses a manifest without an endpoint | Keep the two-deploy order from the brief and make `npm run deploy` detect the missing Alexa Skill ID and print the exact next step |
 
 ### 4.3 Tasks
 
@@ -158,7 +169,7 @@ S2 driver sequences:
 - [x] S5 `∥` (synth run 2026-09-03; see section 16)
 - [ ] S2 container, stack, driver; run sequences 1 to 8 (container, stack, and driver written; deploy not run: creates billable resources, see `spikes/probe-runtime/README.md`)
 - [ ] S3 (script written; not run: `cloudflared` is not installed on the dev machine)
-- [ ] S6 (script written; not run: creates a skill and a Lambda)
+- [ ] S6 (script written; not run: creates an Alexa Skill and a Lambda)
 - [x] Record outcomes and chosen fallbacks in section 16, with numbers (S1, S4 partial, S5; S2, S3, S6 pending)
 - [ ] Tear down the probe stack
 
@@ -258,7 +269,7 @@ Timers: `elicitation.answerTimeoutSeconds` cancels a pending question and logs i
 
 ### 6.3 Tasks
 
-- [x] `mcp/client.ts`: transport from `@modelcontextprotocol/sdk`, `capabilities: {elicitation: {}}`, read the negotiated protocol version from the transport after `initialize` and fail below 2025-11-25, tool list cache, elicitation handler path chosen by S1, reconnect on transport close with a single retry.
+- [x] `mcp/client.ts`: transport from `@modelcontextprotocol/sdk`, `capabilities: {elicitation: {}}`, read the negotiated protocol version from the transport after `initialize` and warn below 2025-11-25 (D34), tool list cache, elicitation handler path chosen by S1, reconnect on transport close with a single retry.
 - [x] `mcp/auth.ts`: header injection for bearer and API key, Secrets Manager fetch at startup (skipped when `type: 'none'`), OAuth client credentials through the SDK auth provider.
 - [x] `elicitation/queue.ts` and `elicitation/question.ts`: `PendingQuestion {id, elicitationId, property, schema, resolve}`, expects derivation (boolean → yesNo, `format: date` → date, integer or number → number, enum → choice, else text), required-first ordering (D5), answer timeout, cancel and decline.
 - [x] `elicitation/answer-mapper.ts`: deterministic mappers with unit tests per `expects`; model fallback that asks Nova for a JSON object matching the property schema (only for `text` answers against non-string properties).
@@ -281,7 +292,7 @@ Timers: `elicitation.answerTimeoutSeconds` cancels a pending question and logs i
 
 ## 7. Phase 3: generator
 
-Goal: `npm run generate` turns any reachable 2025-11-25 MCP server into a tool manifest and an Alexa interaction model, deterministically except for model-written utterances.
+Goal: `npm run generate` turns any reachable MCP server into a tool manifest and an Alexa interaction model, deterministically except for model-written utterances.
 
 ### 7.1 Tasks
 
@@ -311,12 +322,12 @@ Goal: the agent runs on AgentCore Runtime and `npm run chat -- --remote` works a
 - [x] `packages/agent/Dockerfile`: multi-stage, `node:22-slim` arm64, workspace install with `--omit=dev`, prune to `agent` and `core`, `NODE_ENV=production`, non-root user, `EXPOSE 8080`. Target image size under 200 MB; measure cold start against the S2 numbers.
 - [x] `npm run agent:dev`: build and run locally with Docker or Finch, `BRIDGE_CONFIG` from `bridge.config.ts`, curl examples in the script output.
 - [x] `infra/bin/app.ts` and `infra/lib/alexa-mcp-bridge-stack.ts` reading `bridge.config.ts` through `core.loadConfigFile`:
-  - [x] Skill Lambda: `NodejsFunction`, Node 22, arm64, 8 s, 512 MB, env `BRIDGE_CONFIG`, `AGENT_RUNTIME_ARN`; `alexa-appkit.amazon.com` permission with `eventSourceToken` when `skill.id` is set, loud `Annotations.addWarning` when not.
+  - [x] Alexa Skill Lambda: `NodejsFunction`, Node 22, arm64, 8 s, 512 MB, env `BRIDGE_CONFIG`, `AGENT_RUNTIME_ARN`; `alexa-appkit.amazon.com` permission with `eventSourceToken` when `skill.id` is set, loud `Annotations.addWarning` when not.
   - [x] Agent image: `DockerImageAsset` (linux/arm64) → AgentCore `Runtime` with explicit `lifecycleConfiguration` from config, environment from config, execution role: `bedrock:InvokeModel*` on the configured inference profile and the underlying foundation model ARNs in every region the profile routes to, Memory data-plane actions on the memory ARN, `secretsmanager:GetSecretValue` on the named secret, logs.
   - [x] Lambda role: `bedrock-agentcore:InvokeAgentRuntime` on the runtime and its `DEFAULT` endpoint.
   - [x] AgentCore Memory: short-term always; long-term strategies when `memory.longTerm` (wired in Phase 6, resource created here).
   - [x] Log groups with `logRetentionDays`.
-  - [x] AWS Budgets cost budget at `aws.budgetUsd`; email notification when `budgetEmail` is set, warning annotation when not.
+  - [x] ~~AWS Budgets cost budget~~ removed 2026-09-04 (D35): the alarm needed an email address in tracked config.
   - [x] Outputs: Lambda ARN, runtime ARN, memory ID, gateway URL when enabled.
 - [x] `scripts/check-model-access.ts`: one `Converse` call per configured model, prints a pass or the console step to enable access.
 - [x] `scripts/deploy.ts`: validate config, check model access, `cdk deploy --outputs-file`, print outputs, print the cost note (what starts costing money and when), print the next step (skill.json ARN, or "set skill.id and deploy again").
@@ -333,7 +344,7 @@ Goal: the agent runs on AgentCore Runtime and `npm run chat -- --remote` works a
 
 ---
 
-## 9. Phase 5: skill Lambda, skill package, device end to end
+## 9. Phase 5: Alexa Skill Lambda, Alexa Skill package, device end to end
 
 Goal: ship point. The bridge works on an Echo against the sample server.
 
@@ -385,7 +396,7 @@ Every handler reads as: build `TurnInput` → `bridge.turn()` → `render()`.
 
 ### 10.2 Exit criteria
 
-- Close the skill, reopen within 20 minutes: the agent remembers the last search. Reopen after a reclaim: history is rehydrated from Memory.
+- Close the Alexa Skill, reopen within 20 minutes: the agent remembers the last search. Reopen after a reclaim: history is rehydrated from Memory.
 - `features.gateway: true` deploys and the hotel round trip works through the Gateway.
 
 ---
@@ -424,7 +435,7 @@ Logging and privacy:
 Cost guardrails in code:
 
 - `runtime.idleTimeoutMinutes` and `maxLifetimeHours` always rendered into `lifecycleConfiguration`.
-- `deploy.ts` refuses to run when `aws.budgetUsd` is unset and prints the cost note every time.
+- `deploy.ts` prints the cost note every time; there is no budget gate (D35).
 - Log retention always set; no log group without it.
 
 Conventions:
@@ -455,7 +466,7 @@ Conventions:
 2. Keep `spikes/` in the repo after the docs pass (D11), or delete once `docs/architecture.md` records the outcomes?
 3. Should this workspace directory become the repo, or is the repo created elsewhere and these two documents moved in?
 4. GitHub Actions on the personal account is assumed for CI. Any objection?
-5. Preferred handling if S6 shows SMAPI accepts a skill without an endpoint: a `scripts/create-skill.ts` helper, or documented CLI commands only?
+5. Preferred handling if S6 shows SMAPI accepts an Alexa Skill without an endpoint: a `scripts/create-skill.ts` helper, or documented CLI commands only?
 
 ---
 
@@ -489,9 +500,11 @@ Append-only. Move to `docs/architecture.md` in Phase 7.
 | 2026-09-03 | Live round trip through the harness (Phase 2 exit) | With the real model against the sample server: hotel search with the guests elicitation and spoken answer in 2.5 s (two model calls), weather turn in 1.4 s. First attempts failed: Nova returned an empty message (2 output tokens) on a tool result with both `json` and `text` blocks, and hit the 400-token cap with a think-aloud answer on the hotel result. Raw Converse replication: json+text → 545 input tokens, empty; text only → 25 tokens, good; json only → 26 tokens, good | D28. Item 8 through the harness is comfortably inside the budget for these turns; the 20-run measurement is still owed |
 | 2026-09-03 | Phase 3 | Generator: scan, slot mapping, manifest, template utterances, model utterances with fallback, overrides, interaction model with answer and standard intents, generated-file markers. 15 tests including a snapshot and a determinism check. Artifacts for the sample server generated with `--no-model` and committed (`_generated.source` shows the default port 3000; generation ran on 3210 because Docker Desktop's `open-webui` container holds 3000 on the dev machine) | Phase 3 exit criteria met except the console validation (Phase 5) |
 | 2026-09-03 | Phase 4 | Dockerfile (three-stage, arm64, production deps only, build-only tsconfig), `.dockerignore` with negations so the context is manifests plus core and agent sources, CDK stack with tests (lifecycle, Lambda 8 s arm64, Alexa permission with and without `eventSourceToken`, memory strategies, gateway toggle with streaming override, budget, retention, IAM grants), scripts, `chat --remote`. `npm run synth` passes without credentials. Image size: see the next row | Not deployed: `npm run deploy` creates billable resources and waits for the owner |
-| 2026-09-03 | Phase 5 | Skill Lambda: handlers per brief 5.5, poll-first bridge client (D16), render with SSML escaping and session attributes, `withSkillId` (D15), manifest bundled by JSON import; 19 tests. `skill.json`, root `ask-resources.json` (D29), overrides example | Device test, console model validation, and items 1, 7, 8, 10 end to end are owed after a deploy |
+| 2026-09-03 | Phase 5 | Alexa Skill Lambda: handlers per brief 5.5, poll-first bridge client (D16), render with SSML escaping and session attributes, `withSkillId` (D15), manifest bundled by JSON import; 19 tests. `skill.json`, root `ask-resources.json` (D29), overrides example | Device test, console model validation, and items 1, 7, 8, 10 end to end are owed after a deploy |
 | 2026-09-03 | Phase 6 | AgentCore Memory adapter (record, hydrate with role alternation, preferences into the prompt) with mocked-client tests; explicit namespaces (D31); SigV4 gateway fetch and client switch on `MCP_GATEWAY_URL` | The Gateway elicitation round trip and the "reopen within 20 minutes" memory check need a deployment |
 | 2026-09-03 | Phase 7 | README quick start, `docs/architecture.md` (turn story, state table, parking, verification table), `docs/config.md`, `docs/cost.md`, `docs/troubleshooting.md`, `CLAUDE.md` refreshed | `npm audit`, tag `v1.0.0`, and a fresh-account walk-through remain |
 | 2026-09-03 | Agent image (brief item 5, size part) | `docker build --platform linux/arm64` succeeds. node:22-slim with all production deps: 476 MB. node:22-alpine with `--omit=optional` (drops Strands' optional `@tobilu/qmd`, which pulls node-llama-cpp and TypeScript): 301 MB, of which node_modules is 63 MB (110 packages) and the bridge's own code under 1 MB. Smoke test: `/ping` Healthy, `warmup` answers in 5 ms, the container connects to a sample server on the host (`host.docker.internal`), lists tools, and logs `warm-up complete` | The 200 MB target in D17 is not reachable with an official Node base image (the Node binary alone is about 100 MB); cold start against S2's numbers is still the measurement that matters and needs a deploy |
 | 2026-09-03 | Dependency audit | npm audit did not finish (registry timeout on the dev machine); rerun with npm audit --omit=dev | Re-run before tagging v1.0.0 |
 | 2026-09-04 | Owner's first run | Three failures reproduced: `npm run sample:start` crashed with `EADDRINUSE` on 3000 (Docker's open-webui), `npm run chat` failed with "Cannot find module packages/cli/dist/chat.js" (the script pointed at `dist/chat.js`; the CLI builds to `dist/src/`), and `npm test` under the shell's default Node 18 failed 16 tests. Fixed: script path, port 3939 with a named error, engine-strict plus a Node check before every script, `npm run doctor`, readable chat errors with guidance, README rewritten around three tracks (local, cloud, device) with install commands, "Echo" replaced by "Alexa+ device" everywhere the repo authors text | D32, D33. `npm run doctor` and a piped `npm run chat` smoke pass on the dev machine |
+| 2026-09-04 | MCP protocol floor removed | `mcp.protocolVersion` deleted from the config; `assertProtocolVersion` split into `requireProtocolVersion` (throws only when the server reports no version) and `alexaPlusVersionWarning`. Verified live the same day: DeepWiki, Context7, Cloudflare docs, Exa, Firecrawl, Hugging Face and CoinGecko negotiate 2025-11-25; Microsoft Learn and grep.app negotiate 2025-06-18; AWS Knowledge and GitMCP negotiate 2025-03-26 | D34; brief section 2 requirement 1 rewritten |
+| 2026-09-04 | Public-repo hardening (owner request after a security review) | Budget alarm removed (D35). `.env` override layer in `packages/core/src/config.ts` with `.env.example` and `!.env.example` in `.gitignore` (D36). `scripts/check-leaks.ts` plus `.githooks/pre-commit` and a CI step; generated files no longer carry `_generated.source` (D37). Invocation name and Alexa Skill title are now `bridge demo`; artifacts regenerated. Accepted rather than fixed, and written up in the README's "Security, privacy, and what to keep out of git": the Lambda permission stays open until `skill.id` is set (recommended step, not enforced), `skill-package/skill.json` holds a real Lambda ARN locally, MCP server instructions reach the system prompt, `features.debug` logs spoken values, and memory keeps utterances for 30 days | Review found nothing wrong with secret handling itself: names only, fetched at runtime, never logged |

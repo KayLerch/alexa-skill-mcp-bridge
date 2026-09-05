@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 const PROMPTS_DIR = new URL('../../prompts/', import.meta.url);
 
 export type PromptName =
-  'system' | 'tool-result' | 'elicitation' | 'tool-hint' | 'fallback' | 'ask-user';
+  'system' | 'voice' | 'tool-result' | 'elicitation' | 'tool-hint' | 'fallback' | 'ask-user';
 
 const cache = new Map<PromptName, string>();
 
@@ -41,10 +41,22 @@ export interface SystemPromptVars {
   today: string;
   /** "Known about this user" block from long-term memory. Empty string when there is none. */
   memoryContext: string;
+  /** config.speech, so the voice rules carry the same numbers the renderers use. */
+  maxSentences: number;
+  maxChoicesSpoken: number;
 }
 
+/**
+ * Persona, then the voice rules, then how to read a tool result. `voice.md` is its own file
+ * because every model call that produces speech needs it, not only this one.
+ */
 export function buildSystemPrompt(vars: SystemPromptVars): string {
-  return `${renderPrompt('system', { ...vars })}\n\n${loadPrompt('tool-result').trim()}`;
+  const { maxSentences, maxChoicesSpoken, ...persona } = vars;
+  const voice = renderPrompt('voice', {
+    maxSentences: String(maxSentences),
+    maxChoicesSpoken: String(maxChoicesSpoken),
+  });
+  return [renderPrompt('system', persona), voice, loadPrompt('tool-result').trim()].join('\n\n');
 }
 
 /** One line per tool: name, then the description's first sentence. Keeps the prompt small. */

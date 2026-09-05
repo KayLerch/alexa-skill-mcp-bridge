@@ -1,71 +1,166 @@
 {
   "_generated": {
     "by": "alexa-skill-mcp-bridge generator",
-    "notice": "Generated file. Do not edit by hand; run `npm run generate`.",
-    "source": "http://localhost:3939/mcp"
+    "notice": "Generated file. Do not edit by hand; run `npm run generate`."
   },
   "interactionModel": {
     "languageModel": {
-      "invocationName": "my bridge",
+      "invocationName": "bridge demo",
       "intents": [
         {
-          "name": "SearchHotelsIntent",
+          "name": "PlanParkVisitIntent",
           "slots": [
             {
-              "name": "checkIn",
-              "type": "AMAZON.DATE"
+              "name": "park",
+              "type": "ParkType"
             },
             {
-              "name": "checkOut",
-              "type": "AMAZON.DATE"
-            },
-            {
-              "name": "guests",
-              "type": "AMAZON.NUMBER"
-            },
-            {
-              "name": "destination",
-              "type": "AMAZON.SearchQuery"
+              "name": "month",
+              "type": "MonthType"
             }
           ],
           "samples": [
-            "search hotels",
-            "search hotels please",
-            "can you search hotels",
-            "i want to search hotels",
-            "please search hotels",
-            "search hotels check in on {checkIn}",
-            "search hotels check out on {checkOut}",
-            "search hotels guests {guests}",
-            "search hotels check in on {checkIn} check out on {checkOut} guests {guests}",
-            "search hotels destination {destination}",
-            "search hotels for {destination}",
-            "search hotels {destination}",
-            "help me search hotels",
-            "search hotels now",
-            "i'd like to search hotels"
+            "what is {park} like in {month}",
+            "tell me about {park}",
+            "is {park} open in {month}",
+            "should i visit {park} in {month}",
+            "what can i do in {park}",
+            "how is {park} in {month}",
+            "what's {park} like in {month}",
+            "is {park} worth visiting in {month}",
+            "tell me about {park} in {month}",
+            "how crowded is {park} in {month}",
+            "can i visit {park} in {month}",
+            "what should i know about {park} in {month}",
+            "how is the {park} in {month}",
+            "what can i do in {park} in {month}",
+            "plan a trip to {park} in {month}",
+            "{park} in {month}",
+            "what is {park} like",
+            "how is {park} during {month}",
+            "can you tell me about {park} this {month}",
+            "i'd like to know about {park} in {month}",
+            "give me info on {park}",
+            "what is open in {park} during {month}",
+            "{month} at {park}",
+            "tell me about {month} at {park}",
+            "how is it in {park} during {month}",
+            "can you plan a park visit for {park} in {month}",
+            "plan park visit in {month}",
+            "plan park visit",
+            "plan park visit please",
+            "can you plan park visit",
+            "i want to plan park visit",
+            "please plan park visit",
+            "help me plan park visit",
+            "i'd like to plan park visit",
+            "plan park visit in {park}",
+            "plan park visit in {park} in {month}",
+            "plan park visit in {month} in {park}",
+            "i want to plan park visit in {park} in {month}"
           ]
         },
         {
-          "name": "GetWeatherIntent",
+          "name": "FindParkIntent",
           "slots": [
             {
-              "name": "city",
-              "type": "AMAZON.SearchQuery"
+              "name": "activity",
+              "type": "ActivityType"
+            },
+            {
+              "name": "month",
+              "type": "MonthType"
+            },
+            {
+              "name": "state",
+              "type": "StateType"
             }
           ],
           "samples": [
-            "get weather",
-            "get weather please",
-            "can you get weather",
-            "i want to get weather",
-            "please get weather",
-            "get weather city {city}",
-            "get weather for {city}",
-            "get weather {city}",
-            "help me get weather",
-            "get weather now",
-            "i'd like to get weather"
+            "what is the best national park for {activity}",
+            "what is the best national park in {month}",
+            "which park is good for {activity}",
+            "where should i go for {activity} in {month}",
+            "best park in {month} for {activity}",
+            "where can i go {activity}",
+            "a park in {state} for {activity}",
+            "somewhere to go in {state} in {month}",
+            "what is worth visiting in {month}",
+            "where can i go {activity} in {month}",
+            "i want to see wildlife in {month}",
+            "which park has the best {activity}",
+            "recommend a park for {activity} in {state}",
+            "is there a good park for {activity} in {state}",
+            "what's a good place for {activity} in {state}",
+            "where should we go {activity} in {month}",
+            "any park with scenic drives in {state}",
+            "i'd like to go somewhere for {activity} in {month}",
+            "best national park for {activity}",
+            "where can i watch wildlife in {state} in {month}",
+            "a park for {activity} in {state}",
+            "which park is good for {activity} in {month}",
+            "what national park should i visit in {month} for {activity}",
+            "somewhere to go {activity} in {state} in {month}",
+            "where should i go to escape the heat",
+            "{activity}",
+            "find me a park for {activity}",
+            "what is the best park for {activity}",
+            "where should i go for {activity}",
+            "can you find a park for {activity}",
+            "i'd like a park for {activity}",
+            "show me parks for {activity}",
+            "suggest a park for {activity}",
+            "i want to {activity} which park should i go to",
+            "recommend a park for {activity}",
+            "find parks where i can {activity}",
+            "where can i {activity} in a national park",
+            "i need a park for {month}",
+            "what parks are good in {month}",
+            "which parks are open in {month}",
+            "can you find parks for {month}",
+            "i'd like parks available in {month}",
+            "show me parks during {month}",
+            "suggest parks for {month}",
+            "recommend parks in {month}",
+            "where should i visit in {month}",
+            "find me parks in {state}",
+            "what is the best park in {state}",
+            "where should i go in {state}",
+            "can you find parks in {state}",
+            "i'd like a park in {state}",
+            "show me parks in {state}",
+            "suggest a park in {state}",
+            "recommend parks in {state}",
+            "i want to go to a park in {state}",
+            "find me a park for {activity} in {month}",
+            "what park is best for {activity} in {month}",
+            "where should i go to {activity} in {month}",
+            "can you find a park for {activity} during {month}",
+            "i'd like a park for {activity} in {month}",
+            "show me parks for {activity} in {month}",
+            "suggest a park for {activity} and {month}",
+            "recommend a park for {activity} in {month}",
+            "find parks to {activity} in {month}",
+            "i need a park for {activity} and {month}",
+            "find me a park for {activity} in {state}",
+            "what is the best park for {activity} in {state}",
+            "where should i go to {activity} in {state}",
+            "can you find a park for {activity} in {state}",
+            "i'd like a park for {activity} located in {state}",
+            "show me parks for {activity} in {state}",
+            "suggest a park for {activity} in {state}",
+            "find parks to {activity} in {state}",
+            "i need a park for {activity} and {state}",
+            "which parks in {month} are good for {state}",
+            "what parks are best in {month} and {state}",
+            "where should i visit in {month} in {state}",
+            "can you find parks for {month} and {state}",
+            "i'd like parks in {month} and {state}",
+            "show me parks available in {month} in {state}",
+            "suggest parks in {month} and {state}",
+            "recommend parks for {month} in {state}",
+            "find me parks in {month} and {state}",
+            "i need a park for {month} and {state}"
           ]
         },
         {
@@ -128,6 +223,22 @@
           ]
         },
         {
+          "name": "ChoiceAnswerIntent",
+          "slots": [
+            {
+              "name": "choice",
+              "type": "AnswerChoiceType"
+            }
+          ],
+          "samples": [
+            "{choice}",
+            "{choice} please",
+            "i'd say {choice}",
+            "let's say {choice}",
+            "make it {choice}"
+          ]
+        },
+        {
           "name": "FreeTextIntent",
           "slots": [
             {
@@ -146,6 +257,21 @@
           ]
         },
         {
+          "name": "SpokenRequestIntent",
+          "slots": [
+            {
+              "name": "request",
+              "type": "SpokenRequestType"
+            }
+          ],
+          "samples": [
+            "{request}",
+            "ask {request}",
+            "tell me {request}",
+            "i want {request}"
+          ]
+        },
+        {
           "name": "AMAZON.HelpIntent"
         },
         {
@@ -161,7 +287,1400 @@
           "name": "AMAZON.NavigateHomeIntent"
         }
       ],
-      "types": []
+      "types": [
+        {
+          "name": "ActivityType",
+          "values": [
+            {
+              "id": "hiking",
+              "name": {
+                "value": "hiking"
+              }
+            },
+            {
+              "id": "wildlife_watching",
+              "name": {
+                "value": "wildlife watching"
+              }
+            },
+            {
+              "id": "fishing",
+              "name": {
+                "value": "fishing"
+              }
+            },
+            {
+              "id": "stargazing",
+              "name": {
+                "value": "stargazing"
+              }
+            },
+            {
+              "id": "paddling",
+              "name": {
+                "value": "paddling"
+              }
+            },
+            {
+              "id": "scenic_driving",
+              "name": {
+                "value": "scenic driving"
+              }
+            },
+            {
+              "id": "camping",
+              "name": {
+                "value": "camping"
+              }
+            },
+            {
+              "id": "biking",
+              "name": {
+                "value": "biking"
+              }
+            },
+            {
+              "id": "climbing",
+              "name": {
+                "value": "climbing"
+              }
+            },
+            {
+              "id": "winter_sports",
+              "name": {
+                "value": "winter sports"
+              }
+            },
+            {
+              "id": "ranger_programs",
+              "name": {
+                "value": "ranger programs"
+              }
+            }
+          ]
+        },
+        {
+          "name": "MonthType",
+          "values": [
+            {
+              "id": "january",
+              "name": {
+                "value": "january",
+                "synonyms": [
+                  "January"
+                ]
+              }
+            },
+            {
+              "id": "february",
+              "name": {
+                "value": "february",
+                "synonyms": [
+                  "February"
+                ]
+              }
+            },
+            {
+              "id": "march",
+              "name": {
+                "value": "march",
+                "synonyms": [
+                  "March"
+                ]
+              }
+            },
+            {
+              "id": "april",
+              "name": {
+                "value": "april",
+                "synonyms": [
+                  "April"
+                ]
+              }
+            },
+            {
+              "id": "may",
+              "name": {
+                "value": "may",
+                "synonyms": [
+                  "May"
+                ]
+              }
+            },
+            {
+              "id": "june",
+              "name": {
+                "value": "june",
+                "synonyms": [
+                  "June"
+                ]
+              }
+            },
+            {
+              "id": "july",
+              "name": {
+                "value": "july",
+                "synonyms": [
+                  "July"
+                ]
+              }
+            },
+            {
+              "id": "august",
+              "name": {
+                "value": "august",
+                "synonyms": [
+                  "August"
+                ]
+              }
+            },
+            {
+              "id": "september",
+              "name": {
+                "value": "september",
+                "synonyms": [
+                  "September"
+                ]
+              }
+            },
+            {
+              "id": "october",
+              "name": {
+                "value": "october",
+                "synonyms": [
+                  "October"
+                ]
+              }
+            },
+            {
+              "id": "november",
+              "name": {
+                "value": "november",
+                "synonyms": [
+                  "November"
+                ]
+              }
+            },
+            {
+              "id": "december",
+              "name": {
+                "value": "december",
+                "synonyms": [
+                  "December"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "ParkType",
+          "values": [
+            {
+              "id": "yosemite",
+              "name": {
+                "value": "yosemite",
+                "synonyms": [
+                  "Yosemite"
+                ]
+              }
+            },
+            {
+              "id": "yellowstone",
+              "name": {
+                "value": "yellowstone",
+                "synonyms": [
+                  "Yellowstone"
+                ]
+              }
+            },
+            {
+              "id": "glacier",
+              "name": {
+                "value": "glacier",
+                "synonyms": [
+                  "Glacier"
+                ]
+              }
+            },
+            {
+              "id": "grand_canyon",
+              "name": {
+                "value": "grand canyon",
+                "synonyms": [
+                  "Grand Canyon"
+                ]
+              }
+            },
+            {
+              "id": "everglades",
+              "name": {
+                "value": "everglades",
+                "synonyms": [
+                  "Everglades"
+                ]
+              }
+            },
+            {
+              "id": "katmai",
+              "name": {
+                "value": "katmai",
+                "synonyms": [
+                  "Katmai"
+                ]
+              }
+            },
+            {
+              "id": "great_basin",
+              "name": {
+                "value": "great basin",
+                "synonyms": [
+                  "Great Basin"
+                ]
+              }
+            },
+            {
+              "id": "acadia",
+              "name": {
+                "value": "acadia",
+                "synonyms": [
+                  "Acadia"
+                ]
+              }
+            },
+            {
+              "id": "zion",
+              "name": {
+                "value": "zion",
+                "synonyms": [
+                  "Zion"
+                ]
+              }
+            },
+            {
+              "id": "rocky_mountain",
+              "name": {
+                "value": "rocky mountain",
+                "synonyms": [
+                  "Rocky Mountain"
+                ]
+              }
+            },
+            {
+              "id": "olympic",
+              "name": {
+                "value": "olympic",
+                "synonyms": [
+                  "Olympic"
+                ]
+              }
+            },
+            {
+              "id": "joshua_tree",
+              "name": {
+                "value": "joshua tree",
+                "synonyms": [
+                  "Joshua Tree"
+                ]
+              }
+            },
+            {
+              "id": "great_smoky_mountains",
+              "name": {
+                "value": "great smoky mountains",
+                "synonyms": [
+                  "Great Smoky Mountains"
+                ]
+              }
+            },
+            {
+              "id": "bryce_canyon",
+              "name": {
+                "value": "bryce canyon",
+                "synonyms": [
+                  "Bryce Canyon"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "StateType",
+          "values": [
+            {
+              "id": "alaska",
+              "name": {
+                "value": "alaska",
+                "synonyms": [
+                  "Alaska"
+                ]
+              }
+            },
+            {
+              "id": "arizona",
+              "name": {
+                "value": "arizona",
+                "synonyms": [
+                  "Arizona"
+                ]
+              }
+            },
+            {
+              "id": "california",
+              "name": {
+                "value": "california",
+                "synonyms": [
+                  "California"
+                ]
+              }
+            },
+            {
+              "id": "colorado",
+              "name": {
+                "value": "colorado",
+                "synonyms": [
+                  "Colorado"
+                ]
+              }
+            },
+            {
+              "id": "florida",
+              "name": {
+                "value": "florida",
+                "synonyms": [
+                  "Florida"
+                ]
+              }
+            },
+            {
+              "id": "idaho",
+              "name": {
+                "value": "idaho",
+                "synonyms": [
+                  "Idaho"
+                ]
+              }
+            },
+            {
+              "id": "maine",
+              "name": {
+                "value": "maine",
+                "synonyms": [
+                  "Maine"
+                ]
+              }
+            },
+            {
+              "id": "montana",
+              "name": {
+                "value": "montana",
+                "synonyms": [
+                  "Montana"
+                ]
+              }
+            },
+            {
+              "id": "nevada",
+              "name": {
+                "value": "nevada",
+                "synonyms": [
+                  "Nevada"
+                ]
+              }
+            },
+            {
+              "id": "north_carolina",
+              "name": {
+                "value": "north carolina",
+                "synonyms": [
+                  "North Carolina"
+                ]
+              }
+            },
+            {
+              "id": "tennessee",
+              "name": {
+                "value": "tennessee",
+                "synonyms": [
+                  "Tennessee"
+                ]
+              }
+            },
+            {
+              "id": "utah",
+              "name": {
+                "value": "utah",
+                "synonyms": [
+                  "Utah"
+                ]
+              }
+            },
+            {
+              "id": "washington",
+              "name": {
+                "value": "washington",
+                "synonyms": [
+                  "Washington"
+                ]
+              }
+            },
+            {
+              "id": "wyoming",
+              "name": {
+                "value": "wyoming",
+                "synonyms": [
+                  "Wyoming"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AnswerChoiceType",
+          "values": [
+            {
+              "id": "hiking",
+              "name": {
+                "value": "hiking"
+              }
+            },
+            {
+              "id": "wildlife_watching",
+              "name": {
+                "value": "wildlife watching"
+              }
+            },
+            {
+              "id": "fishing",
+              "name": {
+                "value": "fishing"
+              }
+            },
+            {
+              "id": "stargazing",
+              "name": {
+                "value": "stargazing"
+              }
+            },
+            {
+              "id": "paddling",
+              "name": {
+                "value": "paddling"
+              }
+            },
+            {
+              "id": "scenic_driving",
+              "name": {
+                "value": "scenic driving"
+              }
+            },
+            {
+              "id": "camping",
+              "name": {
+                "value": "camping"
+              }
+            },
+            {
+              "id": "biking",
+              "name": {
+                "value": "biking"
+              }
+            },
+            {
+              "id": "climbing",
+              "name": {
+                "value": "climbing"
+              }
+            },
+            {
+              "id": "winter_sports",
+              "name": {
+                "value": "winter sports"
+              }
+            },
+            {
+              "id": "ranger_programs",
+              "name": {
+                "value": "ranger programs"
+              }
+            },
+            {
+              "id": "january",
+              "name": {
+                "value": "january",
+                "synonyms": [
+                  "January"
+                ]
+              }
+            },
+            {
+              "id": "february",
+              "name": {
+                "value": "february",
+                "synonyms": [
+                  "February"
+                ]
+              }
+            },
+            {
+              "id": "march",
+              "name": {
+                "value": "march",
+                "synonyms": [
+                  "March"
+                ]
+              }
+            },
+            {
+              "id": "april",
+              "name": {
+                "value": "april",
+                "synonyms": [
+                  "April"
+                ]
+              }
+            },
+            {
+              "id": "may",
+              "name": {
+                "value": "may",
+                "synonyms": [
+                  "May"
+                ]
+              }
+            },
+            {
+              "id": "june",
+              "name": {
+                "value": "june",
+                "synonyms": [
+                  "June"
+                ]
+              }
+            },
+            {
+              "id": "july",
+              "name": {
+                "value": "july",
+                "synonyms": [
+                  "July"
+                ]
+              }
+            },
+            {
+              "id": "august",
+              "name": {
+                "value": "august",
+                "synonyms": [
+                  "August"
+                ]
+              }
+            },
+            {
+              "id": "september",
+              "name": {
+                "value": "september",
+                "synonyms": [
+                  "September"
+                ]
+              }
+            },
+            {
+              "id": "october",
+              "name": {
+                "value": "october",
+                "synonyms": [
+                  "October"
+                ]
+              }
+            },
+            {
+              "id": "november",
+              "name": {
+                "value": "november",
+                "synonyms": [
+                  "November"
+                ]
+              }
+            },
+            {
+              "id": "december",
+              "name": {
+                "value": "december",
+                "synonyms": [
+                  "December"
+                ]
+              }
+            },
+            {
+              "id": "yosemite",
+              "name": {
+                "value": "yosemite",
+                "synonyms": [
+                  "Yosemite"
+                ]
+              }
+            },
+            {
+              "id": "yellowstone",
+              "name": {
+                "value": "yellowstone",
+                "synonyms": [
+                  "Yellowstone"
+                ]
+              }
+            },
+            {
+              "id": "glacier",
+              "name": {
+                "value": "glacier",
+                "synonyms": [
+                  "Glacier"
+                ]
+              }
+            },
+            {
+              "id": "grand_canyon",
+              "name": {
+                "value": "grand canyon",
+                "synonyms": [
+                  "Grand Canyon"
+                ]
+              }
+            },
+            {
+              "id": "everglades",
+              "name": {
+                "value": "everglades",
+                "synonyms": [
+                  "Everglades"
+                ]
+              }
+            },
+            {
+              "id": "katmai",
+              "name": {
+                "value": "katmai",
+                "synonyms": [
+                  "Katmai"
+                ]
+              }
+            },
+            {
+              "id": "great_basin",
+              "name": {
+                "value": "great basin",
+                "synonyms": [
+                  "Great Basin"
+                ]
+              }
+            },
+            {
+              "id": "acadia",
+              "name": {
+                "value": "acadia",
+                "synonyms": [
+                  "Acadia"
+                ]
+              }
+            },
+            {
+              "id": "zion",
+              "name": {
+                "value": "zion",
+                "synonyms": [
+                  "Zion"
+                ]
+              }
+            },
+            {
+              "id": "rocky_mountain",
+              "name": {
+                "value": "rocky mountain",
+                "synonyms": [
+                  "Rocky Mountain"
+                ]
+              }
+            },
+            {
+              "id": "olympic",
+              "name": {
+                "value": "olympic",
+                "synonyms": [
+                  "Olympic"
+                ]
+              }
+            },
+            {
+              "id": "joshua_tree",
+              "name": {
+                "value": "joshua tree",
+                "synonyms": [
+                  "Joshua Tree"
+                ]
+              }
+            },
+            {
+              "id": "great_smoky_mountains",
+              "name": {
+                "value": "great smoky mountains",
+                "synonyms": [
+                  "Great Smoky Mountains"
+                ]
+              }
+            },
+            {
+              "id": "bryce_canyon",
+              "name": {
+                "value": "bryce canyon",
+                "synonyms": [
+                  "Bryce Canyon"
+                ]
+              }
+            },
+            {
+              "id": "alaska",
+              "name": {
+                "value": "alaska",
+                "synonyms": [
+                  "Alaska"
+                ]
+              }
+            },
+            {
+              "id": "arizona",
+              "name": {
+                "value": "arizona",
+                "synonyms": [
+                  "Arizona"
+                ]
+              }
+            },
+            {
+              "id": "california",
+              "name": {
+                "value": "california",
+                "synonyms": [
+                  "California"
+                ]
+              }
+            },
+            {
+              "id": "colorado",
+              "name": {
+                "value": "colorado",
+                "synonyms": [
+                  "Colorado"
+                ]
+              }
+            },
+            {
+              "id": "florida",
+              "name": {
+                "value": "florida",
+                "synonyms": [
+                  "Florida"
+                ]
+              }
+            },
+            {
+              "id": "idaho",
+              "name": {
+                "value": "idaho",
+                "synonyms": [
+                  "Idaho"
+                ]
+              }
+            },
+            {
+              "id": "maine",
+              "name": {
+                "value": "maine",
+                "synonyms": [
+                  "Maine"
+                ]
+              }
+            },
+            {
+              "id": "montana",
+              "name": {
+                "value": "montana",
+                "synonyms": [
+                  "Montana"
+                ]
+              }
+            },
+            {
+              "id": "nevada",
+              "name": {
+                "value": "nevada",
+                "synonyms": [
+                  "Nevada"
+                ]
+              }
+            },
+            {
+              "id": "north_carolina",
+              "name": {
+                "value": "north carolina",
+                "synonyms": [
+                  "North Carolina"
+                ]
+              }
+            },
+            {
+              "id": "tennessee",
+              "name": {
+                "value": "tennessee",
+                "synonyms": [
+                  "Tennessee"
+                ]
+              }
+            },
+            {
+              "id": "utah",
+              "name": {
+                "value": "utah",
+                "synonyms": [
+                  "Utah"
+                ]
+              }
+            },
+            {
+              "id": "washington",
+              "name": {
+                "value": "washington",
+                "synonyms": [
+                  "Washington"
+                ]
+              }
+            },
+            {
+              "id": "wyoming",
+              "name": {
+                "value": "wyoming",
+                "synonyms": [
+                  "Wyoming"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "SpokenRequestType",
+          "values": [
+            {
+              "name": {
+                "value": "a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "a park in something for something"
+              }
+            },
+            {
+              "name": {
+                "value": "any park with scenic drives in something"
+              }
+            },
+            {
+              "name": {
+                "value": "best national park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "best park in something for something"
+              }
+            },
+            {
+              "name": {
+                "value": "can i visit something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find a park for something during something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find parks for something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find parks for something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you find parks in something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you plan a park visit for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "can you plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "can you tell me about something this something"
+              }
+            },
+            {
+              "name": {
+                "value": "find me a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "find me a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "find me parks in something"
+              }
+            },
+            {
+              "name": {
+                "value": "find me parks in something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "find parks to something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "find parks where i can something"
+              }
+            },
+            {
+              "name": {
+                "value": "give me info on something"
+              }
+            },
+            {
+              "name": {
+                "value": "help me plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "how crowded is something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "how is it in something during something"
+              }
+            },
+            {
+              "name": {
+                "value": "how is something during something"
+              }
+            },
+            {
+              "name": {
+                "value": "how is something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "how is the something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i need a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "i need a park for something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "i want to go to a park in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i want to plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "i want to plan park visit in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i want to see wildlife in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i want to something which park should i go to"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like a park for something located in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like a park in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like parks available in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like parks in something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like to go somewhere for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like to know about something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'd like to plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "is something open in something"
+              }
+            },
+            {
+              "name": {
+                "value": "is something worth visiting in something"
+              }
+            },
+            {
+              "name": {
+                "value": "is there a good park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "plan a trip to something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "plan park visit in something"
+              }
+            },
+            {
+              "name": {
+                "value": "plan park visit in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "plan park visit please"
+              }
+            },
+            {
+              "name": {
+                "value": "please plan park visit"
+              }
+            },
+            {
+              "name": {
+                "value": "recommend a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "recommend a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "recommend parks for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "recommend parks in something"
+              }
+            },
+            {
+              "name": {
+                "value": "should i visit something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "show me parks available in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "show me parks during something"
+              }
+            },
+            {
+              "name": {
+                "value": "show me parks for something"
+              }
+            },
+            {
+              "name": {
+                "value": "show me parks for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "show me parks in something"
+              }
+            },
+            {
+              "name": {
+                "value": "something at something"
+              }
+            },
+            {
+              "name": {
+                "value": "something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "somewhere to go in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "somewhere to go something in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest a park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest a park for something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest a park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest a park in something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest parks for something"
+              }
+            },
+            {
+              "name": {
+                "value": "suggest parks in something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "tell me about something"
+              }
+            },
+            {
+              "name": {
+                "value": "tell me about something at something"
+              }
+            },
+            {
+              "name": {
+                "value": "tell me about something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what can i do in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what can i do in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is open in something during something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is something like"
+              }
+            },
+            {
+              "name": {
+                "value": "what is something like in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is the best national park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is the best national park in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is the best park for something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is the best park for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is the best park in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what is worth visiting in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what national park should i visit in something for something"
+              }
+            },
+            {
+              "name": {
+                "value": "what park is best for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what parks are best in something and something"
+              }
+            },
+            {
+              "name": {
+                "value": "what parks are good in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what should i know about something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what's a good place for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "what's something like in something"
+              }
+            },
+            {
+              "name": {
+                "value": "where can i go something"
+              }
+            },
+            {
+              "name": {
+                "value": "where can i go something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "where can i something in a national park"
+              }
+            },
+            {
+              "name": {
+                "value": "where can i watch wildlife in something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "where should i go for something"
+              }
+            },
+            {
+              "name": {
+                "value": "where should i go for something in something"
+              }
+            },
+            {
+              "name": {
+                "value": "i'm looking for a park in arizona"
+              }
+            },
+            {
+              "name": {
+                "value": "a park my kids would like"
+              }
+            }
+          ]
+        }
+      ]
     }
   }
 }

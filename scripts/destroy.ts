@@ -1,11 +1,20 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { BatchDeleteImageCommand, ECRClient } from '@aws-sdk/client-ecr';
-import { STACK_NAME, loadRepo, run } from './lib.ts';
+import {
+  PLACEHOLDER_LAMBDA_ARN,
+  STACK_NAME,
+  loadRepo,
+  readSkillEndpoint,
+  removeEnv,
+  run,
+  writeSkillEndpoint,
+} from './lib.ts';
 
 /**
  * npm run destroy: cdk destroy, then delete this app's container images from the CDK asset
- * repository (cdk destroy leaves them behind), then remind about the Alexa skill.
+ * repository (cdk destroy leaves them behind), then undo what deploy wrote into the working tree
+ * so the repo is committable again, and remind about the Alexa Skill.
  */
 const { root, config } = await loadRepo();
 const infra = join(root, 'infra');
@@ -48,13 +57,27 @@ if (existsSync(assetsFile)) {
   );
 }
 
-const leftovers = existsSync(join(root, 'cdk-outputs.json')) ? ['cdk-outputs.json'] : [];
-if (leftovers.length) console.log(`You can delete: ${leftovers.join(', ')}`);
-const stateDir = join(root, 'skill-package', '.ask');
+// The Lambda is gone, so the ARN that deploy and skill:deploy left behind is dead: put the
+// shipped placeholder back into skill.json (tracked) and drop the ARN from .env (not tracked).
+if (readSkillEndpoint(root) !== PLACEHOLDER_LAMBDA_ARN) {
+  writeSkillEndpoint(root, PLACEHOLDER_LAMBDA_ARN);
+  console.log('\nskill-package/skill.json: placeholder ARN restored.');
+}
+removeEnv(root, 'BRIDGE_LAMBDA_ARN');
+
+const stateDir = join(root, '.ask');
 const hasSkill = existsSync(stateDir) && readdirSync(stateDir).length > 0;
 console.log(
-  '\nThe Alexa skill stays in your developer account (no cost). Delete it with: ' +
+  '\nThe Alexa Skill stays in your developer account (no cost). Delete it with: ' +
     `ask smapi delete-skill --skill-id ${config.skill.id ?? '<skill id>'}` +
-    (hasSkill ? '  (skill-package/.ask holds the deployed state)' : ''),
+    (hasSkill ? '  (.ask holds the deployed state)' : ''),
+);
+console.log(
+  'BRIDGE_SKILL_ID stays in .env for that reason; remove it yourself if you delete the Alexa Skill.',
 );
 console.log('AgentCore Memory records and CloudWatch logs expire on their own.');
+console.log(
+  '\nWhat is left is git-ignored (.env, .ask/, cdk-outputs.json, infra/cdk.out/). The generated ' +
+    'interaction model and tool manifest are meant to be committed. To be sure before you push: ' +
+    'npm run check:leaks -- --all',
+);
