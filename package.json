@@ -20,7 +20,7 @@
     "precheck:leaks": "node scripts/check-node.mjs",
     "build": "tsc -b",
     "prebuild": "node scripts/check-node.mjs",
-    "typecheck:tooling": "tsc -p tsconfig.tooling.json",
+    "typecheck:tooling": "tsc -b && tsc -p tsconfig.tooling.json",
     "lint": "eslint . && prettier --check . && npm run typecheck:tooling",
     "prelint": "node scripts/check-node.mjs",
     "format": "prettier --write .",

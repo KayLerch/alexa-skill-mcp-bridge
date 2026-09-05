@@ -51,7 +51,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 | `npm run doctor -- --track local\|cloud\|skill` | Prerequisite check per track. Prints the exact fix for whatever is missing; the state oracle the onboarding procedure leans on. |
 | `npm run build` | `tsc -b` across packages. |
 | `npm test` | vitest, no AWS credentials needed. |
-| `npm run lint` | ESLint and Prettier check. |
+| `npm run lint` | ESLint, Prettier check, and a type check of `bridge.config.ts` and `scripts/` (builds the packages first, so it works on a fresh clone). |
 | `npm run sample:start` | An example MCP server on port 3939. `EXAMPLE=<name>` picks one (default `national-parks`), `-- --list` lists them, `PORT=` moves it. Adding an example is a directory under `examples/` with a `src/server.ts`; the runner discovers it. |
 | `npm run chat` | In-process agent REPL against `mcp.url`. Fastest dev loop. `--debug` shows tool calls and timings; `--record` appends turns to `skill-package/training/<locale>.chat.jsonl` for the generator (D46). |
 | `npm run chat -- --remote` | Same REPL through the deployed runtime. |
