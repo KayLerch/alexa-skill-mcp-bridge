@@ -1,5 +1,18 @@
 # Alexa Skill MCP Bridge
 
+<p align="center">
+  <a href="https://github.com/KayLerch/alexa-skill-mcp-bridge/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/KayLerch/alexa-skill-mcp-bridge/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
+  <img alt="Node 22.18 or later" src="https://img.shields.io/badge/node-%3E%3D22.18-339933?logo=node.js&logoColor=white">
+  <img alt="Runs in us-east-1" src="https://img.shields.io/badge/region-us--east--1-lightgrey">
+</p>
+<p align="center">
+  <a href="https://modelcontextprotocol.io/specification/2025-11-25"><img alt="MCP Streamable HTTP, protocol 2025-11-25" src="https://img.shields.io/badge/MCP-Streamable%20HTTP%20%C2%B7%202025--11--25-111111"></a>
+  <a href="https://aws.amazon.com/bedrock/agentcore/"><img alt="Amazon Bedrock AgentCore Runtime" src="https://img.shields.io/badge/Amazon%20Bedrock-AgentCore%20Runtime-FF9900"></a>
+  <a href="https://strandsagents.com/"><img alt="Strands Agents with Amazon Nova 2 Lite" src="https://img.shields.io/badge/Strands%20Agents-Nova%202%20Lite-232F3E"></a>
+  <a href="https://amazonappdev2026.devpost.com/"><img alt="Amazon Devpost hackathon, Alexa+ track" src="https://img.shields.io/badge/Devpost-Alexa%2B%20track-003E54?logo=devpost&logoColor=white"></a>
+</p>
+
 Demo your MCP server on a physical Alexa+ device, through an Alexa Skill that stands in for an Alexa+ add-on.
 
 An add-on is how an MCP server is meant to reach Alexa+, and that tooling is not open to the public yet. Alexa Skills are open to every developer today, so this bridge puts one where the add-on would be. The Alexa Skill wraps your MCP server, and behind it an agent emulates the work the Alexa+ orchestrator does for an add-on: it picks the MCP tool, fills the arguments, handles elicitation, turns the tool result into a short spoken answer, and carries the conversation's context to the next turn. From your server's side there is nothing unusual to see, just an MCP client over Streamable HTTP that declares `elicitation` and calls the tools you advertise.
