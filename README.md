@@ -29,7 +29,7 @@ This project exists mainly for the Alexa+ track of the [Amazon Devpost hackathon
 
 You put your MCP server URL into one config file. A generator turns your server's tools into an Alexa Skill interaction model so Alexa's NLU can route to them. One CDK stack deploys the agent that plays the orchestrator's part on Amazon Bedrock AgentCore Runtime (Strands Agents, Amazon Nova 2 Lite), and the Alexa Skill Lambda in front of it stays thin.
 
-**This bridge reproduces the mechanics of an Alexa+ MCP client, not Alexa's own model judgment.** Tool choice, argument filling, and phrasing come from Nova 2 Lite with the prompts in this repo; Alexa+ will pick and phrase differently. What you can verify here: that your MCP server speaks Streamable HTTP at a version Alexa+ accepts, that its tool descriptions lead a model to the right call, that elicitation works with a spoken answer that arrives a minute later, and how your results sound.
+**This bridge reproduces the mechanics of an Alexa+ MCP client, not Alexa's own model judgment.** Tool choice, argument filling, and phrasing come from Nova 2 Lite with the prompts in this repo; Alexa+ will pick and phrase differently. What you can verify here: that your MCP server speaks Streamable HTTP at a version Alexa+ accepts, that its tool descriptions lead a model to the right call, that elicitation survives the gap between two Alexa turns, where the tool call stays open while the user is asked and answers, and how your results sound.
 
 **Tear down:** `npm run destroy` removes everything the cloud track created. See [docs/cost.md](docs/cost.md).
 

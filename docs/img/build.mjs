@@ -214,7 +214,7 @@ function tall(p) {
     text(
       W / 2,
       1024,
-      'Elicitation: the open tools/call stream is parked inside the microVM between Alexa turns, so an answer a minute later resumes the same call.',
+      'Elicitation: MCP wants the answer inside the same tools/call, but an Alexa turn ends in seconds. The call stays parked in the microVM across turns.',
       { anchor: 'middle', size: 11.5, fill: p.sub },
     ),
   );

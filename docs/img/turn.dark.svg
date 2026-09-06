@@ -57,6 +57,6 @@
   <text x="204" y="924" font-size="11" font-weight="600" letter-spacing="1.3" fill="#3fb950">OUTSIDE AWS</text>
   <text x="204" y="952" font-size="19" font-weight="600" fill="#e6edf3">Your MCP server</text>
   <text x="204" y="975" font-size="13" fill="#9198a1">Anywhere reachable over HTTPS. Nothing in it changes for the bridge</text>
-  <text x="460" y="1024" text-anchor="middle" font-size="11.5" fill="#9198a1">Elicitation: the open tools/call stream is parked inside the microVM between Alexa turns, so an answer a minute later resumes the same call.</text>
+  <text x="460" y="1024" text-anchor="middle" font-size="11.5" fill="#9198a1">Elicitation: MCP wants the answer inside the same tools/call, but an Alexa turn ends in seconds. The call stays parked in the microVM across turns.</text>
   </g>
 </svg>
