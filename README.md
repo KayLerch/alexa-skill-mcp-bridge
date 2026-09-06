@@ -18,12 +18,11 @@ Demo your MCP server on a physical Alexa+ device, through an Alexa Skill that st
 An add-on is how an MCP server is meant to reach Alexa+, and that tooling is not open to the public yet. Alexa Skills are open to every developer today, so this bridge puts one where the add-on would be. The Alexa Skill wraps your MCP server, and behind it an agent emulates the work the Alexa+ orchestrator does for an add-on: it picks the MCP tool, fills the arguments, handles elicitation, turns the tool result into a short spoken answer, and carries the conversation's context to the next turn. From your server's side there is nothing unusual to see, just an MCP client over Streamable HTTP that declares `elicitation` and calls the tools you advertise.
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.light.svg">
-    <img src="docs/img/bridge.light.svg#gh-light-mode-only" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
-  </a>
-  <a href="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.dark.svg">
-    <img src="docs/img/bridge.dark.svg#gh-dark-mode-only" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/bridge.dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="docs/img/bridge.light.svg">
+    <img src="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.auto.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
+  </picture>
 </p>
 
 This project exists mainly for the Alexa+ track of the [Amazon Devpost hackathon](https://amazonappdev2026.devpost.com/), where a submission is an MCP-server-backed Alexa+ experience and has to be demoed. Until Alexa+ add-on tooling opens up, an Alexa Skill is how you put your server in front of Alexa+ and record it: in your terminal, in the Alexa developer console's simulator, or on a physical Alexa+ device signed in to your Amazon developer account.

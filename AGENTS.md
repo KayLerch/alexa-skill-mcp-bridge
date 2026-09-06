@@ -38,7 +38,8 @@ examples/national-parks-mcp-server  THE default example: find_park and plan_park
 examples/hotels-weather-mcp-server   The other example: search_hotels (elicits guests) and get_weather.
 spikes                       Day-one verification probes. Outside the npm workspaces. Re-runnable.
 docs                         architecture, config, cost, decisions, onboarding, troubleshooting, history/ (frozen brief and plan),
-                             img/ (README diagrams: build.mjs emits the wide banner and the tall turn diagram, light and dark).
+                             img/ (README diagrams: build.mjs emits the wide banner light, dark and auto, plus the
+                             tall turn diagram; auto carries both palettes as CSS variables and is the click-to-enlarge target).
 .claude/commands             Thin entry points (/onboard). One line each; the procedure lives in docs/.
 scripts                      deploy, skill-deploy, destroy, doctor, check-leaks, check-model-access, agent-dev. Run by Node 22 directly.
 ask-resources.json           ASK CLI project file at the root; `ask deploy` runs from here and reads skill-package/.
