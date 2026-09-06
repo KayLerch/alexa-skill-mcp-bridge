@@ -37,7 +37,8 @@ examples/national-parks-mcp-server  THE default example: find_park and plan_park
                              nps.gov extract (14 parks). Elicits only when a request is underdetermined.
 examples/hotels-weather-mcp-server   The other example: search_hotels (elicits guests) and get_weather.
 spikes                       Day-one verification probes. Outside the npm workspaces. Re-runnable.
-docs                         architecture, config, cost, decisions, onboarding, troubleshooting, history/ (frozen brief and plan).
+docs                         architecture, config, cost, decisions, onboarding, troubleshooting, history/ (frozen brief and plan),
+                             img/ (README diagrams: build.mjs emits the wide banner and the tall turn diagram, light and dark).
 .claude/commands             Thin entry points (/onboard). One line each; the procedure lives in docs/.
 scripts                      deploy, skill-deploy, destroy, doctor, check-leaks, check-model-access, agent-dev. Run by Node 22 directly.
 ask-resources.json           ASK CLI project file at the root; `ask deploy` runs from here and reads skill-package/.
@@ -80,8 +81,9 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 
 - `packages/skill-lambda/generated/tool-manifest.json`
 - `skill-package/interactionModels/custom/*.json`
+- `docs/img/*.svg` (the README diagrams; `node docs/img/build.mjs` rebuilds all four from one source)
 
-They carry a `_generated` marker (`by` and `notice` only: no source URL, no timestamp, so they stay deterministic and leak nothing, D37) and a `.gitattributes` entry. Regenerate with `npm run generate`. Everything a developer adds goes beside them and survives regeneration: `skill-package/overrides/<locale>.utterances.json` (extra samples, `catchAll` phrases, `slotSynonyms`, alias `intents`, D46) and `skill-package/training/<locale>.chat.jsonl` (written by `npm run chat -- --record`). `docs/customizing.md` is the developer-facing version. Handlers are never generated; generated artifacts are data only, and an alias intent routes through the manifest with no code.
+They carry a `_generated` marker (`by` and `notice` only: no source URL, no timestamp, so they stay deterministic and leak nothing, D37) and a `.gitattributes` entry. Regenerate with `npm run generate`. Everything a developer adds goes beside them and survives regeneration: `skill-package/overrides/<locale>.utterances.json` (extra samples, `catchAll` phrases, `slotSynonyms`, alias `intents`, D46) and `skill-package/training/<locale>.chat.jsonl` (written by `npm run chat -- --record`). `docs/customizing.md` is the developer-facing version. The diagrams are the exception to the `_generated` marker: an SVG carries an XML comment instead. Change a documented fact that a diagram states and `docs/img/build.mjs` is part of that change. Handlers are never generated; generated artifacts are data only, and an alias intent routes through the manifest with no code.
 
 ## Hard constraints (do not "fix" these)
 

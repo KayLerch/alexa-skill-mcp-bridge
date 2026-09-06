@@ -2,19 +2,23 @@
 
 The bridge lets a developer test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on. It reproduces the mechanics of an Alexa+ MCP client (initialize, tools/call, structured results, elicitation) with its own model judgment (Nova 2 Lite with the prompts in `packages/agent/prompts`).
 
-```
-Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► Alexa Skill Lambda (packages/skill-lambda)
-                                                     │ InvokeAgentRuntime(runtimeSessionId = hash(userId), AgentInvocation)
-                                                     ▼
-                                      AgentCore Runtime, one microVM per user (packages/agent)
-                                        BridgeSession: Strands Agent + Nova 2 Lite
-                                        BridgeMcpClient over Streamable HTTP ──► the MCP server
-                                        QuestionQueue: parked elicitations and ask_user questions
-                                        AgentCore Memory: exchanges, preferences
-                                                     │ TurnOutput {status, speech, question?, endSession, visual: null}
-                                                     ▼
-                                              Lambda renders SSML ──► the device speaks
-```
+<p align="center">
+  <a href="img/bridge.light.svg?raw=1">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="img/bridge.dark.svg">
+      <img src="img/bridge.light.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
+    </picture>
+  </a>
+</p>
+
+Where each part of that lives, and what it is called in the code:
+
+- The Alexa Skill Lambda is `packages/skill-lambda`. It calls `InvokeAgentRuntime` with the runtime session id set to
+  `hash(userId)` and an `AgentInvocation` payload, and renders the returned `TurnOutput`
+  (`status`, `speech`, `question?`, `endSession`, `visual: null`) as SSML.
+- The agent is `packages/agent`: `BridgeSession` holds the Strands Agent on Nova 2 Lite, `BridgeMcpClient` speaks
+  Streamable HTTP to the MCP server, `QuestionQueue` holds parked elicitations and `ask_user` questions, and
+  AgentCore Memory keeps exchanges and preferences.
 
 ## The contract
 

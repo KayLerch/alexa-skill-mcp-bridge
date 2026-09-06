@@ -17,6 +17,15 @@ Demo your MCP server on a physical Alexa+ device, through an Alexa Skill that st
 
 An add-on is how an MCP server is meant to reach Alexa+, and that tooling is not open to the public yet. Alexa Skills are open to every developer today, so this bridge puts one where the add-on would be. The Alexa Skill wraps your MCP server, and behind it an agent emulates the work the Alexa+ orchestrator does for an add-on: it picks the MCP tool, fills the arguments, handles elicitation, turns the tool result into a short spoken answer, and carries the conversation's context to the next turn. From your server's side there is nothing unusual to see, just an MCP client over Streamable HTTP that declares `elicitation` and calls the tools you advertise.
 
+<p align="center">
+  <a href="docs/img/bridge.light.svg?raw=1">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/img/bridge.dark.svg">
+      <img src="docs/img/bridge.light.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
+    </picture>
+  </a>
+</p>
+
 This project exists mainly for the Alexa+ track of the [Amazon Devpost hackathon](https://amazonappdev2026.devpost.com/), where a submission is an MCP-server-backed Alexa+ experience and has to be demoed. Until Alexa+ add-on tooling opens up, an Alexa Skill is how you put your server in front of Alexa+ and record it: in your terminal, in the Alexa developer console's simulator, or on a physical Alexa+ device signed in to your Amazon developer account.
 
 You put your MCP server URL into one config file. A generator turns your server's tools into an Alexa Skill interaction model so Alexa's NLU can route to them. One CDK stack deploys the agent that plays the orchestrator's part on Amazon Bedrock AgentCore Runtime (Strands Agents, Amazon Nova 2 Lite), and the Alexa Skill Lambda in front of it stays thin.
@@ -183,18 +192,7 @@ When you are done: `npm run destroy`. The Alexa Skill stays in your Amazon devel
 
 ## What happens on a turn
 
-```
-Alexa+ device ── voice ──► Alexa NLU ── intent + slots ──► Alexa Skill Lambda (thin)
-                                                             │ InvokeAgentRuntime, 6.5 s budget
-                                                             ▼
-                                              AgentCore Runtime: one microVM per user
-                                                Strands agent + Nova 2 Lite
-                                                MCP client over Streamable HTTP ──► your server
-                                                AgentCore Memory (history, preferences)
-                                                             │ {speech, question?, endSession}
-                                                             ▼
-                                                     Lambda renders SSML ──► the device speaks
-```
+One turn is the eight numbered steps in the diagram near the top of this page. The whole round trip has to finish inside the few seconds Alexa allows, which is what shapes every choice in the turn path.
 
 Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the Alexa Skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field. Details in [docs/architecture.md](docs/architecture.md).
 
