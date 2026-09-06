@@ -3,7 +3,7 @@
 The bridge lets a developer test an MCP server on a physical Alexa+ device as if it were an Alexa+ add-on. It reproduces the mechanics of an Alexa+ MCP client (initialize, tools/call, structured results, elicitation) with its own model judgment (Nova 2 Lite with the prompts in `packages/agent/prompts`).
 
 <p align="center">
-  <a href="img/bridge.light.svg?raw=1">
+  <a href="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.light.svg">
     <picture>
       <source media="(prefers-color-scheme: dark)" srcset="img/bridge.dark.svg">
       <img src="img/bridge.light.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
