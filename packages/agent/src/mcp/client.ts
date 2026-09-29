@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   ElicitRequestSchema,
   type ElicitRequestParams,
@@ -95,12 +98,36 @@ export class BridgeMcpClient {
     args: Record<string, unknown>,
     options: { signal?: AbortSignal } = {},
   ): Promise<McpToolResult> {
-    const client = await this.ensureClient();
-    const raw = await client.callTool({ name, arguments: args }, undefined, {
-      timeout: this.options.callTimeoutMs,
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-    return parseToolResult(raw);
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const client = await this.ensureClient();
+      try {
+        const raw = await client.callTool({ name, arguments: args }, undefined, {
+          timeout: this.options.callTimeoutMs,
+          ...(options.signal ? { signal: options.signal } : {}),
+        });
+        return parseToolResult(raw);
+      } catch (err) {
+        // Two recoverable cases, both fixed by dropping this client and
+        // reconnecting once (which re-runs initialize + tools/list, so the
+        // replacement session has a fresh session id AND fresh tool schemas):
+        //  - stale session: the server restarted or the idle tunnel dropped the
+        //    SSE stream, so the old session id is gone (JSON-RPC -32600).
+        //  - stale schema: the server's tool output schema changed since this
+        //    warm session first listed tools, so the SDK rejects the new result
+        //    against the cached schema (-32602 "does not match ... output schema").
+        const recoverable = isStaleSessionError(err) || isStaleSchemaError(err);
+        if (recoverable) {
+          if (this.client === client) this.forget();
+          await client.close().catch(() => undefined);
+        }
+        if (!recoverable || attempt === 1) throw err;
+        options.signal?.throwIfAborted();
+        this.options.logger.warn('mcp session stale; reconnecting and retrying tool call', {
+          tool: name,
+        });
+      }
+    }
+    throw new Error('unreachable');
   }
 
   async close(): Promise<void> {
@@ -170,4 +197,42 @@ export class BridgeMcpClient {
     this.info = undefined;
     this.tools = undefined;
   }
+}
+
+function isStaleSessionError(error: unknown): boolean {
+  if (!(error instanceof StreamableHTTPError)) return false;
+  const marker = 'Error POSTing to endpoint: ';
+  const markerAt = error.message.indexOf(marker);
+  if (markerAt < 0) return false;
+
+  try {
+    const envelope = JSON.parse(error.message.slice(markerAt + marker.length)) as {
+      jsonrpc?: unknown;
+      id?: unknown;
+      error?: { code?: unknown; message?: unknown };
+    };
+    return (
+      envelope.jsonrpc === '2.0' &&
+      envelope.id === null &&
+      envelope.error?.code === -32600 &&
+      envelope.error.message === 'Session not found'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The SDK validates a tool result against the outputSchema it cached during this
+ * session's tools/list. When the server's schema changed since (e.g. a tool that
+ * used to return structured data now returns plain text, or vice versa), the client
+ * raises one of:
+ *   -32602 ... does not match the tool's output schema
+ *   -32600 ... has an output schema but did not return structured content
+ * Both mean "my cached schema is stale". Reconnecting re-lists the tools, so the
+ * fresh session validates against the server's current schema.
+ */
+function isStaleSchemaError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes('output schema');
 }

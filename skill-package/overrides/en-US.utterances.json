@@ -20,5 +20,33 @@
     "how is {park} in {month}"
   ],
   "SearchHotelsIntent": ["find me a place to stay in {destination}", "hotels in {destination}"],
-  "GetWeatherIntent": ["weather in {city}", "how is the weather in {city}"]
+  "GetWeatherIntent": ["weather in {city}", "how is the weather in {city}"],
+  "RejectTopIntent": [
+    "reject it",
+    "reject that",
+    "reject this",
+    "no reject it",
+    "reject the decision",
+    "skip it",
+    "skip that",
+    "deny it",
+    "deny that",
+    "cancel it",
+    "don't do it",
+    "don't approve it",
+    "no don't"
+  ],
+  "ApproveTopIntent": [
+    "approve it",
+    "approve that",
+    "approve this",
+    "yes approve it",
+    "approve the decision",
+    "allow it",
+    "allow that",
+    "confirm it",
+    "yes confirm it",
+    "go ahead and do it",
+    "yes approve"
+  ]
 }
