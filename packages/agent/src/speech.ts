@@ -19,7 +19,15 @@ export function cleanSpeech(text: string): string {
   return t.trim();
 }
 
-/** A spoken answer that ends without a question does not need the microphone open. */
+/**
+ * A spoken answer that ends without a question does not need the microphone open —
+ * except when it explicitly asks the user to say "yes"/"no" (a confirmation prompt).
+ * Some tools return a confirmation request that a model may phrase as a statement
+ * ("Please say yes to approve."), dropping the question mark; closing the mic there
+ * would strand the user mid-confirmation. Treat those as open turns too.
+ */
 export function endsWithQuestion(speech: string): boolean {
-  return /\?\s*$/.test(speech);
+  if (/\?\s*$/.test(speech)) return true;
+  // Confirmation prompts that invite a spoken yes/no, even without a "?".
+  return /\bsay\s+(?:["']?yes["']?|["']?no["']?)\b/i.test(speech);
 }
