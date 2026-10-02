@@ -152,6 +152,8 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       environment: {
         BRIDGE_CONFIG: configJson,
         AGENT_RUNTIME_ARN: runtime.agentRuntimeArn,
+        // Changes on every runtime update, so users leave microVMs running the old code.
+        AGENT_RUNTIME_VERSION: runtime.agentRuntimeVersion ?? '',
       },
       bundling: {
         format: nodejs.OutputFormat.ESM,

@@ -11,4 +11,5 @@ export const logger = createLogger(
   { level: config.features.debug ? 'debug' : 'info' },
 );
 export const runtimeArn = process.env.AGENT_RUNTIME_ARN ?? '';
+export const runtimeVersion = process.env.AGENT_RUNTIME_VERSION || undefined;
 export const manifest = toolManifestSchema.parse(manifestJson);

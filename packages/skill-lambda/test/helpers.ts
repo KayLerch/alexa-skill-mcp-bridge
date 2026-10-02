@@ -46,6 +46,7 @@ export interface FakeRequest {
   intent?: string;
   slots?: Record<string, Slot>;
   sessionAttributes?: Record<string, unknown>;
+  sessionId?: string;
 }
 
 export function handlerInput(fake: FakeRequest = {}): HandlerInput {
@@ -69,7 +70,7 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
     version: '1.0',
     session: {
       new: type === 'LaunchRequest',
-      sessionId: 'amzn1.echo-api.session.abc',
+      sessionId: fake.sessionId ?? 'amzn1.echo-api.session.abc',
       application: { applicationId: 'amzn1.ask.skill.x' },
       user: { userId: 'amzn1.ask.account.USER' },
       attributes: fake.sessionAttributes ?? {},

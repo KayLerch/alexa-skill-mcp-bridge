@@ -1,6 +1,6 @@
 import askSdk from 'ask-sdk-core';
 import { BridgeClient } from './bridge.js';
-import { config, logger, manifest, runtimeArn } from './config.js';
+import { config, logger, manifest, runtimeArn, runtimeVersion } from './config.js';
 import { answerHandler, yesNoTurnHandler } from './handlers/answers.js';
 import { freeTextHandler } from './handlers/free-text.js';
 import { launchHandler } from './handlers/launch.js';
@@ -17,7 +17,7 @@ import { toolIntentHandler } from './handlers/tool-intent.js';
  * The Alexa endpoint. Every handler reads the same way: build a TurnInput, call the bridge,
  * render the TurnOutput. No MCP or model logic lives here.
  */
-const bridge = new BridgeClient({ config, runtimeArn, logger });
+const bridge = new BridgeClient({ config, runtimeArn, runtimeVersion, logger });
 
 const builder = askSdk.SkillBuilders.custom()
   .addRequestHandlers(
