@@ -4,6 +4,10 @@
  */
 export function cleanSpeech(text: string): string {
   let t = text;
+  // Nova Pro sometimes writes its reasoning inline; a voice must never read it out.
+  t = t.replace(/<(thinking|reasoning)>[\s\S]*?<\/\1>/gi, ' ');
+  t = t.replace(/<(thinking|reasoning)>[\s\S]*$/gi, ' ');
+  t = t.replace(/<\/?(thinking|reasoning|response|answer)>/gi, ' ');
   t = t.replace(/```[\s\S]*?```/g, ' ');
   t = t.replace(/`([^`]*)`/g, '$1');
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ');
