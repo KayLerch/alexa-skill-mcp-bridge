@@ -24,8 +24,17 @@ export function endsWithQuestion(speech: string): boolean {
   return /\?\s*$/.test(speech);
 }
 
-/** The last sentence that ends with a question mark: the question alone, without the feedback before it. */
+/**
+ * The last question alone, without the feedback before it: the last sentence that ends with a
+ * question mark, together with the sentences right before it that end with one too, so a question
+ * followed by its options ("Which vendor? A, Adyen; or B, Stripe?") comes back whole.
+ */
 export function lastQuestion(speech: string): string | undefined {
   const sentences = speech.split(/(?<=[.!?])\s+/);
-  return sentences.reverse().find((sentence) => sentence.endsWith('?'));
+  let end = sentences.length - 1;
+  while (end >= 0 && !sentences[end]?.endsWith('?')) end -= 1;
+  if (end < 0) return undefined;
+  let start = end;
+  while (start > 0 && sentences[start - 1]?.endsWith('?')) start -= 1;
+  return sentences.slice(start, end + 1).join(' ');
 }

@@ -39,13 +39,21 @@ export class HiddenArguments {
     this.latest.clear();
   }
 
+  /**
+   * Fills each hidden name the call left out. `null` and `""` count as left out: a model that was
+   * never told the value often sends an empty one for a required argument.
+   */
   fill(args: Record<string, unknown>): Record<string, unknown> {
     const filled = { ...args };
     for (const name of this.names) {
-      if (filled[name] === undefined && this.latest.has(name)) filled[name] = this.latest.get(name);
+      if (isMissing(filled[name]) && this.latest.has(name)) filled[name] = this.latest.get(name);
     }
     return filled;
   }
+}
+
+function isMissing(value: unknown): boolean {
+  return value === undefined || value === null || value === '';
 }
 
 /**

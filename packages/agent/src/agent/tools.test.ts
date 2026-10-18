@@ -52,6 +52,16 @@ describe('BridgeMcpTool hidden arguments', () => {
     expect(calls[1]?.args).toEqual({ session_id: 'mine', answer: 'B' });
   });
 
+  it.each([
+    ['null', null],
+    ['an empty string', ''],
+  ])('treats %s from the model as missing', async (_label, value) => {
+    const { calls, run } = setup();
+    await run('start_quiz', {});
+    await run('submit_answer', { session_id: value, answer: 'B' });
+    expect(calls[1]?.args).toEqual({ session_id: 's1', answer: 'B' });
+  });
+
   it('adds nothing when no result has carried the key yet', async () => {
     const { calls, run } = setup();
     await run('submit_answer', { answer: 'B' });
