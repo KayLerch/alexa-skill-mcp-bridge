@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanSpeech, endsWithQuestion } from './speech.js';
+import { cleanSpeech, endsWithQuestion, lastQuestion } from './speech.js';
 
 describe('cleanSpeech', () => {
   it('strips markdown, bullets, links, and code', () => {
@@ -30,5 +30,20 @@ describe('endsWithQuestion', () => {
     expect(endsWithQuestion('Want to hear more?')).toBe(true);
     expect(endsWithQuestion('Want to hear more? ')).toBe(true);
     expect(endsWithQuestion('Done.')).toBe(false);
+  });
+});
+
+describe('lastQuestion', () => {
+  it('returns the question alone, not the feedback before it', () => {
+    expect(lastQuestion('Correct! Next, from the standup: who chose Adyen?')).toBe(
+      'Next, from the standup: who chose Adyen?',
+    );
+    expect(lastQuestion('Close. It was Stripe. Ready for another? Say yes.')).toBe(
+      'Ready for another?',
+    );
+  });
+
+  it('is undefined when nothing asks', () => {
+    expect(lastQuestion('That was the last one.')).toBeUndefined();
   });
 });

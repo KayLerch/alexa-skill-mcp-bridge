@@ -23,3 +23,9 @@ export function cleanSpeech(text: string): string {
 export function endsWithQuestion(speech: string): boolean {
   return /\?\s*$/.test(speech);
 }
+
+/** The last sentence that ends with a question mark: the question alone, without the feedback before it. */
+export function lastQuestion(speech: string): string | undefined {
+  const sentences = speech.split(/(?<=[.!?])\s+/);
+  return sentences.reverse().find((sentence) => sentence.endsWith('?'));
+}
