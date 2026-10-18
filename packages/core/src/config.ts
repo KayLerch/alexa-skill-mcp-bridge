@@ -313,6 +313,34 @@ export function loadProfileEnv(profileDir: string, realEnvKeys: ReadonlySet<stri
   }
 }
 
+export const PROFILE_OVERLAY_FILE = 'bridge.config.json';
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/** Objects merge key by key, everything else (arrays included) is replaced by the overlay. */
+export function deepMerge(base: unknown, overlay: unknown): unknown {
+  if (!isRecord(base) || !isRecord(overlay)) return overlay;
+  const out: Record<string, unknown> = { ...base };
+  for (const [key, value] of Object.entries(overlay)) out[key] = deepMerge(base[key], value);
+  return out;
+}
+
+/** The profile's partial config (bridge.config.json), or undefined when there is none. */
+export function readProfileOverlay(profileDir: string): Record<string, unknown> | undefined {
+  const file = join(profileDir, PROFILE_OVERLAY_FILE);
+  if (!existsSync(file)) return undefined;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'));
+  } catch {
+    throw new ConfigError(`${file} is not valid JSON.`);
+  }
+  if (!isRecord(parsed)) throw new ConfigError(`${file} must be a JSON object.`);
+  return parsed;
+}
+
 /** The profile's prompt addendum, trimmed, or undefined when there is none. */
 export function readPromptAddendum(profileDir: string): string | undefined {
   const file = join(profileDir, PROFILE_ADDENDUM_FILE);
@@ -354,7 +382,11 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
   if (mod.default === undefined) {
     throw new ConfigError(`${file} must export the result of defineConfig() as default.`);
   }
-  let raw = applyEnvOverrides(mod.default);
+  // Order: bridge.config.ts < profile bridge.config.json < environment overrides (repo .env,
+  // profile .env, real variables). The env wins so a one-off `BRIDGE_MCP_URL=… npm run chat`
+  // still works with a profile set.
+  const overlay = profileDir ? readProfileOverlay(profileDir) : undefined;
+  let raw = applyEnvOverrides(overlay ? deepMerge(mod.default, overlay) : mod.default);
   const addendum = profileDir ? readPromptAddendum(profileDir) : undefined;
   if (addendum && typeof raw === 'object' && raw !== null) {
     const agent = (raw as { agent?: unknown }).agent;
@@ -366,7 +398,16 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
       },
     };
   }
-  return parseConfig(raw);
+  try {
+    return parseConfig(raw);
+  } catch (err) {
+    if (overlay && err instanceof ConfigError) {
+      throw new ConfigError(
+        `${err.message}\n  (the profile overlay ${join(profileDir as string, PROFILE_OVERLAY_FILE)} was applied)`,
+      );
+    }
+    throw err;
+  }
 }
 
 /** Load config from the BRIDGE_CONFIG env var. Used by the Lambda and the container. */

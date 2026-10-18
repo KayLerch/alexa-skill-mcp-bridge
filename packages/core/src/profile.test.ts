@@ -97,4 +97,64 @@ describe('BRIDGE_PROFILE_DIR (D56)', () => {
       /agent\.promptAddendum/,
     );
   });
+
+  describe('bridge.config.json overlay', () => {
+    const load = () => loadConfigFile(join(root, 'bridge.config.ts'));
+
+    it('sets the typed fields a consumer needs', async () => {
+      write(
+        join(profile, 'bridge.config.json'),
+        JSON.stringify({
+          mcp: { auth: { type: 'alexaAccountLinking' } },
+          skill: { invocationName: 'remembee quiz' },
+          memory: { shortTerm: false, longTerm: false },
+          features: { debug: false },
+          speech: { resultField: 'say' },
+          tools: { hiddenArguments: ['session_id'] },
+          visual: { enabled: true },
+        }),
+      );
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      const config = await load();
+      expect(config.mcp.url).toBe('http://localhost:3939/mcp');
+      expect(config.mcp.auth.type).toBe('alexaAccountLinking');
+      expect(config.skill.invocationName).toBe('remembee quiz');
+      expect(config.memory).toMatchObject({ shortTerm: false, longTerm: false });
+      expect(config.features.debug).toBe(false);
+      expect(config.speech.resultField).toBe('say');
+      expect(config.tools.hiddenArguments).toEqual(['session_id']);
+      expect(config.visual.enabled).toBe(true);
+    });
+
+    it('replaces arrays and lets an env override win', async () => {
+      write(
+        join(root, 'bridge.config.ts'),
+        "export default { mcp: { url: 'http://localhost:3939/mcp' }, tools: { hiddenArguments: ['a', 'b'] } };\n",
+      );
+      write(
+        join(profile, 'bridge.config.json'),
+        JSON.stringify({
+          mcp: { url: 'https://overlay.example.com/mcp' },
+          tools: { hiddenArguments: ['c'] },
+        }),
+      );
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      expect((await load()).tools.hiddenArguments).toEqual(['c']);
+      expect((await load()).mcp.url).toBe('https://overlay.example.com/mcp');
+      process.env.BRIDGE_MCP_URL = 'https://env.example.com/mcp';
+      expect((await load()).mcp.url).toBe('https://env.example.com/mcp');
+    });
+
+    it('names the file and the path of an invalid value', async () => {
+      write(join(profile, 'bridge.config.json'), JSON.stringify({ speech: { maxSentences: 99 } }));
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      await expect(load()).rejects.toThrowError(/speech\.maxSentences[\s\S]*bridge\.config\.json/);
+    });
+
+    it('rejects malformed JSON naming the file', async () => {
+      write(join(profile, 'bridge.config.json'), '{ nope');
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      await expect(load()).rejects.toThrowError(/bridge\.config\.json is not valid JSON/);
+    });
+  });
 });

@@ -31,13 +31,28 @@ Two more keys live in `.env` without overriding a config field: `npm run deploy`
 
 `BRIDGE_PROFILE_DIR` points to a folder you keep in your own repository, so you never fork the bridge. Set it in the shell or in the repo's `.env` (a relative path resolves against the repo root; a folder that does not exist is a config error, files missing inside it are fine):
 
-| In the folder                        | Read after                 | Effect                                                                                                                                          |
-| ------------------------------------ | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.env`                               | the repo's `.env`          | Same variables as above; it wins over the repo's `.env`, a real environment variable wins over both. It cannot set `BRIDGE_PROFILE_DIR` itself. |
-| `overrides/<locale>.utterances.json` | `skill-package/overrides/` | Same format ([customizing](customizing.md)); its samples come first, an alias intent of the same name replaces the repo's.                      |
-| `prompt-addendum.md`                 | (nothing)                  | Becomes `agent.promptAddendum`, appended to the system prompt under "Server-specific guidance".                                                 |
+| In the folder                        | Read after                 | Effect                                                                                                                                                                                                                                                                                      |
+| ------------------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`                               | the repo's `.env`          | Same variables as above; it wins over the repo's `.env`, a real environment variable wins over both. It cannot set `BRIDGE_PROFILE_DIR` itself.                                                                                                                                             |
+| `overrides/<locale>.utterances.json` | `skill-package/overrides/` | Same format ([customizing](customizing.md)); its samples come first, an alias intent of the same name replaces the repo's.                                                                                                                                                                  |
+| `bridge.config.json`                 | `bridge.config.ts`         | A partial config, deep-merged over `bridge.config.ts` (objects merge, arrays replace) and validated by the same schema; an error names the field path and the file. Environment overrides still win over it, so a one-off `BRIDGE_MCP_URL=… npm run chat` works. Secrets stay by name only. |
+| `prompt-addendum.md`                 | (nothing)                  | Becomes `agent.promptAddendum`, appended to the system prompt under "Server-specific guidance".                                                                                                                                                                                             |
 
-The deployed agent never sees your folder. `loadConfigFile()` reads the addendum on your machine and puts it into the config, which `npm run deploy` hands the container as `BRIDGE_CONFIG`; so the addendum reaches AWS when you deploy, and a changed addendum needs a redeploy. Only variables in `ENV_OVERRIDES` (the table above) take effect from a profile `.env`; everything else stays in `bridge.config.ts`.
+The deployed agent never sees your folder. `loadConfigFile()` reads the addendum on your machine and puts it into the config, which `npm run deploy` hands the container as `BRIDGE_CONFIG`; so the addendum reaches AWS when you deploy, and a changed addendum needs a redeploy. Only variables in `ENV_OVERRIDES` (the table above) take effect from a profile `.env`; every other field goes in the profile's `bridge.config.json`, for example:
+
+```json
+{
+  "mcp": { "auth": { "type": "alexaAccountLinking" } },
+  "skill": { "invocationName": "remembee quiz" },
+  "memory": { "shortTerm": false, "longTerm": false },
+  "features": { "debug": false },
+  "speech": { "resultField": "say" },
+  "tools": { "hiddenArguments": ["session_id"] },
+  "visual": { "enabled": true }
+}
+```
+
+Precedence, lowest first: `bridge.config.ts`, the profile's `bridge.config.json`, then environment overrides (repo `.env`, profile `.env`, real variables). The environment goes last on purpose: it is the documented way to change one value for one run. The merged result reaches the generator, the CLI, the CDK app (`visual.enabled` sets the Chromium build arg) and, through `BRIDGE_CONFIG`, the Lambda and the agent.
 
 ## Secrets
 
