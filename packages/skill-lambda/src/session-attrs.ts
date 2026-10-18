@@ -3,7 +3,8 @@ import type { Question } from '@alexa-mcp-bridge/core';
 
 /**
  * Typed accessors for the two things the Alexa Skill keeps in Alexa session attributes:
- * the question the user is answering, and whether a result is still being worked on.
+ * the question the user is answering, whether a result is still being worked on, and whether the
+ * session is open for an ordinary turn (the agent asked in its own speech, no question parked).
  */
 export interface PendingQuestion {
   id: string;
@@ -15,6 +16,7 @@ export interface PendingQuestion {
 interface Attributes {
   pendingQuestion?: PendingQuestion;
   awaitingResult?: boolean;
+  openTurn?: boolean;
 }
 
 function read(input: HandlerInput): Attributes {
@@ -52,5 +54,16 @@ export function setAwaitingResult(input: HandlerInput, awaiting: boolean): void 
   const attrs = read(input);
   if (awaiting) attrs.awaitingResult = true;
   else delete attrs.awaitingResult;
+  write(input, attrs);
+}
+
+export function hasOpenTurn(input: HandlerInput): boolean {
+  return read(input).openTurn === true;
+}
+
+export function setOpenTurn(input: HandlerInput, open: boolean): void {
+  const attrs = read(input);
+  if (open) attrs.openTurn = true;
+  else delete attrs.openTurn;
   write(input, attrs);
 }

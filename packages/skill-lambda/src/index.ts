@@ -1,7 +1,7 @@
 import askSdk from 'ask-sdk-core';
 import { BridgeClient } from './bridge.js';
 import { config, logger, manifest, runtimeArn } from './config.js';
-import { answerHandler, yesNoTurnHandler } from './handlers/answers.js';
+import { answerHandler, openAnswerHandler, yesNoTurnHandler } from './handlers/answers.js';
 import { freeTextHandler } from './handlers/free-text.js';
 import { launchHandler } from './handlers/launch.js';
 import {
@@ -23,6 +23,7 @@ const builder = askSdk.SkillBuilders.custom()
   .addRequestHandlers(
     launchHandler(bridge, config, manifest),
     answerHandler(bridge),
+    openAnswerHandler(bridge),
     toolIntentHandler(bridge, manifest),
     freeTextHandler(bridge),
     yesNoTurnHandler(bridge),
