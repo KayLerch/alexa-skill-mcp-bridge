@@ -1,6 +1,11 @@
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
-import { ConfigError, findConfigFile, loadConfigFile } from '@alexa-mcp-bridge/core';
+import {
+  ConfigError,
+  findConfigFile,
+  loadConfigFile,
+  resolveProfileDir,
+} from '@alexa-mcp-bridge/core';
 import { defaultPaths, generate } from './generate.js';
 import { ScanError } from './scan.js';
 
@@ -25,7 +30,7 @@ try {
   const config = await loadConfigFile(configPath);
   const result = await generate({
     config,
-    paths: defaultPaths(dirname(configPath)),
+    paths: defaultPaths(dirname(configPath), resolveProfileDir(dirname(configPath))),
     useModel: !values['no-model'],
     log: (line) => console.log(line),
   });

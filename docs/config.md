@@ -12,19 +12,32 @@ This repo is public and every clone edits the same tracked config file, which is
 cp .env.example .env      # .env is git-ignored; .env.example is not
 ```
 
-| Variable                 | Sets                  | Why it is here                                                              |
-| ------------------------ | --------------------- | --------------------------------------------------------------------------- |
-| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often         |
-| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`, `alexaAccountLinking` |
-| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                         |
-| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill              |
-| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                            |
+| Variable                 | Sets                  | Why it is here                                                                      |
+| ------------------------ | --------------------- | ----------------------------------------------------------------------------------- |
+| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often                 |
+| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`, `alexaAccountLinking`         |
+| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                                 |
+| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill                      |
+| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                                    |
+| `BRIDGE_PROFILE_DIR`     | (none; see below)     | A folder outside the repo with your own `.env`, overrides and prompt addendum (D56) |
 
 A real environment variable wins over the file, so one-off runs and CI still work: `BRIDGE_MCP_URL=https://staging.example.com/mcp npm run chat`. Everything else stays in `bridge.config.ts`, where it is typed and commented.
 
 Two more keys live in `.env` without overriding a config field: `npm run deploy` writes the Lambda ARN as `BRIDGE_LAMBDA_ARN`, and `npm run skill:deploy` reads it, writes it into `skill-package/skill.json`, runs `ask deploy`, and stores the resulting Alexa Skill id as `BRIDGE_SKILL_ID`. Both identify your account, which is why they never go into a tracked file.
 
 `.env` reaches the generator, the CLI, the CDK app and the scripts, because they all load `bridge.config.ts` through `loadConfigFile()`. The Lambda and the agent container never read it: they get the merged config as `BRIDGE_CONFIG`, resolved at synth time.
+
+### A profile folder
+
+`BRIDGE_PROFILE_DIR` points to a folder you keep in your own repository, so you never fork the bridge. Set it in the shell or in the repo's `.env` (a relative path resolves against the repo root; a folder that does not exist is a config error, files missing inside it are fine):
+
+| In the folder                        | Read after                 | Effect                                                                                                                                          |
+| ------------------------------------ | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.env`                               | the repo's `.env`          | Same variables as above; it wins over the repo's `.env`, a real environment variable wins over both. It cannot set `BRIDGE_PROFILE_DIR` itself. |
+| `overrides/<locale>.utterances.json` | `skill-package/overrides/` | Same format ([customizing](customizing.md)); its samples come first, an alias intent of the same name replaces the repo's.                      |
+| `prompt-addendum.md`                 | (nothing)                  | Becomes `agent.promptAddendum`, appended to the system prompt under "Server-specific guidance".                                                 |
+
+The deployed agent never sees your folder. `loadConfigFile()` reads the addendum on your machine and puts it into the config, which `npm run deploy` hands the container as `BRIDGE_CONFIG`; so the addendum reaches AWS when you deploy, and a changed addendum needs a redeploy. Only variables in `ENV_OVERRIDES` (the table above) take effect from a profile `.env`; everything else stays in `bridge.config.ts`.
 
 ## Secrets
 
@@ -78,6 +91,7 @@ and the agent log a warning that it would not be supported as an Alexa+ add-on.
 | `reasoningEffort` | `off`                        | Nova 2 reasoning: `off` sends no reasoning config and is what the turn budget assumes (about 1.5 s faster per turn than `low`); `low`, `medium`, `high` enable it. Ignored for non-Nova models. |
 | `fallbackModelId` | unset                        | A documented alternative such as `us.anthropic.claude-haiku-4-5-20251001-v1:0`. The stack grants access to it; switch by setting it as `modelId`.                                               |
 | `maxTokens`       | `400`                        | Cap on output tokens per model call. Spoken answers are short.                                                                                                                                  |
+| `promptAddendum`  | unset                        | Extra guidance for your MCP server, appended to the system prompt (at most 2000 characters). Normally filled from the profile's `prompt-addendum.md` (D56).                                     |
 
 ### runtime
 

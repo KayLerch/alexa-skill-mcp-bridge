@@ -84,6 +84,33 @@ export function readOverrides(path: string): Overrides {
   return out;
 }
 
+/**
+ * The repo's overrides plus a profile folder's (D56). Profile samples come first, so they survive
+ * the utterance cap; an alias intent with the same name is replaced by the profile's.
+ */
+export function combineOverrides(repo: Overrides, profile: Overrides): Overrides {
+  const utterances: Record<string, string[]> = { ...repo.utterances };
+  for (const [intent, samples] of Object.entries(profile.utterances)) {
+    utterances[intent] = [...samples, ...(repo.utterances[intent] ?? [])];
+  }
+  const slotSynonyms: Overrides['slotSynonyms'] = {};
+  for (const source of [repo.slotSynonyms, profile.slotSynonyms]) {
+    for (const [type, values] of Object.entries(source)) {
+      const merged = (slotSynonyms[type] ??= {});
+      for (const [value, synonyms] of Object.entries(values)) {
+        merged[value] = [...new Set([...(merged[value] ?? []), ...synonyms])];
+      }
+    }
+  }
+  const profileNames = new Set(profile.intents.map((i) => i.name));
+  return {
+    utterances,
+    catchAll: [...profile.catchAll, ...repo.catchAll],
+    slotSynonyms,
+    intents: [...repo.intents.filter((i) => !profileNames.has(i.name)), ...profile.intents],
+  };
+}
+
 export interface MergeReport {
   utterances: string[];
   rejected: string[];

@@ -87,6 +87,14 @@ manifest gains a second route to that tool, and the Lambda handles it with no ne
 generated intent already goes through one manifest-driven handler. You will rarely need this;
 extra utterances on the existing intent cover most cases.
 
+### Keeping the file in your own repository
+
+Set `BRIDGE_PROFILE_DIR` (see [config](config.md#a-profile-folder)) and the generator also reads
+`<profile>/overrides/<locale>.utterances.json`, in the same format, after the one above. Its samples
+come first, and an alias intent with the same name replaces the one here. The same folder holds
+`.env` and `prompt-addendum.md`, a short note for the agent's system prompt (for example "ask one
+quiz question at a time"), up to 2000 characters. Nothing in the folder is tracked by this repo.
+
 ## Let chat write your utterances
 
 The best guess at what people will say to the device is what you say to the bridge while testing:

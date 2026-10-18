@@ -1,6 +1,7 @@
 import { z } from 'zod';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { parseEnv } from 'node:util';
 import { pathToFileURL } from 'node:url';
 
 /**
@@ -12,6 +13,8 @@ import { pathToFileURL } from 'node:url';
  * name, your Alexa Skill id) can come from a git-ignored .env instead, so bridge.config.ts
  * stays committable as it ships. See ENV_OVERRIDES below and docs/config.md.
  */
+
+export const PROMPT_ADDENDUM_MAX_CHARS = 2000;
 
 export const mcpAuthSchema = z
   .object({
@@ -84,6 +87,13 @@ const bridgeConfigShape = z.object({
       fallbackModelId: z.string().min(1).optional(),
       /** Cap on spoken output. Short answers are the point. */
       maxTokens: z.number().int().positive().max(2000).default(400),
+      /**
+       * Extra guidance for the MCP server this bridge talks to, appended to the system prompt
+       * under "Server-specific guidance". Normally filled from <BRIDGE_PROFILE_DIR>/prompt-addendum.md
+       * at load time (D56); it travels inside BRIDGE_CONFIG, so the deployed agent has it too.
+       * Capped because BRIDGE_CONFIG is an environment variable.
+       */
+      promptAddendum: z.string().trim().min(1).max(PROMPT_ADDENDUM_MAX_CHARS).optional(),
     })
     .prefault({}),
   runtime: z
@@ -266,6 +276,50 @@ export function loadEnvFile(dir: string): void {
   if (existsSync(file)) process.loadEnvFile(file);
 }
 
+/** Where a consumer keeps its own .env, overrides and prompt addendum, outside this repo (D56). */
+export const PROFILE_DIR_ENV = 'BRIDGE_PROFILE_DIR';
+export const PROFILE_ADDENDUM_FILE = 'prompt-addendum.md';
+
+/**
+ * The profile folder from BRIDGE_PROFILE_DIR, or undefined when unset. A relative path resolves
+ * against `repoRoot`. A folder that does not exist is a config error; files missing inside it are fine.
+ */
+export function resolveProfileDir(
+  repoRoot: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const value = env[PROFILE_DIR_ENV]?.trim();
+  if (!value) return undefined;
+  const dir = resolve(repoRoot, value);
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    throw new ConfigError(
+      `${PROFILE_DIR_ENV} points to ${dir}, which is not a directory. ` +
+        'Create it, fix the path, or unset the variable.',
+    );
+  }
+  return dir;
+}
+
+/**
+ * Read <profile>/.env after the repo's own. The profile beats the repo's .env, a real
+ * environment variable beats both, and the profile cannot set BRIDGE_PROFILE_DIR (no chaining).
+ */
+export function loadProfileEnv(profileDir: string, realEnvKeys: ReadonlySet<string>): void {
+  const file = join(profileDir, ENV_FILE_NAME);
+  if (!existsSync(file)) return;
+  for (const [key, value] of Object.entries(parseEnv(readFileSync(file, 'utf8')))) {
+    if (key === PROFILE_DIR_ENV || realEnvKeys.has(key) || value === undefined) continue;
+    process.env[key] = value;
+  }
+}
+
+/** The profile's prompt addendum, trimmed, or undefined when there is none. */
+export function readPromptAddendum(profileDir: string): string | undefined {
+  const file = join(profileDir, PROFILE_ADDENDUM_FILE);
+  if (!existsSync(file)) return undefined;
+  return readFileSync(file, 'utf8').trim() || undefined;
+}
+
 /** Walk up from `from` until a bridge.config.ts is found. */
 export function findConfigFile(from: string = process.cwd()): string | undefined {
   let dir = resolve(from);
@@ -279,7 +333,7 @@ export function findConfigFile(from: string = process.cwd()): string | undefined
 }
 
 /**
- * Load and validate bridge.config.ts, with .env applied on top. Used by the generator, the
+ * Load and validate bridge.config.ts, with .env applied on top (and the profile folder's, D56). Used by the generator, the
  * CLI, the CDK app, and scripts. Node 22 strips the types on import; the file must use
  * erasable syntax only. The Lambda and the container do not come through here: they read the
  * already-merged config from BRIDGE_CONFIG.
@@ -291,12 +345,28 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
       `${CONFIG_FILE_NAME} not found in ${process.cwd()} or any parent directory.`,
     );
   }
-  loadEnvFile(dirname(resolve(file)));
+  const repoRoot = dirname(resolve(file));
+  const realEnvKeys = new Set(Object.keys(process.env));
+  loadEnvFile(repoRoot);
+  const profileDir = resolveProfileDir(repoRoot);
+  if (profileDir) loadProfileEnv(profileDir, realEnvKeys);
   const mod = (await import(pathToFileURL(resolve(file)).href)) as { default?: unknown };
   if (mod.default === undefined) {
     throw new ConfigError(`${file} must export the result of defineConfig() as default.`);
   }
-  return parseConfig(applyEnvOverrides(mod.default));
+  let raw = applyEnvOverrides(mod.default);
+  const addendum = profileDir ? readPromptAddendum(profileDir) : undefined;
+  if (addendum && typeof raw === 'object' && raw !== null) {
+    const agent = (raw as { agent?: unknown }).agent;
+    raw = {
+      ...raw,
+      agent: {
+        ...(typeof agent === 'object' && agent !== null ? agent : {}),
+        promptAddendum: addendum,
+      },
+    };
+  }
+  return parseConfig(raw);
 }
 
 /** Load config from the BRIDGE_CONFIG env var. Used by the Lambda and the container. */
