@@ -126,6 +126,7 @@ function harness(
   auth: Record<string, unknown> = { type: 'alexaAccountLinking' },
   memory: MemoryAdapter = noopMemory,
   hiddenArguments: string[] = [],
+  resultField?: string,
 ) {
   seen = [];
   refuse = () => false;
@@ -135,6 +136,7 @@ function harness(
     mcp: { url: proxyUrl, auth },
     features: { debug: true },
     tools: { hiddenArguments },
+    ...(resultField ? { speech: { resultField } } : {}),
   });
   const model = new ScriptedModel(steps);
   const session = new BridgeSession({
@@ -217,6 +219,22 @@ describe('account-linked token', () => {
     });
     expect(session.state).toBe('ready');
     for (const line of lines) expect(line).not.toContain('tok-revoked-55aa');
+    await session.close();
+  });
+
+  it('keeps the link prompt when speech.resultField is configured and the server answers 401', async () => {
+    const { session, send } = harness(
+      [weather('Berlin'), { text: 'never spoken' }],
+      { type: 'alexaAccountLinking' },
+      noopMemory,
+      [],
+      'city',
+    );
+    await send({ type: 'warmup' }, 'tok-field-1b2c');
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    refuse = (s) => s.method === 'tools/call';
+    const out = await send({ type: 'turn', utterance: { text: 'weather' } }, 'tok-field-1b2c');
+    expect(out).toMatchObject({ speech: SPOKEN.linkAccount, linkAccount: true, endSession: true });
     await session.close();
   });
 

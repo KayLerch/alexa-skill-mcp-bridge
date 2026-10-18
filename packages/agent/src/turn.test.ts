@@ -255,6 +255,31 @@ describe('speech.resultField (D51)', () => {
     await session.close();
   });
 
+  it('speaks a server line verbatim and reprompts with the question alone', async () => {
+    const say = 'Correct! Next, from the standup: who chose Adyen?';
+    const { session, send } = harness(
+      [
+        {
+          toolUse: {
+            name: 'search_hotels',
+            input: { destination: say, checkIn: '2026-10-05', checkOut: '2026-10-07', guests: 2 },
+          },
+        },
+        { text: 'The model rephrased it.' },
+      ],
+      { speech: { resultField: 'destination' } },
+    );
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    const out = await send({ type: 'turn', utterance: { text: 'quiz me' } });
+    expect(out).toMatchObject({
+      status: 'done',
+      speech: say,
+      reprompt: 'Next, from the standup: who chose Adyen?',
+      endSession: false,
+    });
+    await session.close();
+  });
+
   it('keeps the model text when the run called no tool', async () => {
     const { session, send } = harness([{ text: 'Hello there.' }], {
       speech: { resultField: 'city' },
