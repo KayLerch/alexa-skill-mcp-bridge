@@ -49,6 +49,7 @@ export class BridgeSession {
   readonly token = new TokenHolder();
   currentRun?: TurnRun;
   private mcp?: BridgeMcpClient;
+  private hiddenArguments?: HiddenArguments;
   private agent?: Agent;
   private warmup?: Promise<void>;
   private identity?: SessionIdentity;
@@ -157,6 +158,7 @@ export class BridgeSession {
    */
   forgetConversation(): void {
     this.forgotten = true;
+    this.hiddenArguments?.clear();
     if (this.agent) {
       this.agent.messages.splice(0);
       if (this.promptInputs) {
@@ -224,6 +226,7 @@ export class BridgeSession {
     };
     const systemPrompt = buildSystemPrompt(this.promptInputs);
     this.mcp = mcp;
+    this.hiddenArguments = new HiddenArguments(config.tools.hiddenArguments);
     this.agent = buildAgent({
       model: this.model,
       tools: [
@@ -232,7 +235,7 @@ export class BridgeSession {
           mcp,
           logger,
           this.accountLinking ? () => this.onUnauthorized() : undefined,
-          new HiddenArguments(config.tools.hiddenArguments),
+          this.hiddenArguments,
         ),
         askUserTool(this.queue),
       ],

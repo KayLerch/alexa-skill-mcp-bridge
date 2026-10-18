@@ -29,6 +29,8 @@ import { ScriptedModel, type ScriptStep } from './testing/scripted-model.js';
 interface Seen {
   method: string;
   authorization?: string;
+  /** The arguments of a tools/call. */
+  args?: unknown;
 }
 
 let upstream: HotelsWeatherServerHandle;
@@ -45,6 +47,7 @@ beforeAll(async () => {
       const method = rpcMethod(body);
       const entry: Seen = {
         method,
+        ...(method === 'tools/call' ? { args: rpcArguments(body) } : {}),
         ...(req.headers.authorization ? { authorization: req.headers.authorization } : {}),
       };
       if (req.method === 'POST') seen.push(entry);
@@ -95,6 +98,15 @@ function rpcMethod(body: Buffer): string {
   }
 }
 
+function rpcArguments(body: Buffer): unknown {
+  try {
+    return (JSON.parse(body.toString('utf8')) as { params?: { arguments?: unknown } }).params
+      ?.arguments;
+  } catch {
+    return undefined;
+  }
+}
+
 const weather = (city: string): ScriptStep => ({
   toolUse: { name: 'get_weather', input: { city } },
 });
@@ -113,12 +125,17 @@ function harness(
   steps: ScriptStep[],
   auth: Record<string, unknown> = { type: 'alexaAccountLinking' },
   memory: MemoryAdapter = noopMemory,
+  hiddenArguments: string[] = [],
 ) {
   seen = [];
   refuse = () => false;
   const lines: string[] = [];
   const logger = createLogger({ service: 'test' }, { level: 'debug', write: (l) => lines.push(l) });
-  const config = parseConfig({ mcp: { url: proxyUrl, auth }, features: { debug: true } });
+  const config = parseConfig({
+    mcp: { url: proxyUrl, auth },
+    features: { debug: true },
+    tools: { hiddenArguments },
+  });
   const model = new ScriptedModel(steps);
   const session = new BridgeSession({
     config,
@@ -307,6 +324,35 @@ describe('a lost link forgets the conversation (D48)', () => {
     expect(next.speech).toBe('Fresh start.');
     expect(lastCall(model)).not.toMatch(earlier);
     await session.close();
+  });
+
+  it('forgets remembered hidden arguments with the conversation (no id from the last account)', async () => {
+    const steps = [
+      weather('Berlin'),
+      { text: 'Berlin is cloudy.' },
+      { toolUse: { name: 'get_weather', input: {} } },
+      { text: 'Done.' },
+    ];
+    const lastArgs = () => toolCalls().at(-1)?.args;
+
+    // Control: with the link intact, the missing city is filled from the earlier result.
+    const kept = harness(steps, { type: 'alexaAccountLinking' }, noopMemory, ['city']);
+    await kept.send({ type: 'warmup' }, 'tok-one-7f3a');
+    await kept.session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    await kept.send({ type: 'turn', utterance: { text: 'weather in Berlin' } }, 'tok-one-7f3a');
+    await kept.send({ type: 'turn', utterance: { text: 'again' } }, 'tok-one-7f3a');
+    expect(lastArgs()).toEqual({ city: 'Berlin' });
+    await kept.session.close();
+
+    // A tokenless invocation forgets the conversation, and the remembered value with it.
+    const lost = harness(steps, { type: 'alexaAccountLinking' }, noopMemory, ['city']);
+    await lost.send({ type: 'warmup' }, 'tok-one-7f3a');
+    await lost.session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    await lost.send({ type: 'turn', utterance: { text: 'weather in Berlin' } }, 'tok-one-7f3a');
+    await lost.send({ type: 'cancel' });
+    await lost.send({ type: 'turn', utterance: { text: 'again' } }, 'tok-two-9c1e');
+    expect(lastArgs()).toEqual({});
+    await lost.session.close();
   });
 
   it('other modes keep the history when an invocation has no token', async () => {

@@ -34,6 +34,11 @@ export class HiddenArguments {
     }
   }
 
+  /** The conversation was forgotten (D48): nothing from the earlier account may carry over. */
+  clear(): void {
+    this.latest.clear();
+  }
+
   fill(args: Record<string, unknown>): Record<string, unknown> {
     const filled = { ...args };
     for (const name of this.names) {
