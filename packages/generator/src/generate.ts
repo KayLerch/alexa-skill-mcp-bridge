@@ -64,7 +64,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   const versionWarning = alexaPlusVersionWarning(scan.protocolVersion);
   if (versionWarning) log(`warning: ${versionWarning}`);
 
-  const { manifest: draft, customTypes } = buildManifest(scan, []);
+  const { manifest: draft, customTypes } = buildManifest(scan, [], config.tools.hiddenArguments);
   const models: Record<string, InteractionModel> = {};
   const files: string[] = [];
   let examplePhrases: string[] = [];

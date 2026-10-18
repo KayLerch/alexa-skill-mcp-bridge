@@ -2,7 +2,7 @@ import type { Agent, Model } from '@strands-agents/sdk';
 import { errorFields, type BridgeConfig, type Logger } from '@alexa-mcp-bridge/core';
 import { buildAgent } from './agent/build-agent.js';
 import { buildSystemPrompt, formatToolList, type SystemPromptVars } from './agent/prompt.js';
-import { askUserTool, mcpTools } from './agent/tools.js';
+import { HiddenArguments, askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
 import { BridgeMcpClient } from './mcp/client.js';
@@ -232,6 +232,7 @@ export class BridgeSession {
           mcp,
           logger,
           this.accountLinking ? () => this.onUnauthorized() : undefined,
+          new HiddenArguments(config.tools.hiddenArguments),
         ),
         askUserTool(this.queue),
       ],

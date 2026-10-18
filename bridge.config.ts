@@ -73,6 +73,13 @@ export default defineConfig({
     budgetMs: 6500,
   },
 
+  tools: {
+    // Argument names the agent fills itself, never a spoken slot (D50). A quiz server's opaque
+    // session id is the usual one: ['session_id']. A missing one is taken from the latest tool
+    // result whose structuredContent has that key; a value the model passes wins.
+    hiddenArguments: [],
+  },
+
   speech: {
     // Voice rules the agent and the question renderer both follow.
     // How many sentences a spoken answer may run to.

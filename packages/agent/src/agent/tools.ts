@@ -17,6 +17,32 @@ import { toolResultText } from '../mcp/result.js';
 import type { QuestionQueue } from '../elicitation/queue.js';
 import { loadPrompt } from './prompt.js';
 
+/**
+ * Hidden arguments (D50): names the model never has to supply. The latest `structuredContent`
+ * value for each name is remembered across tool calls and fills a call that left it out.
+ */
+export class HiddenArguments {
+  private readonly latest = new Map<string, unknown>();
+
+  constructor(private readonly names: readonly string[]) {}
+
+  remember(structured: unknown): void {
+    if (!structured || typeof structured !== 'object' || Array.isArray(structured)) return;
+    const record = structured as Record<string, unknown>;
+    for (const name of this.names) {
+      if (record[name] !== undefined) this.latest.set(name, record[name]);
+    }
+  }
+
+  fill(args: Record<string, unknown>): Record<string, unknown> {
+    const filled = { ...args };
+    for (const name of this.names) {
+      if (filled[name] === undefined && this.latest.has(name)) filled[name] = this.latest.get(name);
+    }
+    return filled;
+  }
+}
+
 /** An MCP tool as a Strands tool. Prefers structuredContent, keeps text, never leaks raw errors. */
 export class BridgeMcpTool extends Tool {
   readonly name: string;
@@ -28,6 +54,7 @@ export class BridgeMcpTool extends Tool {
     private readonly client: BridgeMcpClient,
     private readonly logger: Logger,
     private readonly onUnauthorized?: () => void,
+    private readonly hidden?: HiddenArguments,
   ) {
     super();
     this.name = definition.name;
@@ -46,7 +73,10 @@ export class BridgeMcpTool extends Tool {
         ? (input as Record<string, unknown>)
         : {};
     try {
-      const result = await this.client.callTool(this.name, args, { signal: context.cancelSignal });
+      const result = await this.client.callTool(this.name, this.hidden?.fill(args) ?? args, {
+        signal: context.cancelSignal,
+      });
+      if (!result.isError) this.hidden?.remember(result.structuredContent);
       // One block only. Nova collapses its context on a result that mixes json and text
       // (measured: 545 input tokens instead of 1712, empty answer; see plan D28).
       const text = toolResultText(result);
@@ -93,8 +123,9 @@ export function mcpTools(
   client: BridgeMcpClient,
   logger: Logger,
   onUnauthorized?: () => void,
+  hidden?: HiddenArguments,
 ): Tool[] {
-  return definitions.map((d) => new BridgeMcpTool(d, client, logger, onUnauthorized));
+  return definitions.map((d) => new BridgeMcpTool(d, client, logger, onUnauthorized, hidden));
 }
 
 const askUserInput = z.object({

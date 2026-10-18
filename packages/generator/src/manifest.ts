@@ -15,10 +15,14 @@ export interface ManifestBuild {
   customTypes: CustomSlotType[];
 }
 
-export function buildManifest(scan: ScanResult, examplePhrases: string[]): ManifestBuild {
+export function buildManifest(
+  scan: ScanResult,
+  examplePhrases: string[],
+  hiddenArguments: readonly string[] = [],
+): ManifestBuild {
   const types = new Map<string, CustomSlotType>();
   const tools: ManifestTool[] = scan.tools.map((tool) => {
-    const plan = planSlots(tool.name, tool.inputSchema);
+    const plan = planSlots(tool.name, tool.inputSchema, hiddenArguments);
     for (const t of plan.customTypes) types.set(t.name, t);
     return {
       name: tool.name,

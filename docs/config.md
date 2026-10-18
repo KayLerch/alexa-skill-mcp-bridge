@@ -103,6 +103,12 @@ A server's own text is spoken nearly as written, so an elicitation `message` sho
 someone can hear. Markdown, links and emoji in it are stripped on the way through, but a paragraph
 is still a paragraph.
 
+### tools
+
+| Field                   | Default | Effect                                                                                                                                                                                                                                                                                     |
+| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tools.hiddenArguments` | `[]`    | Argument names the agent fills itself (D50). They get no Alexa slot and appear in no sample utterance, so the one spoken slot goes to the next free-text argument. A missing one is taken from the latest tool result with that key in `structuredContent`; a value the model passes wins. |
+
 ### turn, elicitation, memory
 
 | Field                              | Default | Effect                                                                                                        |

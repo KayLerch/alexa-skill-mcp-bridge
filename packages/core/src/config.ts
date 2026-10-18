@@ -99,6 +99,15 @@ const bridgeConfigShape = z.object({
       budgetMs: z.number().int().min(1000).max(7500).default(6500),
     })
     .prefault({}),
+  tools: z
+    .object({
+      /**
+       * Argument names the agent fills itself (D50): never an Alexa slot, never in a sample
+       * utterance. A missing one is taken from the latest tool result that carries that key.
+       */
+      hiddenArguments: z.array(z.string().min(1)).default([]),
+    })
+    .prefault({}),
   /** Voice rules that both the prompt and the deterministic renderers obey. */
   speech: z
     .object({

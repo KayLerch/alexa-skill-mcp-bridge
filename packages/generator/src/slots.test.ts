@@ -79,4 +79,16 @@ describe('planSlots', () => {
     expect(plan.slots.find((s) => s.argument === 'breakfast')?.slotType).toBe('YesNoType');
     expect(plan.customTypes.map((t) => t.name)).toEqual(['BookRoomRoomTypeType', 'YesNoType']);
   });
+
+  it('never gives a hidden argument a slot, so the answer takes the spoken slot', () => {
+    const schema = {
+      type: 'object',
+      properties: { session_id: { type: 'string' }, answer: { type: 'string' } },
+      required: ['session_id', 'answer'],
+    };
+    expect(planSlots('submit_answer', schema).slots.map((s) => s.slot)).toEqual(['sessionId']);
+    const hidden = planSlots('submit_answer', schema, ['session_id']);
+    expect(hidden.slots.map((s) => s.slot)).toEqual(['answer']);
+    expect(hidden.elicitedArguments).toEqual([]);
+  });
 });
