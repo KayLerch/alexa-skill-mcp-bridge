@@ -25,6 +25,8 @@ export type ScriptStep =
 
 export class ScriptedModel extends Model<BaseModelConfig> {
   readonly calls: Message[][] = [];
+  /** The system prompt each call was given, as JSON text. */
+  readonly systemPrompts: string[] = [];
   private cursor = 0;
   private counter = 0;
 
@@ -40,6 +42,7 @@ export class ScriptedModel extends Model<BaseModelConfig> {
 
   async *stream(messages: Message[], options?: StreamOptions): AsyncIterable<ModelStreamEvent> {
     this.calls.push(messages);
+    this.systemPrompts.push(JSON.stringify(options?.systemPrompt ?? ''));
     let step = this.steps[this.cursor++] ?? { text: 'I have nothing more to add.' };
     while (typeof step === 'function') step = step(messages);
     options?.cancelSignal?.throwIfAborted();

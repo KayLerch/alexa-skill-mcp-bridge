@@ -42,6 +42,8 @@ export async function runTurn(
   const identity: SessionIdentity = { actorId: invocation.actorId, locale: invocation.locale };
   // With account linking, every MCP request from here on carries this invocation's token (D48).
   session.token.set(invocation.userToken);
+  // No token means the user is no longer linked: whoever links next starts with a clean slate.
+  if (session.accountLinking && !invocation.userToken) await unlinked(session, log);
 
   switch (turn.type) {
     case 'warmup':
@@ -92,7 +94,10 @@ async function newRequest(
     const needsLink = session.warmupNeedsAccountLink;
     log.warn('request while the session failed to warm up', { needsLink });
     session.resetWarmup();
-    if (needsLink) return linkAccountOutput();
+    if (needsLink) {
+      session.forgetConversation();
+      return linkAccountOutput();
+    }
     return { status: 'error', speech: SPOKEN.error, endSession: true, visual: null };
   }
   if (readiness === 'warming') {
@@ -169,6 +174,24 @@ async function cancel(session: BridgeSession, log: Logger): Promise<TurnOutput> 
   session.clearRun();
   log.info('cancelled');
   return done('');
+}
+
+/** Stop whatever runs for the previous link, then forget the conversation (D48). */
+async function unlinked(session: BridgeSession, log: Logger): Promise<void> {
+  session.queue.cancelAll('account link lost');
+  const run = session.currentRun;
+  if (run?.isRunning) {
+    run.cancel();
+    await run.waitForOutcome(UNWIND_MS);
+  }
+  if (run?.isRunning) {
+    // Still unwinding: its messages are in use. Forget as soon as it has stopped.
+    log.warn('run still unwinding after the link was lost; forgetting once it stops');
+    void run.finished.then(() => session.forgetConversation());
+    return;
+  }
+  session.clearRun();
+  session.forgetConversation();
 }
 
 /** Map a run outcome onto the state table and the TurnOutput the frontend renders. */

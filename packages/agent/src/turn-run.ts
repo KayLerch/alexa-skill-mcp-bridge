@@ -36,7 +36,8 @@ export class TurnRun {
   readonly input: string;
   readonly debug?: DebugSink;
   private readonly aborter = new AbortController();
-  private readonly finished: Promise<TurnOutput>;
+  /** Settles once the agent loop has stopped, however it ended. */
+  readonly finished: Promise<TurnOutput>;
   private settled?: TurnOutput;
   private linkRequired = false;
 

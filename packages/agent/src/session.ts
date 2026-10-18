@@ -1,7 +1,7 @@
 import type { Agent, Model } from '@strands-agents/sdk';
 import { errorFields, type BridgeConfig, type Logger } from '@alexa-mcp-bridge/core';
 import { buildAgent } from './agent/build-agent.js';
-import { buildSystemPrompt, formatToolList } from './agent/prompt.js';
+import { buildSystemPrompt, formatToolList, type SystemPromptVars } from './agent/prompt.js';
 import { askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
@@ -54,6 +54,10 @@ export class BridgeSession {
   private identity?: SessionIdentity;
   /** Why the last warm-up failed, for frontends that can show it (the CLI). */
   warmupError?: Error;
+  /** The system prompt's inputs, kept so a lost link can rebuild it without the memory context. */
+  private promptInputs?: SystemPromptVars;
+  /** Set once the link was lost: this container no longer hydrates from memory (D48). */
+  private forgotten = false;
 
   constructor(private readonly options: BridgeSessionOptions) {
     this.config = options.config;
@@ -141,8 +145,25 @@ export class BridgeSession {
     return this.accountLinking && isUnauthorized(this.warmupError);
   }
 
-  private get accountLinking(): boolean {
+  get accountLinking(): boolean {
     return this.config.mcp.auth.type === 'alexaAccountLinking';
+  }
+
+  /**
+   * The account link went away (an invocation without a token, or a 401). Memory is keyed by the
+   * Alexa user, not the linked account, so whoever links next must not inherit this conversation:
+   * drop the agent's messages and the long-term context in its system prompt, and skip hydration
+   * on any later warm-up in this container. Call it only while no run is working.
+   */
+  forgetConversation(): void {
+    this.forgotten = true;
+    if (this.agent) {
+      this.agent.messages.splice(0);
+      if (this.promptInputs) {
+        this.agent.systemPrompt = buildSystemPrompt({ ...this.promptInputs, memoryContext: '' });
+      }
+    }
+    this.logger.info('account link lost; conversation history dropped');
   }
 
   get serverName(): string | undefined {
@@ -153,6 +174,14 @@ export class BridgeSession {
     this.queue.cancelAll('session closed');
     this.currentRun?.cancel();
     await this.mcp?.close();
+  }
+
+  /** A tool call got a 401: end the run with the link prompt, then forget once it has stopped. */
+  private onUnauthorized(): void {
+    const run = this.currentRun;
+    if (!run) return;
+    run.requireAccountLink();
+    void run.finished.then(() => this.forgetConversation());
   }
 
   private async connect(identity: SessionIdentity): Promise<void> {
@@ -174,14 +203,16 @@ export class BridgeSession {
     const [info, definitions, history, memoryContext] = await Promise.all([
       mcp.connect(),
       mcp.connect().then(() => mcp.listTools()),
-      memory.hydrate(identity.actorId).catch((err: unknown) => {
-        logger.warn('memory hydration failed; starting without history', errorFields(err));
-        return [];
-      }),
-      memory.longTermContext(identity.actorId).catch(() => ''),
+      this.forgotten
+        ? []
+        : memory.hydrate(identity.actorId).catch((err: unknown) => {
+            logger.warn('memory hydration failed; starting without history', errorFields(err));
+            return [];
+          }),
+      this.forgotten ? '' : memory.longTermContext(identity.actorId).catch(() => ''),
     ]);
     const today = (this.options.now ?? (() => new Date()))().toISOString().slice(0, 10);
-    const systemPrompt = buildSystemPrompt({
+    this.promptInputs = {
       serverName: info.name,
       serverInstructions: info.instructions ?? '(the server gave no instructions)',
       toolList: formatToolList(definitions),
@@ -190,7 +221,8 @@ export class BridgeSession {
       memoryContext,
       maxSentences: config.speech.maxSentences,
       maxChoicesSpoken: config.speech.maxChoicesSpoken,
-    });
+    };
+    const systemPrompt = buildSystemPrompt(this.promptInputs);
     this.mcp = mcp;
     this.agent = buildAgent({
       model: this.model,
@@ -199,7 +231,7 @@ export class BridgeSession {
           definitions,
           mcp,
           logger,
-          this.accountLinking ? () => this.currentRun?.requireAccountLink() : undefined,
+          this.accountLinking ? () => this.onUnauthorized() : undefined,
         ),
         askUserTool(this.queue),
       ],

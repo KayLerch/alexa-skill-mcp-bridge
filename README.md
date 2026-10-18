@@ -209,7 +209,9 @@ Elicitation: when your tool asks the user a question, the agent parks the open `
 
 When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged.
 
-A user who has not linked yet, or whose token your server refuses with HTTP 401, hears "Please link your account in the Alexa app, then ask me again." and gets the link card in the Alexa app. `initialize` and `tools/list` may go out without a token, so `npm run generate` works against a server that allows public discovery; if yours does not, set `MCP_SECRET_VALUE` to a token of your own account for the scan and for `npm run chat`. It does not combine with `features.gateway`, which cannot pass the token on.
+A user who has not linked yet, or whose token your server refuses with HTTP 401, hears "Please link your account in the Alexa app, then ask me again." and gets the link card in the Alexa app. Either way the agent drops the conversation it holds for that Alexa user, so whoever links next starts clean.
+
+**Turn memory off when your server's data belongs to the linked account.** AgentCore Memory is keyed by the Alexa user, not by the account they linked: relink the same Alexa account to a different account on your server, and a new container would hydrate the first account's conversation. For such servers set `memory.shortTerm` and `memory.longTerm` to `false`. `initialize` and `tools/list` may go out without a token, so `npm run generate` works against a server that allows public discovery; if yours does not, set `MCP_SECRET_VALUE` to a token of your own account for the scan and for `npm run chat`. It does not combine with `features.gateway`, which cannot pass the token on.
 
 Account linking itself is configured on your Alexa Skill, once, by you (authorization code grant):
 
@@ -232,7 +234,7 @@ ask smapi update-account-linking-info --skill-id <your Alexa Skill id> --stage d
 }
 ```
 
-Keep that file outside the repo: it holds the client secret. Add the redirect URLs the developer console lists under Build, Account Linking to your authorization server's allowed callback URLs, then `npm run deploy` so the Alexa Skill Lambda and the agent pick up the mode.
+The fields are described in Amazon's [account linking schema](https://developer.amazon.com/en-US/docs/alexa/smapi/account-linking-schemas.html): `type` is `AUTH_CODE` or `IMPLICIT`, `accessTokenScheme` is `HTTP_BASIC` or `REQUEST_BODY_CREDENTIALS`, and optional fields such as `domains`, `skipOnEnablement` and `pkceConfiguration` are listed there. Keep that file outside the repo: it holds the client secret. Add the redirect URLs the developer console lists under Build, Account Linking to your authorization server's allowed callback URLs, then `npm run deploy` so the Alexa Skill Lambda and the agent pick up the mode.
 
 ## Docs
 

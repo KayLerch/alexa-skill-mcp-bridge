@@ -23,7 +23,8 @@ import { isAwaitingResult } from './session-attrs.js';
  * When a result is outstanding it polls first and speaks that result ahead of the new
  * input (plan D16); the poll's time comes out of the main call's budget.
  * With mcp.auth.type 'alexaAccountLinking' the user's account-linked token rides along on
- * every envelope; without one the user is asked to link and the agent is not called (D48).
+ * every envelope; without one the user is asked to link, and the agent only hears a cancel
+ * without a token, which makes it forget the conversation (D48).
  */
 export interface BridgeClientOptions {
   config: BridgeConfig;
@@ -77,7 +78,10 @@ export class BridgeClient {
     const userToken = linking ? linkedToken(input) : undefined;
     if (linking && !userToken) {
       log.info('no account-linked token on the request; asking the user to link');
-      // Stop still just ends the session; there is nothing to cancel without the agent.
+      // A cancel without a token tells the agent the link is gone, so it drops the conversation
+      // before anyone links again (D48). Its answer never changes ours; send() never throws.
+      await this.send(ids, { type: 'cancel' }, config.turn.budgetMs, log);
+      // Stop still just ends the session.
       return turn.type === 'cancel'
         ? { status: 'done', speech: '', endSession: true, visual: null }
         : linkAccountOutput();

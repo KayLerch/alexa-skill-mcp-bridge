@@ -9,7 +9,7 @@ import {
 } from '@alexa-mcp-bridge/core';
 import { BridgeClient } from '../src/bridge.js';
 import { launchHandler } from '../src/handlers/launch.js';
-import { stopHandler } from '../src/handlers/standard.js';
+import { sessionEndedHandler, stopHandler } from '../src/handlers/standard.js';
 import { toolIntentHandler } from '../src/handlers/tool-intent.js';
 import { render } from '../src/render.js';
 import { handlerInput, manifest, slot } from './helpers.js';
@@ -61,8 +61,8 @@ const searchHotels = (accessToken?: string) =>
   });
 
 describe('account linking in the Alexa Skill Lambda', () => {
-  it('asks the user to link, with the LinkAccount card, and never calls the agent without a token', async () => {
-    const { bridge, invoke } = harness(linking);
+  it('asks the user to link, with the LinkAccount card, without a token; the agent only hears a cancel', async () => {
+    const { bridge, envelopes } = harness(linking);
     const launch = await launchHandler(bridge, linking, manifest).handle(handlerInput());
     const request = await toolIntentHandler(bridge, manifest).handle(searchHotels());
     for (const response of [launch, request]) {
@@ -73,11 +73,38 @@ describe('account linking in the Alexa Skill Lambda', () => {
       });
       expect(response.shouldEndSession).toBe(true);
     }
-    expect(invoke).not.toHaveBeenCalled();
+    // The agent learns the user is unlinked (and drops its history), never with a token.
+    expect(envelopes.map((e) => e.turn.type)).toEqual(['cancel', 'cancel']);
+    expect(envelopes.every((e) => e.userToken === undefined)).toBe(true);
   });
 
-  it('still says goodbye on stop without a token, without the card or an agent call', async () => {
-    const { bridge, invoke } = harness(linking);
+  it('answers the same when the unlinked cancel fails or hangs', async () => {
+    const failing = harness(linking, async () => {
+      throw new Error('agent runtime returned 500');
+    });
+    const hanging = new BridgeClient({
+      config: { ...linking, turn: { budgetMs: 1000 } },
+      runtimeArn: 'arn:test',
+      logger: createLogger({}, { write: () => undefined }),
+      invoke: (_e, _s, signal) =>
+        new Promise((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('aborted'))),
+        ),
+    });
+    for (const bridge of [failing.bridge, hanging]) {
+      const response = await toolIntentHandler(bridge, manifest).handle(searchHotels());
+      expect(response.card).toEqual({ type: 'LinkAccount' });
+      expect(response.outputSpeech).toEqual({
+        type: 'SSML',
+        ssml: `<speak>${SPOKEN.linkAccount}</speak>`,
+      });
+      expect(response.shouldEndSession).toBe(true);
+      expect(response.reprompt).toBeUndefined();
+    }
+  });
+
+  it('still says goodbye on stop without a token, without the card; the cancel goes out without one', async () => {
+    const { bridge, envelopes } = harness(linking);
     const response = await stopHandler(bridge).handle(
       handlerInput({ intent: 'AMAZON.StopIntent' }),
     );
@@ -86,7 +113,13 @@ describe('account linking in the Alexa Skill Lambda', () => {
       ssml: `<speak>${SPOKEN.goodbye}</speak>`,
     });
     expect(response.card).toBeUndefined();
-    expect(invoke).not.toHaveBeenCalled();
+    expect(envelopes.map((e) => [e.turn.type, e.userToken])).toEqual([['cancel', undefined]]);
+    const ended = await sessionEndedHandler(
+      bridge,
+      createLogger({}, { write: () => undefined }),
+    ).handle(handlerInput({ type: 'SessionEndedRequest' }));
+    expect(ended.card).toBeUndefined();
+    expect(ended.outputSpeech).toBeUndefined();
   });
 
   it('forwards the token on every envelope, warm-up included', async () => {
@@ -98,6 +131,21 @@ describe('account linking in the Alexa Skill Lambda', () => {
     await toolIntentHandler(bridge, manifest).handle(searchHotels(TOKEN));
     expect(envelopes.map((e) => e.turn.type)).toEqual(['warmup', 'turn']);
     expect(envelopes.map((e) => e.userToken)).toEqual([TOKEN, TOKEN]);
+  });
+
+  it('forwards the token on the poll that fetches an outstanding result, too', async () => {
+    const { bridge, envelopes } = harness(linking);
+    const input = handlerInput({
+      intent: 'SearchHotelsIntent',
+      slots: { destination: slot('destination', 'Berlin') },
+      sessionAttributes: { awaitingResult: true },
+      accessToken: TOKEN,
+    });
+    await toolIntentHandler(bridge, manifest).handle(input);
+    expect(envelopes.map((e) => [e.turn.type, e.userToken])).toEqual([
+      ['poll', TOKEN],
+      ['turn', TOKEN],
+    ]);
   });
 
   it('shows the card when the agent reports that the server refused the token', async () => {

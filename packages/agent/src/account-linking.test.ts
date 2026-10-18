@@ -13,7 +13,7 @@ import {
   type TurnInput,
 } from '@alexa-mcp-bridge/core';
 import { BridgeSession } from './session.js';
-import { noopMemory } from './memory/store.js';
+import { noopMemory, type MemoryAdapter } from './memory/store.js';
 import { runTurn } from './turn.js';
 import { ScriptedModel, type ScriptStep } from './testing/scripted-model.js';
 
@@ -99,19 +99,31 @@ const weather = (city: string): ScriptStep => ({
   toolUse: { name: 'get_weather', input: { city } },
 });
 
+/** Memory that remembers an earlier conversation, to show what an unlink forgets. */
+const remembering: MemoryAdapter = {
+  hydrate: async () => [
+    { role: 'user', content: [{ text: 'HYDRATED-OLD question' }] },
+    { role: 'assistant', content: [{ text: 'HYDRATED-OLD answer' }] },
+  ],
+  longTermContext: async () => 'LONGTERM-FACT about the first account',
+  record: async () => undefined,
+};
+
 function harness(
   steps: ScriptStep[],
   auth: Record<string, unknown> = { type: 'alexaAccountLinking' },
+  memory: MemoryAdapter = noopMemory,
 ) {
   seen = [];
   refuse = () => false;
   const lines: string[] = [];
   const logger = createLogger({ service: 'test' }, { level: 'debug', write: (l) => lines.push(l) });
   const config = parseConfig({ mcp: { url: proxyUrl, auth }, features: { debug: true } });
+  const model = new ScriptedModel(steps);
   const session = new BridgeSession({
     config,
-    model: new ScriptedModel(steps),
-    memory: noopMemory,
+    model,
+    memory,
     logger,
     secretResolver: async () => 'static-secret',
   });
@@ -125,7 +137,13 @@ function harness(
       debug: true,
       ...(userToken ? { userToken } : {}),
     } satisfies AgentInvocation);
-  return { session, send, lines };
+  return { session, send, lines, model };
+}
+
+/** What the model saw on its last call: the conversation and the system prompt. */
+function lastCall(model: ScriptedModel): string {
+  const messages = JSON.stringify(model.calls.at(-1)?.map((m) => m.toJSON()));
+  return `${messages} ${model.systemPrompts.at(-1) ?? ''}`;
 }
 
 const toolCalls = () => seen.filter((s) => s.method === 'tools/call');
@@ -223,5 +241,85 @@ describe('other auth modes are unchanged', () => {
     expect(out.linkAccount).toBeUndefined();
     expect(out.speech).toBe('The tool failed.');
     await refused.session.close();
+  });
+});
+
+describe('a lost link forgets the conversation (D48)', () => {
+  const earlier = /HYDRATED-OLD|LONGTERM-FACT|Berlin/;
+
+  it('an invocation without a token drops the history and what was hydrated', async () => {
+    const { session, send, model } = harness(
+      [weather('Berlin'), { text: 'Berlin is cloudy.' }, { text: 'Fresh start.' }],
+      { type: 'alexaAccountLinking' },
+      remembering,
+    );
+    await send({ type: 'warmup' }, 'tok-one-7f3a');
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    await send({ type: 'turn', utterance: { text: 'weather in Berlin' } }, 'tok-one-7f3a');
+    expect(lastCall(model)).toMatch(/HYDRATED-OLD/);
+    expect(lastCall(model)).toMatch(/LONGTERM-FACT/);
+
+    expect(await send({ type: 'cancel' })).toMatchObject({ status: 'done', speech: '' });
+    const next = await send({ type: 'turn', utterance: { text: 'hello' } }, 'tok-two-9c1e');
+    expect(next.speech).toBe('Fresh start.');
+    expect(lastCall(model)).toMatch(/hello/);
+    expect(lastCall(model)).not.toMatch(earlier);
+    await session.close();
+  });
+
+  it('a 401 from the server drops it too', async () => {
+    const { session, send, model } = harness(
+      [
+        weather('Berlin'),
+        { text: 'Berlin is cloudy.' },
+        weather('Berlin'),
+        { text: 'never spoken' },
+        { text: 'Fresh start.' },
+      ],
+      { type: 'alexaAccountLinking' },
+      remembering,
+    );
+    await send({ type: 'warmup' }, 'tok-one-7f3a');
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    await send({ type: 'turn', utterance: { text: 'weather in Berlin' } }, 'tok-one-7f3a');
+    refuse = (s) => s.method === 'tools/call';
+    const refused = await send({ type: 'turn', utterance: { text: 'again' } }, 'tok-one-7f3a');
+    expect(refused.linkAccount).toBe(true);
+    refuse = () => false;
+    await send({ type: 'turn', utterance: { text: 'hello' } }, 'tok-two-9c1e');
+    expect(lastCall(model)).toMatch(/hello/);
+    expect(lastCall(model)).not.toMatch(earlier);
+    await session.close();
+  });
+
+  it('a 401 at warm-up means the next warm-up does not hydrate memory', async () => {
+    const { session, send, model } = harness(
+      [{ text: 'Fresh start.' }],
+      { type: 'alexaAccountLinking' },
+      remembering,
+    );
+    refuse = () => true;
+    await send({ type: 'warmup' }, 'tok-expired-0b0b');
+    const out = await send({ type: 'turn', utterance: { text: 'hi' } }, 'tok-expired-0b0b');
+    expect(out.linkAccount).toBe(true);
+    refuse = () => false;
+    const next = await send({ type: 'turn', utterance: { text: 'hello' } }, 'tok-two-9c1e');
+    expect(next.speech).toBe('Fresh start.');
+    expect(lastCall(model)).not.toMatch(earlier);
+    await session.close();
+  });
+
+  it('other modes keep the history when an invocation has no token', async () => {
+    const { session, send, model } = harness(
+      [{ text: 'One.' }, { text: 'Two.' }],
+      { type: 'none' },
+      remembering,
+    );
+    await send({ type: 'turn', utterance: { text: 'first' } });
+    await send({ type: 'cancel' });
+    await send({ type: 'turn', utterance: { text: 'second' } });
+    expect(lastCall(model)).toMatch(/HYDRATED-OLD/);
+    expect(lastCall(model)).toMatch(/first/);
+    await session.close();
   });
 });
