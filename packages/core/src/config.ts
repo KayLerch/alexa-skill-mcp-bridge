@@ -15,7 +15,13 @@ import { pathToFileURL } from 'node:url';
 
 export const mcpAuthSchema = z
   .object({
-    type: z.enum(['none', 'bearer', 'apiKey', 'oauthClientCredentials']).default('none'),
+    /**
+     * alexaAccountLinking: no shared secret. Each request carries the user's own token from
+     * Alexa account linking, and a user without one is asked to link (D48).
+     */
+    type: z
+      .enum(['none', 'bearer', 'apiKey', 'oauthClientCredentials', 'alexaAccountLinking'])
+      .default('none'),
     /** Secrets Manager secret holding the token, API key, or {clientId, clientSecret} JSON. */
     secretName: z.string().min(1).optional(),
     /** Header name for apiKey auth. Default x-api-key. */
@@ -24,7 +30,7 @@ export const mcpAuthSchema = z
     scopes: z.array(z.string()).optional(),
   })
   .superRefine((auth, ctx) => {
-    if (auth.type !== 'none' && !auth.secretName) {
+    if (auth.type !== 'none' && auth.type !== 'alexaAccountLinking' && !auth.secretName) {
       ctx.addIssue({
         code: 'custom',
         path: ['secretName'],
@@ -36,7 +42,7 @@ export const mcpAuthSchema = z
   });
 export type McpAuthConfig = z.output<typeof mcpAuthSchema>;
 
-export const bridgeConfigSchema = z.object({
+const bridgeConfigShape = z.object({
   mcp: z.object({
     url: z.url({
       error:
@@ -144,6 +150,19 @@ export const bridgeConfigSchema = z.object({
       logRetentionDays: z.number().int().positive().default(7),
     })
     .prefault({}),
+});
+
+export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) => {
+  // The Gateway authenticates the agent with SigV4 and has no way to pass the user's token on.
+  if (config.features.gateway && config.mcp.auth.type === 'alexaAccountLinking') {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['features', 'gateway'],
+      message:
+        "cannot be combined with mcp.auth.type 'alexaAccountLinking': the Gateway does not " +
+        "forward the user's token. Turn the Gateway off.",
+    });
+  }
 });
 
 export type BridgeConfig = z.output<typeof bridgeConfigSchema>;

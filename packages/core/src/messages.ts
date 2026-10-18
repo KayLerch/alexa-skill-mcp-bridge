@@ -10,4 +10,5 @@ export const SPOKEN = {
   urlElicitationDeclined:
     "That step needs a link to be opened, which I can't do by voice. Let's try something else.",
   questionRepeat: 'Sorry, I still need an answer.',
+  linkAccount: 'Please link your account in the Alexa app, then ask me again.',
 } as const;

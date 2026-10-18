@@ -10,6 +10,7 @@ const { getRequestType } = askSdk;
 /**
  * LaunchRequest: send warmup and wait up to the budget. Warm runtime: greet and stay open.
  * Cold runtime: speak the cold-start line and end the session; provisioning continues.
+ * Not linked yet (account linking on, no token): the link prompt instead of the greeting.
  */
 export function launchHandler(
   bridge: BridgeClient,
@@ -20,6 +21,7 @@ export function launchHandler(
     canHandle: (input: HandlerInput) => getRequestType(input.requestEnvelope) === 'LaunchRequest',
     handle: async (input: HandlerInput) => {
       const output = await bridge.turn(input, { type: 'warmup' });
+      if (output.linkAccount) return render(input, output);
       if (output.status === 'pending') {
         return render(input, output, { speech: config.skill.coldStartMessage, endSession: true });
       }

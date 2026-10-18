@@ -13,7 +13,14 @@ export { QuestionQueue, type PendingQuestion } from './elicitation/queue.js';
 export { planElicitation, expectsFor } from './elicitation/question.js';
 export { mapAnswer, parseSpokenNumber, type MappedAnswer } from './elicitation/answer-mapper.js';
 export { BridgeMcpClient, type McpServerInfo, type McpToolDefinition } from './mcp/client.js';
-export { resolveMcpAuth, type McpAuth, type SecretResolver } from './mcp/auth.js';
+export {
+  isUnauthorized,
+  resolveMcpAuth,
+  userTokenFetch,
+  type McpAuth,
+  type SecretResolver,
+} from './mcp/auth.js';
+export { TokenHolder } from './mcp/token.js';
 export {
   ALEXA_PLUS_PROTOCOL_VERSION,
   ProtocolVersionError,

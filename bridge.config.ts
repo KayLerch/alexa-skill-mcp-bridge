@@ -21,7 +21,9 @@ export default defineConfig({
     // For device tests the URL must be reachable from AWS (see examples/hotels-weather-mcp-server/README.md).
     url: 'http://localhost:3939/mcp',
     auth: {
-      // 'none' | 'bearer' | 'apiKey' | 'oauthClientCredentials'
+      // 'none' | 'bearer' | 'apiKey' | 'oauthClientCredentials' | 'alexaAccountLinking'.
+      // alexaAccountLinking: no secret; each request carries the user's own token from Alexa
+      // account linking, and a user who has not linked hears how to (README, "Per-user sign-in").
       type: 'none',
       // Secrets Manager secret name (BRIDGE_MCP_SECRET_NAME in .env). bearer: the token.
       // apiKey: the key. oauthClientCredentials: JSON {"clientId": "...", "clientSecret": "..."}.

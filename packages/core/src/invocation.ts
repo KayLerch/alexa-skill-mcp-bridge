@@ -15,6 +15,11 @@ export const agentInvocationSchema = z.object({
   /** How long the agent may take for this call before answering 'pending'. */
   budgetMs: z.number().int().positive(),
   debug: z.boolean().default(false),
+  /**
+   * The user's account-linked token, when mcp.auth.type is 'alexaAccountLinking' (D48).
+   * Sent on to the MCP server as a bearer token; never logged.
+   */
+  userToken: z.string().min(1).optional(),
 });
 export type AgentInvocation = z.infer<typeof agentInvocationSchema>;
 export type AgentInvocationInput = z.input<typeof agentInvocationSchema>;

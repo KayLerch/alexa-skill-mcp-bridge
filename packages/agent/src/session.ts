@@ -4,9 +4,10 @@ import { buildAgent } from './agent/build-agent.js';
 import { buildSystemPrompt, formatToolList } from './agent/prompt.js';
 import { askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
-import { resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
+import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
 import { BridgeMcpClient } from './mcp/client.js';
 import { sigV4Fetch } from './mcp/gateway.js';
+import { TokenHolder } from './mcp/token.js';
 import type { MemoryAdapter } from './memory/store.js';
 import { TurnRun } from './turn-run.js';
 
@@ -44,6 +45,8 @@ export class BridgeSession {
   readonly config: BridgeConfig;
   readonly model: Model;
   readonly memory: MemoryAdapter;
+  /** The user's account-linked token, set from every invocation (D48). */
+  readonly token = new TokenHolder();
   currentRun?: TurnRun;
   private mcp?: BridgeMcpClient;
   private agent?: Agent;
@@ -133,6 +136,15 @@ export class BridgeSession {
     return this.state === 'overrun' ? 'HealthyBusy' : 'Healthy';
   }
 
+  /** With account linking: the MCP server refused the user's token at warm-up. */
+  get warmupNeedsAccountLink(): boolean {
+    return this.accountLinking && isUnauthorized(this.warmupError);
+  }
+
+  private get accountLinking(): boolean {
+    return this.config.mcp.auth.type === 'alexaAccountLinking';
+  }
+
   get serverName(): string | undefined {
     return this.mcp?.serverInfo?.name;
   }
@@ -149,11 +161,12 @@ export class BridgeSession {
     const gatewayUrl = this.options.gatewayUrl;
     const auth = gatewayUrl
       ? { headers: {} }
-      : await resolveMcpAuth(config, this.options.secretResolver);
+      : await resolveMcpAuth(config, this.options.secretResolver, this.token);
+    const fetch = gatewayUrl ? sigV4Fetch(config.aws.region) : auth.fetch;
     const mcp = new BridgeMcpClient({
       url: gatewayUrl ?? config.mcp.url,
       auth,
-      ...(gatewayUrl ? { fetch: sigV4Fetch(config.aws.region) } : {}),
+      ...(fetch ? { fetch } : {}),
       callTimeoutMs: TOOL_CALL_TIMEOUT_MS,
       onElicitation: (params) => this.queue.elicit(params),
       logger,
@@ -181,7 +194,15 @@ export class BridgeSession {
     this.mcp = mcp;
     this.agent = buildAgent({
       model: this.model,
-      tools: [...mcpTools(definitions, mcp, logger), askUserTool(this.queue)],
+      tools: [
+        ...mcpTools(
+          definitions,
+          mcp,
+          logger,
+          this.accountLinking ? () => this.currentRun?.requireAccountLink() : undefined,
+        ),
+        askUserTool(this.queue),
+      ],
       systemPrompt,
       messages: history,
       debugSink: () => this.currentRun?.debug,

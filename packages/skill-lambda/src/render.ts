@@ -7,7 +7,8 @@ import { setAwaitingResult, setPendingQuestion } from './session-attrs.js';
 /**
  * TurnOutput → Alexa response. Speech becomes SSML with light escaping, a reprompt keeps the
  * microphone open whenever the session stays open, and session attributes track a pending
- * question or an outstanding result for the next request.
+ * question or an outstanding result for the next request. An output that asks the user to link
+ * their account adds the LinkAccount card.
  */
 export interface RenderOptions {
   /** Spoken before the agent's speech (a fetched result, a greeting). */
@@ -32,6 +33,8 @@ export function render(
   if (speech) builder.speak(ssml(speech));
   if (!endSession)
     builder.reprompt(ssml(output.reprompt ?? (output.status === 'question' ? speech : REPROMPT)));
+  // The card in the Alexa app is where the user links their account (D48).
+  if (output.linkAccount) builder.withLinkAccountCard();
   return builder.withShouldEndSession(endSession).getResponse();
 }
 

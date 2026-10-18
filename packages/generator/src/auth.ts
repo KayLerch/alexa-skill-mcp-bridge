@@ -9,7 +9,8 @@ import {
 
 /**
  * Same auth settings as the agent, resolved once for the scan. Kept small and separate so the
- * generator depends on core only (plan section 3). MCP_SECRET_VALUE overrides Secrets Manager.
+ * generator depends on core only (plan section 3). MCP_SECRET_VALUE overrides Secrets Manager;
+ * with alexaAccountLinking it is the optional user token for the scan.
  */
 export interface ScanAuth {
   headers: Record<string, string>;
@@ -19,6 +20,10 @@ export interface ScanAuth {
 export async function resolveScanAuth(config: BridgeConfig): Promise<ScanAuth> {
   const auth = config.mcp.auth;
   if (auth.type === 'none') return { headers: {} };
+  // No shared secret: the scan goes out unauthenticated, or with a token of your own account.
+  if (auth.type === 'alexaAccountLinking') {
+    return { headers: buildAuthHeaders(auth, process.env.MCP_SECRET_VALUE) };
+  }
   const secret =
     process.env.MCP_SECRET_VALUE ??
     (await fetchSecret(auth.secretName as string, config.aws.region));

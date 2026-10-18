@@ -1,5 +1,6 @@
 import {
   SPOKEN,
+  linkAccountOutput,
   type AgentInvocation,
   type AnswerHint,
   type Logger,
@@ -39,6 +40,8 @@ export async function runTurn(
   });
   const deadlineMs = Math.max(250, invocation.budgetMs - DEADLINE_MARGIN_MS);
   const identity: SessionIdentity = { actorId: invocation.actorId, locale: invocation.locale };
+  // With account linking, every MCP request from here on carries this invocation's token (D48).
+  session.token.set(invocation.userToken);
 
   switch (turn.type) {
     case 'warmup':
@@ -86,8 +89,10 @@ async function newRequest(
 
   const readiness = await session.ready(identity, deadlineMs);
   if (readiness === 'failed') {
-    log.warn('request while the session failed to warm up');
+    const needsLink = session.warmupNeedsAccountLink;
+    log.warn('request while the session failed to warm up', { needsLink });
     session.resetWarmup();
+    if (needsLink) return linkAccountOutput();
     return { status: 'error', speech: SPOKEN.error, endSession: true, visual: null };
   }
   if (readiness === 'warming') {
@@ -177,7 +182,12 @@ function deliver(
     case 'done': {
       const run = session.currentRun;
       session.clearRun();
-      if (run && outcome.output.status === 'done' && outcome.output.speech) {
+      if (
+        run &&
+        outcome.output.status === 'done' &&
+        outcome.output.speech &&
+        !outcome.output.linkAccount
+      ) {
         void session.memory
           .record(invocation.actorId, invocation.sessionId, run.input, outcome.output.speech)
           .catch((err: unknown) => log.warn('memory record failed', { error: String(err) }));

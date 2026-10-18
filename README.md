@@ -205,6 +205,35 @@ Elicitation: when your tool asks the user a question, the agent parks the open `
 - If a tool elicits, the server's `elicitInput` timeout must exceed the MCP SDK's 60 s default, and it should send a `ping` every 15 s or so to keep tunnels from cutting the stream. The example servers show both.
 - **Set `relatedRequestId` on the elicitation** to the tool call's request id, so the question travels on the stream the client is already waiting on. Without it the SDK uses a side channel the client may not have opened yet, and the message is dropped with no error: the call then hangs until it times out. Measured, and the example servers show it.
 
+## Per-user sign-in
+
+When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged.
+
+A user who has not linked yet, or whose token your server refuses with HTTP 401, hears "Please link your account in the Alexa app, then ask me again." and gets the link card in the Alexa app. `initialize` and `tools/list` may go out without a token, so `npm run generate` works against a server that allows public discovery; if yours does not, set `MCP_SECRET_VALUE` to a token of your own account for the scan and for `npm run chat`. It does not combine with `features.gateway`, which cannot pass the token on.
+
+Account linking itself is configured on your Alexa Skill, once, by you (authorization code grant):
+
+```bash
+ask smapi update-account-linking-info --skill-id <your Alexa Skill id> --stage development \
+  --account-linking-request file:../account-linking.json
+```
+
+```json
+{
+  "accountLinkingRequest": {
+    "type": "AUTH_CODE",
+    "authorizationUrl": "https://auth.example.com/oauth2/authorize",
+    "accessTokenUrl": "https://auth.example.com/oauth2/token",
+    "clientId": "your-client-id",
+    "clientSecret": "your-client-secret",
+    "accessTokenScheme": "HTTP_BASIC",
+    "scopes": ["openid"]
+  }
+}
+```
+
+Keep that file outside the repo: it holds the client secret. Add the redirect URLs the developer console lists under Build, Account Linking to your authorization server's allowed callback URLs, then `npm run deploy` so the Alexa Skill Lambda and the agent pick up the mode.
+
 ## Docs
 
 - [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine, and what was verified against live AWS.
@@ -219,7 +248,7 @@ Elicitation: when your tool asks the user a question, the agent parks the open `
 
 ## Out of scope for v1
 
-Widgets and visual output (`visual` is always null; `_meta.ui.resourceUri` is preserved for later), a web frontend (the CLI harness and the `Turn` contract are its foundation), OAuth authorization-code account linking, other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
+Widgets and visual output (`visual` is always null; `_meta.ui.resourceUri` is preserved for later), a web frontend (the CLI harness and the `Turn` contract are its foundation), other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
 
 ## Security, privacy, and what to keep out of git
 

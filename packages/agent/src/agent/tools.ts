@@ -11,6 +11,7 @@ import {
 } from '@strands-agents/sdk';
 import { z } from 'zod';
 import { errorFields, questionExpectsSchema, type Logger } from '@alexa-mcp-bridge/core';
+import { isUnauthorized } from '../mcp/auth.js';
 import type { BridgeMcpClient, McpToolDefinition } from '../mcp/client.js';
 import { toolResultText } from '../mcp/result.js';
 import type { QuestionQueue } from '../elicitation/queue.js';
@@ -26,6 +27,7 @@ export class BridgeMcpTool extends Tool {
     definition: McpToolDefinition,
     private readonly client: BridgeMcpClient,
     private readonly logger: Logger,
+    private readonly onUnauthorized?: () => void,
   ) {
     super();
     this.name = definition.name;
@@ -65,6 +67,16 @@ export class BridgeMcpTool extends Tool {
         content,
       });
     } catch (err) {
+      if (this.onUnauthorized && isUnauthorized(err)) {
+        // The user's token is missing, expired or revoked: no retry, the run ends with the link prompt.
+        this.logger.warn('mcp server refused the account-linked token', { tool: this.name });
+        this.onUnauthorized();
+        return new ToolResultBlock({
+          toolUseId,
+          status: 'error',
+          content: [new TextBlock('The user needs to link their account first.')],
+        });
+      }
       this.logger.warn('tool call failed', { tool: this.name, ...errorFields(err) });
       return new ToolResultBlock({
         toolUseId,
@@ -75,12 +87,14 @@ export class BridgeMcpTool extends Tool {
   }
 }
 
+/** `onUnauthorized` is set with account linking only: a 401 then means the user must link. */
 export function mcpTools(
   definitions: McpToolDefinition[],
   client: BridgeMcpClient,
   logger: Logger,
+  onUnauthorized?: () => void,
 ): Tool[] {
-  return definitions.map((d) => new BridgeMcpTool(d, client, logger));
+  return definitions.map((d) => new BridgeMcpTool(d, client, logger, onUnauthorized));
 }
 
 const askUserInput = z.object({

@@ -19,6 +19,8 @@ export interface RemoteBridgeOptions {
   region: string;
   runtimeArn?: string;
   stillWorkingMessage: string;
+  /** Stands in for the Alexa account-linked token when mcp.auth.type is alexaAccountLinking. */
+  userToken?: string;
 }
 
 /**
@@ -53,6 +55,7 @@ export function createRemoteBridge(options: RemoteBridgeOptions): Bridge {
                 locale: options.identity.locale,
                 budgetMs: options.budgetMs,
                 debug: options.debug,
+                ...(options.userToken ? { userToken: options.userToken } : {}),
               }),
             ),
           }),
