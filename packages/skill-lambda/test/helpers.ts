@@ -52,6 +52,14 @@ export interface FakeRequest {
   enqueue?: (request: unknown) => Promise<void>;
   /** Test seam for ASK's UPS service (the device's time zone). */
   timeZone?: (deviceId: string) => Promise<string>;
+  /** A device with a screen: the APL interface and a viewport (D55). Omit for a speaker. */
+  screen?: {
+    pixelWidth: number;
+    pixelHeight: number;
+    currentPixelWidth?: number;
+    currentPixelHeight?: number;
+    theme?: string;
+  };
 }
 
 export function handlerInput(fake: FakeRequest = {}): HandlerInput {
@@ -88,8 +96,14 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
           ...(fake.accessToken ? { accessToken: fake.accessToken } : {}),
         },
         apiEndpoint: 'https://api.amazonalexa.com',
-        device: { deviceId: 'amzn1.ask.device.D1' },
+        device: {
+          deviceId: 'amzn1.ask.device.D1',
+          supportedInterfaces: fake.screen
+            ? { 'Alexa.Presentation.APL': { runtime: { maxVersion: '2024.3' } } }
+            : {},
+        },
       },
+      ...(fake.screen ? { Viewport: fake.screen } : {}),
     },
     request,
   } as unknown as RequestEnvelope;

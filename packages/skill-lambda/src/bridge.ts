@@ -12,10 +12,12 @@ import {
   turnOutputSchema,
   type AgentInvocationInput,
   type BridgeConfig,
+  type Display,
   type Logger,
   type TurnInput,
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
+import { displayOf } from './apl/screen.js';
 import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
 
 /**
@@ -132,10 +134,12 @@ export class BridgeClient {
     }
     const lookupStarted = Date.now();
     const timeZone = await this.deviceTimeZone(input, log);
+    const display = displayOf(input);
     const call: Call = {
       ...ids,
       ...(userToken ? { userToken } : {}),
       ...(timeZone ? { timeZone } : {}),
+      ...(display ? { display } : {}),
     };
     let budgetMs = config.turn.budgetMs - (Date.now() - lookupStarted);
     let prefix = '';
@@ -207,6 +211,7 @@ export class BridgeClient {
       debug: config.features.debug,
       ...(call.userToken ? { userToken: call.userToken } : {}),
       ...(call.timeZone ? { timeZone: call.timeZone } : {}),
+      ...(call.display ? { display: call.display } : {}),
     };
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), budgetMs);
@@ -238,6 +243,7 @@ interface Identity {
 interface Call extends Identity {
   userToken?: string;
   timeZone?: string;
+  display?: Display;
 }
 
 /** Raw Alexa ids are hashed here and never leave the Lambda. */
