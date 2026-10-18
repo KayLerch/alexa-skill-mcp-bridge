@@ -60,7 +60,7 @@ export default defineConfig({
     // Cap on spoken output tokens per answer.
     maxTokens: 400,
     // Extra guidance for your MCP server, appended to the system prompt (D56). Usually not set
-    // here: it is read from <BRIDGE_PROFILE_DIR>/prompt-addendum.md. At most 2000 characters.
+    // here: it is read from <BRIDGE_PROFILE_DIR>/prompt-addendum.md. At most 2000 UTF-8 bytes.
     // promptAddendum: 'Ask one quiz question at a time.',
   },
 

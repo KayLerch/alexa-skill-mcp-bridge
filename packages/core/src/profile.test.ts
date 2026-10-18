@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ConfigError, loadConfigFile } from './config.js';
+import { ConfigError, deepMerge, loadConfigFile } from './config.js';
 
 // A repo root with a minimal bridge.config.ts, and a profile folder beside it.
 let root: string;
@@ -155,6 +155,35 @@ describe('BRIDGE_PROFILE_DIR (D56)', () => {
       write(join(profile, 'bridge.config.json'), '{ nope');
       process.env.BRIDGE_PROFILE_DIR = profile;
       await expect(load()).rejects.toThrowError(/bridge\.config\.json is not valid JSON/);
+    });
+
+    it('rejects an unknown overlay key, naming the file and the path', async () => {
+      write(
+        join(profile, 'bridge.config.json'),
+        JSON.stringify({ memory: { shortterm: false }, features: { degub: false } }),
+      );
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      await expect(load()).rejects.toThrowError(
+        /bridge\.config\.json has fields .*memory\.shortterm, features\.degub/,
+      );
+    });
+
+    it('never merges __proto__ keys: deepMerge skips them and the loader rejects them', async () => {
+      expect(deepMerge({}, JSON.parse('{"__proto__":{"x":1}}'))).toEqual({});
+      expect(({} as Record<string, unknown>).x).toBeUndefined();
+      write(
+        join(profile, 'bridge.config.json'),
+        '{ "__proto__": { "polluted": true }, "visual": { "enabled": true } }',
+      );
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      await expect(load()).rejects.toThrowError(/__proto__/);
+      expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    });
+
+    it('counts the addendum in UTF-8 bytes', async () => {
+      write(join(profile, 'prompt-addendum.md'), 'é'.repeat(1001));
+      process.env.BRIDGE_PROFILE_DIR = profile;
+      await expect(load()).rejects.toThrowError(/agent\.promptAddendum.*2000 bytes/);
     });
   });
 });

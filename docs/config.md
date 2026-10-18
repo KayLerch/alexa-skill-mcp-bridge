@@ -52,6 +52,8 @@ The deployed agent never sees your folder. `loadConfigFile()` reads the addendum
 }
 ```
 
+A key the config does not have (a typo such as `memory.shortterm`) is a config error naming the file, never a silently kept default. The deployed Alexa Skill Lambda gets the config without `agent.promptAddendum` (Lambda's environment is capped at 4 KB); only the agent runtime carries it.
+
 Precedence, lowest first: `bridge.config.ts`, the profile's `bridge.config.json`, then environment overrides (repo `.env`, profile `.env`, real variables). The environment goes last on purpose: it is the documented way to change one value for one run. The merged result reaches the generator, the CLI, the CDK app (`visual.enabled` sets the Chromium build arg) and, through `BRIDGE_CONFIG`, the Lambda and the agent.
 
 ## Secrets
@@ -106,7 +108,7 @@ and the agent log a warning that it would not be supported as an Alexa+ add-on.
 | `reasoningEffort` | `off`                        | Nova 2 reasoning: `off` sends no reasoning config and is what the turn budget assumes (about 1.5 s faster per turn than `low`); `low`, `medium`, `high` enable it. Ignored for non-Nova models. |
 | `fallbackModelId` | unset                        | A documented alternative such as `us.anthropic.claude-haiku-4-5-20251001-v1:0`. The stack grants access to it; switch by setting it as `modelId`.                                               |
 | `maxTokens`       | `400`                        | Cap on output tokens per model call. Spoken answers are short.                                                                                                                                  |
-| `promptAddendum`  | unset                        | Extra guidance for your MCP server, appended to the system prompt (at most 2000 characters). Normally filled from the profile's `prompt-addendum.md` (D56).                                     |
+| `promptAddendum`  | unset                        | Extra guidance for your MCP server, appended to the system prompt (at most 2000 UTF-8 bytes). Normally filled from the profile's `prompt-addendum.md` (D56).                                    |
 
 ### runtime
 

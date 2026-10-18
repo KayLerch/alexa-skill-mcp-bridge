@@ -14,7 +14,7 @@ import { pathToFileURL } from 'node:url';
  * stays committable as it ships. See ENV_OVERRIDES below and docs/config.md.
  */
 
-export const PROMPT_ADDENDUM_MAX_CHARS = 2000;
+export const PROMPT_ADDENDUM_MAX_BYTES = 2000;
 
 export const mcpAuthSchema = z
   .object({
@@ -91,9 +91,16 @@ const bridgeConfigShape = z.object({
        * Extra guidance for the MCP server this bridge talks to, appended to the system prompt
        * under "Server-specific guidance". Normally filled from <BRIDGE_PROFILE_DIR>/prompt-addendum.md
        * at load time (D56); it travels inside BRIDGE_CONFIG, so the deployed agent has it too.
-       * Capped because BRIDGE_CONFIG is an environment variable.
+       * Capped at 2000 UTF-8 bytes because BRIDGE_CONFIG is an environment variable.
        */
-      promptAddendum: z.string().trim().min(1).max(PROMPT_ADDENDUM_MAX_CHARS).optional(),
+      promptAddendum: z
+        .string()
+        .trim()
+        .min(1)
+        .refine((text) => Buffer.byteLength(text, 'utf8') <= PROMPT_ADDENDUM_MAX_BYTES, {
+          message: `must be at most ${PROMPT_ADDENDUM_MAX_BYTES} bytes of UTF-8`,
+        })
+        .optional(),
     })
     .prefault({}),
   runtime: z
@@ -319,12 +326,32 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+const UNSAFE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 /** Objects merge key by key, everything else (arrays included) is replaced by the overlay. */
 export function deepMerge(base: unknown, overlay: unknown): unknown {
   if (!isRecord(base) || !isRecord(overlay)) return overlay;
   const out: Record<string, unknown> = { ...base };
-  for (const [key, value] of Object.entries(overlay)) out[key] = deepMerge(base[key], value);
+  for (const [key, value] of Object.entries(overlay)) {
+    if (UNSAFE_KEYS.has(key)) continue;
+    out[key] = deepMerge(base[key], value);
+  }
   return out;
+}
+
+/** Key paths of the overlay that the validated config does not have: zod strips unknown keys. */
+export function unknownOverlayPaths(
+  overlay: unknown,
+  config: unknown,
+  prefix: readonly string[] = [],
+): string[] {
+  if (!isRecord(overlay)) return [];
+  const known = isRecord(config) ? config : {};
+  return Object.entries(overlay).flatMap(([key, value]) =>
+    Object.hasOwn(known, key)
+      ? unknownOverlayPaths(value, known[key], [...prefix, key])
+      : [[...prefix, key].join('.')],
+  );
 }
 
 /** The profile's partial config (bridge.config.json), or undefined when there is none. */
@@ -399,7 +426,15 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
     };
   }
   try {
-    return parseConfig(raw);
+    const config = parseConfig(raw);
+    const unknown = overlay ? unknownOverlayPaths(overlay, config) : [];
+    if (unknown.length) {
+      throw new ConfigError(
+        `${join(profileDir as string, PROFILE_OVERLAY_FILE)} has fields the config does not know ` +
+          `(a typo would silently keep the default): ${unknown.join(', ')}`,
+      );
+    }
+    return config;
   } catch (err) {
     if (overlay && err instanceof ConfigError) {
       throw new ConfigError(

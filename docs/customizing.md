@@ -93,7 +93,7 @@ Set `BRIDGE_PROFILE_DIR` (see [config](config.md#a-profile-folder)) and the gene
 `<profile>/overrides/<locale>.utterances.json`, in the same format, after the one above. Its samples
 come first, and an alias intent with the same name replaces the one here. The same folder holds
 `.env` and `prompt-addendum.md`, a short note for the agent's system prompt (for example "ask one
-quiz question at a time"), up to 2000 characters, and `bridge.config.json` for any other setting (invocation name, memory, `visual.enabled`, and so on). Nothing in the folder is tracked by this repo.
+quiz question at a time"), up to 2000 UTF-8 bytes, and `bridge.config.json` for any other setting (invocation name, memory, `visual.enabled`, and so on). Nothing in the folder is tracked by this repo.
 
 ## Let chat write your utterances
 
