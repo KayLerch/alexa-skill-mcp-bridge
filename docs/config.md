@@ -12,14 +12,14 @@ This repo is public and every clone edits the same tracked config file, which is
 cp .env.example .env      # .env is git-ignored; .env.example is not
 ```
 
-| Variable                 | Sets                  | Why it is here                                                                      |
-| ------------------------ | --------------------- | ----------------------------------------------------------------------------------- |
-| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often                 |
-| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`, `alexaAccountLinking`         |
-| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                                 |
-| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill                      |
-| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                                    |
-| `BRIDGE_PROFILE_DIR`     | (none; see below)     | A folder outside the repo with your own `.env`, overrides and prompt addendum (D56) |
+| Variable                 | Sets                  | Why it is here                                                                                                    |
+| ------------------------ | --------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often                                               |
+| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`, `alexaAccountLinking`                                       |
+| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                                                               |
+| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill                                                    |
+| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                                                                  |
+| `BRIDGE_PROFILE_DIR`     | (none; see below)     | A folder outside the repo with your own `.env`, `bridge.config.json` overlay, overrides and prompt addendum (D56) |
 
 A real environment variable wins over the file, so one-off runs and CI still work: `BRIDGE_MCP_URL=https://staging.example.com/mcp npm run chat`. Everything else stays in `bridge.config.ts`, where it is typed and commented.
 
