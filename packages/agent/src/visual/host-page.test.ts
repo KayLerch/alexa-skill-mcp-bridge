@@ -157,6 +157,16 @@ describe('MCP Apps host page', () => {
     page.fireTimers();
   });
 
+  it('removes the shot widget on clear, so nothing of it runs between turns', async () => {
+    const page = fakeWindow();
+    installHost(page.win);
+    const rendered = page.win.__bridgeRender?.(job());
+    page.fireTimers();
+    await rendered;
+    page.win.__bridgeClear?.();
+    expect(page.frame()?.removed).toBe(true);
+  });
+
   it('embeds the same host function in the page it serves', () => {
     const html = hostPageHtml();
     expect(html).toContain('__bridgeRender');

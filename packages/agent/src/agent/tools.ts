@@ -153,7 +153,8 @@ export class BridgeMcpTool extends Tool {
       if (!result.isError) {
         this.hidden?.remember(result.structuredContent);
         this.resultField?.record(result.structuredContent);
-        if (resourceUri) {
+        // MCP Apps widgets are ui:// resources; nothing else is read for the screen.
+        if (resourceUri?.startsWith('ui://')) {
           this.widgets?.record({ resourceUri, toolName: this.name, input: sent, result });
         }
       }

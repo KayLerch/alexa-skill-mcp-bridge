@@ -176,18 +176,18 @@ When you are done: `npm run destroy`. The Alexa Skill stays in your Amazon devel
 
 ## Commands
 
-| Command                                         | What it does                                                                                                                                |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run doctor -- --track local\|cloud\|skill` | Prerequisite check with fixes.                                                                                                              |
-| `npm run sample:start`                          | An example MCP server on port 3939. `EXAMPLE=<name>` picks one, `-- --list` shows them, `PORT=…` moves it. Logs every request and reply.    |
-| `npm run chat`                                  | REPL through the in-process agent. `-- --debug`, `-- --remote`, `-- --budget <ms>`, `-- --record` (what you say becomes sample utterances). |
-| `npm run generate`                              | Regenerate the manifest and interaction model. `-- --no-model` for deterministic utterances without a Bedrock call.                         |
-| `npm run check-model-access`                    | One test call per configured model.                                                                                                         |
-| `npm run agent:dev`                             | Build and run the agent container locally on 8080.                                                                                          |
-| `npm run synth`                                 | `cdk synth`, no AWS calls.                                                                                                                  |
-| `npm run deploy` / `npm run destroy`            | The stack.                                                                                                                                  |
-| `npm run check:leaks`                           | What the pre-commit hook runs: staged files, or `-- --all` for everything a `git add -A` would commit.                                      |
-| `npm test`, `npm run lint`, `npm run build`     | Tests need no AWS credentials; `npm run test:live` runs the round trip with the real model.                                                 |
+| Command                                         | What it does                                                                                                                                                                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run doctor -- --track local\|cloud\|skill` | Prerequisite check with fixes.                                                                                                                                                                              |
+| `npm run sample:start`                          | An example MCP server on port 3939. `EXAMPLE=<name>` picks one, `-- --list` shows them, `PORT=…` moves it. Logs every request and reply.                                                                    |
+| `npm run chat`                                  | REPL through the in-process agent. `-- --debug`, `-- --remote`, `-- --budget <ms>`, `-- --record` (what you say becomes sample utterances), `-- --display 1280x800` (saves each rendered screen as a JPEG). |
+| `npm run generate`                              | Regenerate the manifest and interaction model. `-- --no-model` for deterministic utterances without a Bedrock call.                                                                                         |
+| `npm run check-model-access`                    | One test call per configured model.                                                                                                                                                                         |
+| `npm run agent:dev`                             | Build and run the agent container locally on 8080.                                                                                                                                                          |
+| `npm run synth`                                 | `cdk synth`, no AWS calls.                                                                                                                                                                                  |
+| `npm run deploy` / `npm run destroy`            | The stack.                                                                                                                                                                                                  |
+| `npm run check:leaks`                           | What the pre-commit hook runs: staged files, or `-- --all` for everything a `git add -A` would commit.                                                                                                      |
+| `npm test`, `npm run lint`, `npm run build`     | Tests need no AWS credentials; `npm run test:live` runs the round trip with the real model.                                                                                                                 |
 
 ## What happens on a turn
 

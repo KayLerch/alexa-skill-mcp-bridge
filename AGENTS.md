@@ -56,7 +56,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 | `npm test` | vitest, no AWS credentials needed. |
 | `npm run lint` | ESLint, Prettier check, and a type check of `bridge.config.ts` and `scripts/` (builds the packages first, so it works on a fresh clone). |
 | `npm run sample:start` | An example MCP server on port 3939. `EXAMPLE=<name>` picks one (default `national-parks`), `-- --list` lists them, `PORT=` moves it. Adding an example is a directory under `examples/` with a `src/server.ts`; the runner discovers it. |
-| `npm run chat` | In-process agent REPL against `mcp.url`. Fastest dev loop. `--debug` shows tool calls and timings; `--record` appends turns to `skill-package/training/<locale>.chat.jsonl` for the generator (D46). |
+| `npm run chat` | In-process agent REPL against `mcp.url`. Fastest dev loop. `--debug` shows tool calls and timings; `--record` appends turns to `skill-package/training/<locale>.chat.jsonl` for the generator (D46); `--display WxH` acts as a device with a screen and saves each rendered screen as a JPEG (D54). |
 | `npm run chat -- --remote` | Same REPL through the deployed runtime. |
 | `npm run generate` | Rebuild manifest and interaction model from the MCP server. Run after any config change that touches `mcp.*`, `skill.invocationName`, or `skill.locales`. |
 | `npm run agent:dev` | Build and run the container locally on 8080. |
@@ -96,7 +96,7 @@ They carry a `_generated` marker (`by` and `notice` only: no source URL, no time
 - No DynamoDB in v1. State lives in Alexa session attributes, AgentCore Memory, and the microVM.
 - `packages/core` has no AWS dependencies. Frontends contain no MCP or model logic. The agent knows nothing about Alexa.
 - Nothing runs always-on. Every default that costs money is documented where the cost occurs. There is no budget alarm (D35).
-- `TurnOutput.visual` is only ever the MCP server's own widget (`_meta.ui.resourceUri`), rendered by the agent to an inline JPEG for an envelope that carries `display` (D54); the bridge never draws a screen of its own, and a render that fails or runs out of time drops the visual, never the speech. The image bytes and the tool result text are never logged.
+- `TurnOutput.visual` is only ever the MCP server's own widget (`_meta.ui.resourceUri`), rendered by the agent to an inline JPEG for an envelope that carries `display` (D54); the bridge never draws a screen of its own, and a render that fails or runs out of time drops the visual, never the speech. The widget reaches no network (a dead proxy, loopback included, no WebRTC UDP, request interception on top). Chromium is in the image only when `visual.enabled` is on at deploy (`WITH_SCREEN`). The image bytes and the tool result text are never logged.
 - Raw Alexa user and session IDs are hashed with `core.hashId()` before they reach AWS or any log.
 
 ## Naming (from the owner)

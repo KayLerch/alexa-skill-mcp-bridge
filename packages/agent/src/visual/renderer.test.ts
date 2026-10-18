@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { createSocket, type Socket } from 'node:dgram';
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createLogger, type Display } from '@alexa-mcp-bridge/core';
@@ -49,6 +50,29 @@ function jpegSize(dataUrl: string): { width: number; height: number } {
   throw new Error('no start-of-frame marker');
 }
 
+describe('WidgetRenderer without a browser', () => {
+  it('warns once and renders nothing when the screen is on but no browser is installed', async () => {
+    const lines: string[] = [];
+    const logger = createLogger({ service: 'test' }, { write: (l) => lines.push(l) });
+    const renderer = new WidgetRenderer({ logger, executablePath: '/nonexistent/chromium' });
+    await renderer.warm();
+    const job: RenderJob = {
+      html: '<p>x</p>',
+      toolInput: {},
+      toolResult: { content: [] },
+      display: { width: 1280, height: 800, theme: 'dark' },
+    };
+    const startedAt = Date.now();
+    expect(await renderer.render(job)).toBeUndefined();
+    expect(await renderer.render(job)).toBeUndefined();
+    expect(Date.now() - startedAt).toBeLessThan(100);
+    const warnings = lines.filter((l) => l.includes('"level":"warn"'));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toMatch(/no browser/);
+    await renderer.close();
+  });
+});
+
 const chromium = process.env.CHROMIUM_PATH;
 
 describe.skipIf(!chromium)('WidgetRenderer in Chromium', () => {
@@ -65,20 +89,32 @@ describe.skipIf(!chromium)('WidgetRenderer in Chromium', () => {
   let probe: Server;
   let probeUrl = '';
   let probeHits = 0;
+  let upgrades = 0;
+  let stun: Socket;
+  let stunPackets = 0;
 
   beforeAll(async () => {
     probe = createServer((_req, res) => {
       probeHits++;
       res.end('');
     });
+    probe.on('upgrade', (_req, socket) => {
+      upgrades++;
+      socket.destroy();
+    });
     await new Promise<void>((resolve) => probe.listen(0, '127.0.0.1', resolve));
+    stun = createSocket('udp4');
+    stun.on('message', () => stunPackets++);
+    await new Promise<void>((resolve) => stun.bind(0, '127.0.0.1', resolve));
     const address = probe.address();
     probeUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}/x`;
     await renderer.warm();
   });
   afterAll(async () => {
     await renderer.close();
+    probe.closeAllConnections();
     await new Promise<void>((resolve) => probe.close(() => resolve()));
+    stun.close();
   });
 
   const job = (html: string, display: Display): RenderJob => ({
@@ -148,6 +184,55 @@ describe.skipIf(!chromium)('WidgetRenderer in Chromium', () => {
     const fetching = `<!doctype html><img src="${probeUrl}"><script>fetch("${probeUrl}").catch(() => {})</script>`;
     await renderer.render(job(fetching, { width: 1280, height: 800, theme: 'dark' }));
     expect(probeHits).toBe(0);
+  });
+
+  it('lets no WebSocket and no WebRTC traffic out', async () => {
+    upgrades = 0;
+    stunPackets = 0;
+    const port = new URL(probeUrl).port;
+    const stunPort = stun.address().port;
+    const leaking = `<!doctype html><script>
+      try { new WebSocket("ws://127.0.0.1:${port}/ws"); } catch (e) {}
+      try {
+        const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:${stunPort}" }] });
+        pc.createDataChannel("x");
+        pc.createOffer().then((o) => pc.setLocalDescription(o));
+      } catch (e) {}
+      try { navigator.sendBeacon("${probeUrl}", "x"); } catch (e) {}
+    </script>`;
+    await renderer.render(job(leaking, { width: 1280, height: 800, theme: 'dark' }));
+    // ICE gathering and the socket keep going after the shot; give them time to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    expect({ http: probeHits, upgrades, stunPackets }).toEqual({
+      http: 0,
+      upgrades: 0,
+      stunPackets: 0,
+    });
+  });
+
+  it('recovers from a widget that hangs its page: the next render works in normal time', async () => {
+    lines.length = 0;
+    const looping = '<!doctype html><script>for (;;) {}</script>';
+    expect(
+      await renderer.render(job(looping, { width: 1280, height: 800, theme: 'dark' })),
+    ).toBeUndefined();
+    const startedAt = Date.now();
+    const visual = await renderer.render(job(widget, { width: 1280, height: 800, theme: 'dark' }));
+    expect(visual?.width).toBe(1280);
+    expect(Date.now() - startedAt).toBeLessThan(1500);
+  });
+
+  it('recovers from a widget that runs its page out of memory, which the heap cap ends early', async () => {
+    const hungry =
+      '<!doctype html><script>const keep = []; for (;;) keep.push(new Array(1e6).fill(Math.random()));</script>';
+    const crashedAt = Date.now();
+    expect(
+      await renderer.render(job(hungry, { width: 1280, height: 800, theme: 'dark' })),
+    ).toBeUndefined();
+    // The page crashes at the 256 MB heap cap and the render ends then, not at the step timeout.
+    expect(Date.now() - crashedAt).toBeLessThan(1500);
+    const visual = await renderer.render(job(widget, { width: 1280, height: 800, theme: 'dark' }));
+    expect(visual?.width).toBe(1280);
   });
 
   it('never logs the image or the tool result', () => {

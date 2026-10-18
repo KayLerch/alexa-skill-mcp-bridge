@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { parseConfig } from '@alexa-mcp-bridge/core';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AlexaMcpBridgeStack } from '../lib/alexa-mcp-bridge-stack.js';
 import { modelResourceArns } from '../lib/model-arns.js';
@@ -18,7 +20,29 @@ function synth(overrides: Record<string, unknown> = {}) {
   return { stack, template: Template.fromStack(stack) };
 }
 
+/** The docker build arguments of the agent image, as the synthesized asset manifest has them. */
+function imageBuildArgs(overrides: Record<string, unknown> = {}): Record<string, string>[] {
+  const app = new cdk.App();
+  new AlexaMcpBridgeStack(app, 'Test', {
+    config: parseConfig({ mcp: { url: 'https://example.com/mcp' }, ...overrides }),
+    repoRoot,
+    env: { account: '123456789012', region: 'us-east-1' },
+  });
+  const assembly = app.synth();
+  const manifest = JSON.parse(
+    readFileSync(join(assembly.directory, 'Test.assets.json'), 'utf8'),
+  ) as {
+    dockerImages: Record<string, { source: { dockerBuildArgs?: Record<string, string> } }>;
+  };
+  return Object.values(manifest.dockerImages).map((image) => image.source.dockerBuildArgs ?? {});
+}
+
 describe('AlexaMcpBridgeStack', () => {
+  it('builds the agent image without a browser unless visual.enabled is on (D54)', () => {
+    expect(imageBuildArgs()).toEqual([{ WITH_SCREEN: '0' }]);
+    expect(imageBuildArgs({ visual: { enabled: true } })).toEqual([{ WITH_SCREEN: '1' }]);
+  });
+
   it('sets the runtime lifecycle explicitly from config', () => {
     const { template } = synth({ runtime: { idleTimeoutMinutes: 20, maxLifetimeHours: 8 } });
     template.hasResourceProperties('AWS::BedrockAgentCore::Runtime', {

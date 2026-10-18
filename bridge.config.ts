@@ -128,6 +128,7 @@ export default defineConfig({
     // Render the MCP server's own widget (the MCP Apps ui:// resource a tool result names in
     // _meta.ui.resourceUri) to an image for devices with a screen (D54). Starts a headless
     // Chromium in the agent container at warm-up, which adds about 340 MB of memory per session.
+    // The browser is built into the agent image only when this is on: change it, then npm run deploy.
     enabled: false,
   },
 

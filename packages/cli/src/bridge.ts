@@ -6,7 +6,7 @@ import {
   runTurn,
   type MemoryAdapter,
 } from '@alexa-mcp-bridge/agent';
-import type { BridgeConfig, Logger, TurnInput, TurnOutput } from '@alexa-mcp-bridge/core';
+import type { BridgeConfig, Display, Logger, TurnInput, TurnOutput } from '@alexa-mcp-bridge/core';
 
 /**
  * A Bridge is anything that takes a TurnInput and returns a TurnOutput. The in-process one
@@ -36,6 +36,8 @@ export interface LocalBridgeOptions {
   memory?: MemoryAdapter;
   /** Stands in for the Alexa account-linked token when mcp.auth.type is alexaAccountLinking. */
   userToken?: string;
+  /** Sent with every turn, as for a device with a screen (D54). */
+  display?: Display;
 }
 
 export function createLocalBridge(options: LocalBridgeOptions): Bridge {
@@ -55,6 +57,7 @@ export function createLocalBridge(options: LocalBridgeOptions): Bridge {
         budgetMs: options.budgetMs,
         debug: options.debug,
         ...(options.userToken ? { userToken: options.userToken } : {}),
+        ...(options.display ? { display: options.display } : {}),
       }),
     close: () => session.close(),
     waitReady: async (timeoutMs) => {

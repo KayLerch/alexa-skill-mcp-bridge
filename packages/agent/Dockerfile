@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
 # AgentCore Runtime image for the bridge agent. Build context is the repo root:
 #   docker build --platform linux/arm64 -f packages/agent/Dockerfile -t alexa-mcp-bridge-agent .
+# Add --build-arg WITH_SCREEN=1 for the screen (visual.enabled, D54); the stack and agent:dev pass it
+# from bridge.config.ts.
 # Stage 1 compiles core and agent; the final stage ships dist, prompts, and production deps only (plan D17).
 # Alpine base and --omit=optional: Strands' optional @tobilu/qmd would add node-llama-cpp and TypeScript (40 MB).
 # The image must be linux/arm64; an x86 image fails silently on AgentCore.
@@ -29,9 +31,11 @@ RUN npm ci --no-audit --no-fund --omit=dev --omit=optional --workspace packages/
  && npm cache clean --force
 
 FROM --platform=linux/arm64 node:22-alpine
-# Headless Chromium renders the MCP server's widget to an image for devices with a screen (D54,
-# visual.enabled). font-noto gives widgets that use system fonts something to draw with.
-RUN apk add --no-cache chromium font-noto
+# The screen (D54): a headless Chromium renders the MCP server's widget to an image, font-noto gives
+# widgets that use system fonts something to draw with. Only with WITH_SCREEN=1: it adds about
+# 330 MB to the compressed image, which every cold runtime pulls.
+ARG WITH_SCREEN=0
+RUN if [ "$WITH_SCREEN" = "1" ]; then apk add --no-cache chromium font-noto; fi
 ENV NODE_ENV=production
 ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 WORKDIR /repo

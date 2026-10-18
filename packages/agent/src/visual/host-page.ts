@@ -83,15 +83,21 @@ export interface HostWindow {
     body: { appendChild(node: HostFrame): unknown };
   };
   __bridgeRender?: (job: HostJob) => Promise<HostOutcome>;
+  __bridgeClear?: () => void;
 }
 
 /**
- * Installs `window.__bridgeRender(job)`. This function is serialized into the page with
+ * Installs `window.__bridgeRender(job)` and `window.__bridgeClear()`. This function is serialized into the page with
  * `toString()`, so it must stay self-contained: no imports, no references to this module.
  * Every render starts a fresh iframe, so no state carries from one widget to the next.
  */
 export function installHost(win: HostWindow): void {
   let frame: HostFrame | undefined;
+
+  win.__bridgeClear = () => {
+    if (frame) frame.remove();
+    frame = undefined;
+  };
 
   win.__bridgeRender = (job) =>
     new Promise<HostOutcome>((resolve) => {

@@ -155,6 +155,8 @@ describe('WidgetRecorder (D54)', () => {
     expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
     await call(widgets, widgetResult(), undefined, 'plain');
     expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
+    await call(widgets, widgetResult('https://example.com/widget.html'));
+    expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
     widgets.begin();
     expect(widgets.latest).toBeUndefined();
   });
