@@ -269,7 +269,7 @@ describe('launch', () => {
       ssml: expect.stringContaining('Welcome to hotels and weather'),
     });
     expect(response.shouldEndSession).toBe(false);
-    const coldConfig = { ...config, turn: { budgetMs: 300 } };
+    const coldConfig = { ...config, turn: { budgetMs: 300, progressiveAfterMs: 0 } };
     const coldResponse = await launchHandler(
       new BridgeClient({
         config: coldConfig,
@@ -367,7 +367,7 @@ describe('poll-first (D16)', () => {
 
   it('turns an aborted call into pending and a failure into a spoken apology', async () => {
     const slow = new BridgeClient({
-      config: { ...config, turn: { budgetMs: 100 } },
+      config: { ...config, turn: { budgetMs: 100, progressiveAfterMs: 0 } },
       runtimeArn: 'arn',
       logger,
       invoke: neverAnswers,

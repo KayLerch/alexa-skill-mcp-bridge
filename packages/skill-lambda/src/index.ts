@@ -33,6 +33,7 @@ const builder = askSdk.SkillBuilders.custom()
     sessionEndedHandler(bridge, logger),
   )
   .addErrorHandlers(errorHandler(logger))
+  .withApiClient(new askSdk.DefaultApiClient())
   .withCustomUserAgent('alexa-skill-mcp-bridge');
 
 // Defense in depth while the Lambda permission is open (plan D15).

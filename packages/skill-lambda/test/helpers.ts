@@ -48,6 +48,8 @@ export interface FakeRequest {
   sessionAttributes?: Record<string, unknown>;
   /** The account-linked token Alexa puts on the request once the user has linked. */
   accessToken?: string;
+  /** Test seam for ASK's directive service (Progressive Response). */
+  enqueue?: (request: unknown) => Promise<void>;
 }
 
 export function handlerInput(fake: FakeRequest = {}): HandlerInput {
@@ -93,6 +95,9 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
     attributesManager: AttributesManagerFactory.init({ requestEnvelope }),
     responseBuilder: ResponseFactory.init(),
     context: {},
+    ...(fake.enqueue
+      ? { serviceClientFactory: { getDirectiveServiceClient: () => ({ enqueue: fake.enqueue }) } }
+      : {}),
   } as HandlerInput;
 }
 

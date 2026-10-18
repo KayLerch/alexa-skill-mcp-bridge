@@ -97,6 +97,11 @@ const bridgeConfigShape = z.object({
     .object({
       /** The agent call's share of Alexa's 8 s limit. */
       budgetMs: z.number().int().min(1000).max(7500).default(6500),
+      /**
+       * After this long without an answer the Alexa Skill says "One moment." (Progressive
+       * Response), once per request (D52). 0 turns it off. Keep it well under budgetMs.
+       */
+      progressiveAfterMs: z.number().int().min(0).max(7000).default(1500),
     })
     .prefault({}),
   tools: z
