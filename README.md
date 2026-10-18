@@ -250,7 +250,7 @@ The fields are described in Amazon's [account linking schema](https://developer.
 
 ## Out of scope for v1
 
-Widgets and visual output (`visual` is always null; `_meta.ui.resourceUri` is preserved for later), a web frontend (the CLI harness and the `Turn` contract are its foundation), other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
+Interactive widgets (with `visual.enabled` the agent renders a server's MCP Apps widget to a still image, D54; nothing on it can be tapped), a web frontend (the CLI harness and the `Turn` contract are its foundation), other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
 
 ## Security, privacy, and what to keep out of git
 

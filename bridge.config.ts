@@ -124,6 +124,13 @@ export default defineConfig({
     catchAll: true,
   },
 
+  visual: {
+    // Render the MCP server's own widget (the MCP Apps ui:// resource a tool result names in
+    // _meta.ui.resourceUri) to an image for devices with a screen (D54). Starts a headless
+    // Chromium in the agent container at warm-up, which adds about 340 MB of memory per session.
+    enabled: false,
+  },
+
   aws: {
     // Only us-east-1 has been verified. BRIDGE_AWS_REGION in .env overrides it.
     region: 'us-east-1',

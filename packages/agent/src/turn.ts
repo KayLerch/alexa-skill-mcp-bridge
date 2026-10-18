@@ -7,6 +7,7 @@ import {
   type Question,
   type TurnOutput,
   type UtteranceHint,
+  type Visual,
 } from '@alexa-mcp-bridge/core';
 import { renderPrompt } from './agent/prompt.js';
 import { mapAnswer, spokenText } from './elicitation/answer-mapper.js';
@@ -26,6 +27,8 @@ import type { RunOutcome } from './turn-run.js';
 const DEADLINE_MARGIN_MS = 500;
 /** How long a cancelled tool call gets to unwind before the next request starts (plan D7). */
 const UNWIND_MS = 2000;
+/** A screen is rendered only when at least this much of the deadline is left (D54). */
+const SCREEN_MIN_LEFT_MS = 1000;
 
 export async function runTurn(
   session: BridgeSession,
@@ -39,6 +42,7 @@ export async function runTurn(
     stateBefore: session.state,
   });
   const deadlineMs = Math.max(250, invocation.budgetMs - DEADLINE_MARGIN_MS);
+  const deadlineAt = Date.now() + deadlineMs;
   const identity: SessionIdentity = {
     actorId: invocation.actorId,
     locale: invocation.locale,
@@ -58,13 +62,22 @@ export async function runTurn(
       return done('');
 
     case 'turn':
-      return newRequest(session, invocation, identity, turn.utterance, deadlineMs, log);
+      return newRequest(session, invocation, identity, turn.utterance, deadlineMs, deadlineAt, log);
 
     case 'answer':
-      return answer(session, invocation, identity, turn.questionId, turn.answer, deadlineMs, log);
+      return answer(
+        session,
+        invocation,
+        identity,
+        turn.questionId,
+        turn.answer,
+        deadlineMs,
+        deadlineAt,
+        log,
+      );
 
     case 'poll':
-      return poll(session, invocation, deadlineMs, log);
+      return poll(session, invocation, deadlineMs, deadlineAt, log);
 
     case 'cancel':
       return cancel(session, log);
@@ -77,6 +90,7 @@ async function newRequest(
   identity: SessionIdentity,
   utterance: UtteranceHint,
   deadlineMs: number,
+  deadlineAt: number,
   log: Logger,
 ): Promise<TurnOutput> {
   // A pending question means the user changed topic: cancel it, let the tool call unwind, discard.
@@ -111,7 +125,7 @@ async function newRequest(
   }
 
   const run = session.startRun(userMessage(utterance), invocation.debug);
-  return deliver(session, invocation, await run.waitForOutcome(deadlineMs), log);
+  return deliver(session, invocation, await run.waitForOutcome(deadlineMs), deadlineAt, log);
 }
 
 async function answer(
@@ -121,6 +135,7 @@ async function answer(
   questionId: string,
   hint: AnswerHint,
   deadlineMs: number,
+  deadlineAt: number,
   log: Logger,
 ): Promise<TurnOutput> {
   const current = session.queue.current();
@@ -130,14 +145,22 @@ async function answer(
     log.info('answer for a question that is not pending; treating it as a new request', {
       questionId,
     });
-    return newRequest(session, invocation, identity, { text: spokenText(hint) }, deadlineMs, log);
+    return newRequest(
+      session,
+      invocation,
+      identity,
+      { text: spokenText(hint) },
+      deadlineMs,
+      deadlineAt,
+      log,
+    );
   }
 
   // "No" to anything but a yes/no question means the user declines to answer.
   if (hint.yesNo === false && current.expects !== 'yesNo') {
     log.info('user declined the question', { questionId });
     session.queue.decline(questionId);
-    return deliver(session, invocation, await run.waitForOutcome(deadlineMs), log);
+    return deliver(session, invocation, await run.waitForOutcome(deadlineMs), deadlineAt, log);
   }
 
   let mapped = mapAnswer(hint, current);
@@ -155,18 +178,20 @@ async function answer(
     // More properties in the same elicitation: ask the next one without waking the tool.
     return question(session.queue.toQuestion(next));
   }
-  return deliver(session, invocation, await run.waitForOutcome(deadlineMs), log);
+  return deliver(session, invocation, await run.waitForOutcome(deadlineMs), deadlineAt, log);
 }
 
 async function poll(
   session: BridgeSession,
   invocation: AgentInvocation,
   deadlineMs: number,
+  deadlineAt: number,
   log: Logger,
 ): Promise<TurnOutput> {
   // Only an overrun has something to fetch (plan D9). Anything else has nothing to say.
   if (session.state !== 'overrun' || !session.currentRun) return done('');
-  return deliver(session, invocation, await session.currentRun.waitForOutcome(deadlineMs), log);
+  const outcome = await session.currentRun.waitForOutcome(deadlineMs);
+  return deliver(session, invocation, outcome, deadlineAt, log);
 }
 
 async function cancel(session: BridgeSession, log: Logger): Promise<TurnOutput> {
@@ -200,12 +225,13 @@ async function unlinked(session: BridgeSession, log: Logger): Promise<void> {
 }
 
 /** Map a run outcome onto the state table and the TurnOutput the frontend renders. */
-function deliver(
+async function deliver(
   session: BridgeSession,
   invocation: AgentInvocation,
   outcome: RunOutcome,
+  deadlineAt: number,
   log: Logger,
-): TurnOutput {
+): Promise<TurnOutput> {
   switch (outcome.kind) {
     case 'done': {
       const run = session.currentRun;
@@ -220,7 +246,8 @@ function deliver(
           .record(invocation.actorId, invocation.sessionId, run.input, outcome.output.speech)
           .catch((err: unknown) => log.warn('memory record failed', { error: String(err) }));
       }
-      return outcome.output;
+      const visual = await screen(session, invocation, outcome.output, deadlineAt, log);
+      return visual ? { ...outcome.output, visual } : outcome.output;
     }
     case 'question':
       session.state = 'awaiting-answer';
@@ -229,6 +256,45 @@ function deliver(
       session.state = 'overrun';
       log.info('deadline passed; the run continues in the background');
       return pending(session);
+  }
+}
+
+/**
+ * The screen after a finished run (D54): only for a device that sent `display`, a run that called
+ * a tool with a widget, and a turn with a second of its deadline left. The render is cut off at
+ * the deadline; whatever goes wrong, the speech goes out without a visual.
+ */
+async function screen(
+  session: BridgeSession,
+  invocation: AgentInvocation,
+  output: TurnOutput,
+  deadlineAt: number,
+  log: Logger,
+): Promise<Visual | undefined> {
+  const { display } = invocation;
+  if (!display || !session.screen || !session.widgets.latest) return undefined;
+  if (output.status !== 'done' || output.linkAccount || !output.speech) return undefined;
+  const leftMs = deadlineAt - Date.now();
+  if (leftMs < SCREEN_MIN_LEFT_MS) {
+    log.info('too little of the turn left for the screen; speech only', { leftMs });
+    return undefined;
+  }
+  let timer: NodeJS.Timeout | undefined;
+  const cutOff = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn('screen not ready by the deadline; speech only', { leftMs });
+      resolve(undefined);
+    }, leftMs);
+  });
+  try {
+    return await Promise.race([session.renderScreen(display), cutOff]);
+  } catch (err) {
+    log.warn('screen failed; speech only', {
+      errorName: err instanceof Error ? err.name : 'unknown',
+    });
+    return undefined;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

@@ -8,6 +8,7 @@ import {
 import type { FetchLike } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { Logger } from '@alexa-mcp-bridge/core';
 import type { McpAuth } from './auth.js';
+import { parseWidgetResource } from './resource.js';
 import { parseToolResult, type McpToolResult } from './result.js';
 import { alexaPlusVersionWarning, requireProtocolVersion } from './version.js';
 
@@ -26,6 +27,8 @@ export interface McpToolDefinition {
   description?: string;
   inputSchema: Record<string, unknown>;
   outputSchema?: Record<string, unknown>;
+  /** The tool's MCP Apps widget (`_meta.ui.resourceUri`), when it declares one (D54). */
+  uiResourceUri?: string;
 }
 
 export interface McpServerInfo {
@@ -53,6 +56,11 @@ export class BridgeMcpClient {
   private info?: McpServerInfo;
   private tools?: McpToolDefinition[];
   private connecting?: Promise<McpServerInfo>;
+  /**
+   * Widget HTML by `ui://` URI, kept for the container's life (D54): a widget is a static file
+   * (servers put a content hash in the URI), so it survives reconnects. A failed read is dropped.
+   */
+  private readonly resources = new Map<string, Promise<string>>();
 
   constructor(private readonly options: BridgeMcpClientOptions) {}
 
@@ -86,6 +94,7 @@ export class BridgeMcpClient {
       ...(t.description ? { description: t.description } : {}),
       inputSchema: t.inputSchema as Record<string, unknown>,
       ...(t.outputSchema ? { outputSchema: t.outputSchema as Record<string, unknown> } : {}),
+      ...uiResourceUri(t._meta),
     }));
     return this.tools;
   }
@@ -101,6 +110,19 @@ export class BridgeMcpClient {
       ...(options.signal ? { signal: options.signal } : {}),
     });
     return parseToolResult(raw);
+  }
+
+  /** The HTML of a widget resource, read once per URI. */
+  readResource(uri: string): Promise<string> {
+    let html = this.resources.get(uri);
+    if (!html) {
+      html = this.ensureClient()
+        .then((client) => client.readResource({ uri }))
+        .then((raw) => parseWidgetResource(raw, uri));
+      this.resources.set(uri, html);
+      html.catch(() => this.resources.delete(uri));
+    }
+    return html;
   }
 
   async close(): Promise<void> {
@@ -170,4 +192,9 @@ export class BridgeMcpClient {
     this.info = undefined;
     this.tools = undefined;
   }
+}
+
+function uiResourceUri(meta: unknown): { uiResourceUri?: string } {
+  const ui = (meta as { ui?: { resourceUri?: unknown } } | undefined)?.ui;
+  return typeof ui?.resourceUri === 'string' ? { uiResourceUri: ui.resourceUri } : {};
 }

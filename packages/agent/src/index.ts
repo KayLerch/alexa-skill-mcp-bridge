@@ -31,3 +31,4 @@ export { noopMemory, type MemoryAdapter } from './memory/store.js';
 export { createMemoryAdapter } from './memory/index.js';
 export { cleanSpeech, endsWithQuestion } from './speech.js';
 export { ScriptedModel, type ScriptStep } from './testing/scripted-model.js';
+export { WidgetRenderer, type RenderJob, type ScreenRenderer } from './visual/index.js';

@@ -25,7 +25,8 @@ Order of magnitude: a tenth of a cent per turn, dominated by runtime memory whil
 - **AgentCore Memory**: one event per exchange when `memory.shortTerm` is on. With `memory.longTerm`, the service runs extraction (a model call) per session to update user preferences and summaries.
 - **Gateway** (`features.gateway`, off by default): billed per call in addition to the above.
 - **CloudWatch logs** by volume, kept for `aws.logRetentionDays`.
-- **ECR** image storage: about $0.10 per GB-month for the agent image while the stack exists.
+- **ECR** image storage: about $0.10 per GB-month for the agent image while the stack exists. The image is about 0.4 GB, most of it the headless Chromium for `visual.enabled` (D54).
+- **The screen** (`visual.enabled`, off by default): the headless Chromium adds about 340 MB to the runtime's memory for the life of each session, and a little CPU (about 80 ms) per rendered turn.
 
 ## Defaults chosen for cost
 

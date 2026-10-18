@@ -164,6 +164,15 @@ const bridgeConfigShape = z.object({
       catchAll: z.boolean().default(true),
     })
     .prefault({}),
+  visual: z
+    .object({
+      /**
+       * Render a tool result's MCP Apps widget (`_meta.ui.resourceUri`) to an image for devices
+       * with a screen (D54). Starts a headless Chromium in the agent container at warm-up.
+       */
+      enabled: z.boolean().default(false),
+    })
+    .prefault({}),
   aws: z
     .object({
       region: z.string().min(1).default('us-east-1'),

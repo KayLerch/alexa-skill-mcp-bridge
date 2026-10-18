@@ -29,7 +29,11 @@ RUN npm ci --no-audit --no-fund --omit=dev --omit=optional --workspace packages/
  && npm cache clean --force
 
 FROM --platform=linux/arm64 node:22-alpine
+# Headless Chromium renders the MCP server's widget to an image for devices with a screen (D54,
+# visual.enabled). font-noto gives widgets that use system fonts something to draw with.
+RUN apk add --no-cache chromium font-noto
 ENV NODE_ENV=production
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 WORKDIR /repo
 COPY --from=production-deps /repo/package.json ./
 COPY --from=production-deps /repo/node_modules node_modules

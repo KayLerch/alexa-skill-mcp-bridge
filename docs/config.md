@@ -138,6 +138,23 @@ per-tool intents with a single catch-all intent that hands the whole spoken phra
 which decouples the interaction model from your tool schemas at the cost of that resolution. It is
 there for experiments; [decisions.md](decisions.md) D38 has the measurements.
 
+### visual
+
+| Field            | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visual.enabled` | `false` | Render the MCP server's own widget (the MCP Apps `ui://` resource a tool result names in `_meta.ui.resourceUri`, or the tool declares) to a JPEG for a device with a screen (D54). The agent starts a headless Chromium at warm-up and renders after a finished turn that called such a tool, when a second of the turn is left. Off: no browser starts and every turn has `visual: null`. Costs memory, see [cost.md](cost.md). |
+
+What a widget gets is what an Alexa+ device would give it, and no more: a sandboxed iframe of
+768×480 with no network, `ui/initialize` answered with the device's theme and
+`displayMode: fullscreen`, then the tool's input and result. It should send
+`ui/notifications/size-changed` once it has drawn; the shot is taken then, or after 800 ms
+with a warning in the log. The image is at most 1280 px wide and 90 KB; a widget that throws
+gives no image, and the turn keeps its speech either way.
+
+The browser binary comes from `CHROMIUM_PATH` (default `/usr/bin/chromium-browser`, which the
+agent image installs). It is an environment variable of the container, not a config field;
+set it only to run the renderer outside the image, for example in the agent's tests.
+
 ### aws
 
 | Field              | Default     | Effect                                           |

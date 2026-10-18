@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D53 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D54 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
@@ -26,7 +26,8 @@ Complete and green as of 2026-09-05: every package below exists, and `npm run bu
 bridge.config.ts             THE config file. Typed, commented, zod-validated. Ships committable; `.env` overrides
                              the developer-specific fields (D36). Secrets by name only.
 packages/core                Turn contract, config schema and loaders, hashId, manifest schema, logger. No AWS SDK deps.
-packages/agent               AgentCore Runtime container. MCP client, elicitation parking, agent loop, prompts, memory.
+packages/agent               AgentCore Runtime container. MCP client, elicitation parking, agent loop, prompts, memory,
+                             the widget renderer (headless Chromium, visual.enabled).
 packages/skill-lambda        ASK SDK handlers. Reads generated/tool-manifest.json. No MCP or model logic.
 packages/generator           MCP scan → tool manifest + interaction model + utterances.
 packages/cli                 npm run chat: in-process REPL, or --remote against the deployed runtime.
@@ -95,7 +96,7 @@ They carry a `_generated` marker (`by` and `notice` only: no source URL, no time
 - No DynamoDB in v1. State lives in Alexa session attributes, AgentCore Memory, and the microVM.
 - `packages/core` has no AWS dependencies. Frontends contain no MCP or model logic. The agent knows nothing about Alexa.
 - Nothing runs always-on. Every default that costs money is documented where the cost occurs. There is no budget alarm (D35).
-- `TurnOutput.visual` stays `null`. Keep `_meta.ui.resourceUri` in the tool-result type so widgets can be added later.
+- `TurnOutput.visual` is only ever the MCP server's own widget (`_meta.ui.resourceUri`), rendered by the agent to an inline JPEG for an envelope that carries `display` (D54); the bridge never draws a screen of its own, and a render that fails or runs out of time drops the visual, never the speech. The image bytes and the tool result text are never logged.
 - Raw Alexa user and session IDs are hashed with `core.hashId()` before they reach AWS or any log.
 
 ## Naming (from the owner)
@@ -166,6 +167,6 @@ What travels together, from experience:
 - Before changing the turn flow, read `packages/agent/src/turn.ts` and the state machine table in [docs/architecture.md](docs/architecture.md).
 - Prettier runs on save in CI's `npm run lint`; when editing files programmatically, run `npm run format` first so exact-match edits land on formatted text.
 - A new dependency needs a one-line reason in the commit message. Keep the count low; contributors should not need to learn a framework.
-- Do not widen scope from the README's "Out of scope for v1" list (widgets, web frontend, other locales, 2026-07-28 elicitation, progressive responses). Leave hooks, do not build them. Account linking was on that list until D48 lifted it (`mcp.auth.type` `alexaAccountLinking`); the account-linked token is never logged.
+- Do not widen scope from the README's "Out of scope for v1" list (interactive widgets, web frontend, other locales, 2026-07-28 elicitation, progressive responses). Leave hooks, do not build them. Account linking was on that list until D48 lifted it (`mcp.auth.type` `alexaAccountLinking`); the account-linked token is never logged. A widget as a still image was on it until D54 (`visual.enabled`).
 - When you decide something the docs did not decide, append a row to [docs/decisions.md](docs/decisions.md) with its rationale and a "revisit if" condition. When you measure something against live AWS or a new SDK version, append a row to the verification log in the same file.
 - Commit messages describe why, not what. Never commit `bridge.config.ts` changes that contain a real customer URL or an Alexa Skill ID belonging to someone else.

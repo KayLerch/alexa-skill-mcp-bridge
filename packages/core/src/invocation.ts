@@ -12,6 +12,17 @@ export function isValidTimeZone(zone: string): boolean {
 }
 
 /**
+ * The screen of a device that can show one (D54), in pixels. Generic on purpose: the frontend
+ * maps its own device description onto it, the agent only learns how big and which theme.
+ */
+export const displaySchema = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  theme: z.enum(['light', 'dark']).default('dark'),
+});
+export type Display = z.infer<typeof displaySchema>;
+
+/**
  * The envelope a frontend sends to the agent container's POST /invocations.
  * Identity fields are already hashed (see hashId); raw frontend ids never appear here.
  */
@@ -35,6 +46,8 @@ export const agentInvocationSchema = z.object({
    * wrong zone must never cost a turn.
    */
   timeZone: z.string().refine(isValidTimeZone).optional().catch(undefined),
+  /** Present only when the device has a screen: the agent may then render a widget (D54). */
+  display: displaySchema.optional(),
 });
 export type AgentInvocation = z.infer<typeof agentInvocationSchema>;
 export type AgentInvocationInput = z.input<typeof agentInvocationSchema>;

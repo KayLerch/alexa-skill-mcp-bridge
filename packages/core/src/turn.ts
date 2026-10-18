@@ -79,6 +79,19 @@ export const turnDebugSchema = z.object({
 });
 export type TurnDebug = z.infer<typeof turnDebugSchema>;
 
+/**
+ * A rendered screen (D54): the MCP server's own widget as an inline JPEG, at most 1280 px wide.
+ * The bridge draws nothing itself; the frontend shows the image as it is.
+ */
+export const visualSchema = z.object({
+  kind: z.literal('image'),
+  mimeType: z.literal('image/jpeg'),
+  dataUrl: z.string(),
+  width: z.number(),
+  height: z.number(),
+});
+export type Visual = z.infer<typeof visualSchema>;
+
 export const turnStatusSchema = z.enum(['done', 'question', 'pending', 'error']);
 export type TurnStatus = z.infer<typeof turnStatusSchema>;
 
@@ -90,8 +103,8 @@ export const turnOutputSchema = z.object({
   /** Present when status is 'question'. */
   question: questionSchema.optional(),
   endSession: z.boolean(),
-  /** Reserved for widget rendering later. Always null in v1. */
-  visual: z.null(),
+  /** The server's widget rendered for a device with a screen (D54); null otherwise. */
+  visual: visualSchema.nullable(),
   /** Only when features.debug is on. */
   debug: turnDebugSchema.optional(),
   /** The MCP server needs the user's linked account: the frontend shows how to link it (D48). */

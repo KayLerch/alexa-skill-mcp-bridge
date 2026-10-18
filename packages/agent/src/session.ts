@@ -1,5 +1,11 @@
 import type { Agent, Model } from '@strands-agents/sdk';
-import { errorFields, type BridgeConfig, type Logger } from '@alexa-mcp-bridge/core';
+import {
+  errorFields,
+  type BridgeConfig,
+  type Display,
+  type Logger,
+  type Visual,
+} from '@alexa-mcp-bridge/core';
 import { buildAgent } from './agent/build-agent.js';
 import {
   buildSystemPrompt,
@@ -7,7 +13,13 @@ import {
   todayIn,
   type SystemPromptVars,
 } from './agent/prompt.js';
-import { HiddenArguments, ResultField, askUserTool, mcpTools } from './agent/tools.js';
+import {
+  HiddenArguments,
+  ResultField,
+  WidgetRecorder,
+  askUserTool,
+  mcpTools,
+} from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
 import { BridgeMcpClient } from './mcp/client.js';
@@ -15,6 +27,7 @@ import { sigV4Fetch } from './mcp/gateway.js';
 import { TokenHolder } from './mcp/token.js';
 import type { MemoryAdapter } from './memory/store.js';
 import { TurnRun } from './turn-run.js';
+import { WidgetRenderer, type ScreenRenderer } from './visual/index.js';
 
 /**
  * One BridgeSession per container, one container per user. Holds the MCP client, the agent,
@@ -40,6 +53,8 @@ export interface BridgeSessionOptions {
   now?: () => Date;
   /** Set by the stack when features.gateway is on: the Gateway URL, called with SigV4. */
   gatewayUrl?: string;
+  /** Replaces the headless-Chromium renderer used when visual.enabled is on (tests). */
+  renderer?: ScreenRenderer;
 }
 
 /** A tools/call may sit parked on several spoken answers; the queue enforces the per-answer timeout. */
@@ -54,6 +69,10 @@ export class BridgeSession {
   readonly memory: MemoryAdapter;
   /** The user's account-linked token, set from every invocation (D48). */
   readonly token = new TokenHolder();
+  /** Renders the server's widget for devices with a screen; only with visual.enabled (D54). */
+  readonly screen?: ScreenRenderer;
+  /** The run's last tool call with a widget, for the screen after the run. */
+  readonly widgets = new WidgetRecorder();
   currentRun?: TurnRun;
   private mcp?: BridgeMcpClient;
   private hiddenArguments?: HiddenArguments;
@@ -78,6 +97,9 @@ export class BridgeSession {
       speech: { maxChoicesSpoken: options.config.speech.maxChoicesSpoken },
       logger: options.logger,
     });
+    if (options.config.visual.enabled) {
+      this.screen = options.renderer ?? new WidgetRenderer({ logger: options.logger });
+    }
   }
 
   /** Connect to the MCP server, list tools, hydrate memory. Idempotent; runs in the background. */
@@ -86,6 +108,12 @@ export class BridgeSession {
     this.identity = identity;
     this.state = 'warming';
     const startedAt = Date.now();
+    // The browser starts beside the MCP session; a renderer that cannot start costs the screen only.
+    this.screen?.warm().catch((err: unknown) =>
+      this.logger.warn('screen renderer failed to start; turns go without a visual', {
+        errorName: err instanceof Error ? err.name : 'unknown',
+      }),
+    );
     this.warmup = this.connect(identity).then(
       () => {
         this.state = 'ready';
@@ -128,6 +156,7 @@ export class BridgeSession {
 
   startRun(input: string, debug: boolean): TurnRun {
     this.resultField?.begin();
+    this.widgets.begin();
     const run = new TurnRun({
       agent: this.agent as Agent,
       queue: this.queue,
@@ -169,6 +198,7 @@ export class BridgeSession {
   forgetConversation(): void {
     this.forgotten = true;
     this.hiddenArguments?.clear();
+    this.widgets.clear();
     if (this.agent) {
       this.agent.messages.splice(0);
       if (this.promptInputs) {
@@ -207,10 +237,22 @@ export class BridgeSession {
     return this.mcp?.serverInfo?.name;
   }
 
+  /**
+   * The screen for the run that just finished (D54): the widget of its last tool call that had
+   * one, rendered at the display's size. Undefined when there is nothing to show.
+   */
+  async renderScreen(display: Display): Promise<Visual | undefined> {
+    const call = this.widgets.latest;
+    if (!this.screen || !this.mcp || !call) return undefined;
+    const html = await this.mcp.readResource(call.resourceUri);
+    return this.screen.render({ html, toolInput: call.input, toolResult: call.result, display });
+  }
+
   async close(): Promise<void> {
     this.queue.cancelAll('session closed');
     this.currentRun?.cancel();
     await this.mcp?.close();
+    await this.screen?.close();
   }
 
   /** A tool call got a 401: end the run with the link prompt, then forget once it has stopped. */
@@ -276,6 +318,7 @@ export class BridgeSession {
           this.accountLinking ? () => this.onUnauthorized() : undefined,
           this.hiddenArguments,
           this.resultField,
+          this.screen ? this.widgets : undefined,
         ),
         askUserTool(this.queue),
       ],

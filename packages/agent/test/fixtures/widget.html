@@ -1,0 +1,162 @@
+<!doctype html>
+<!--
+  A stand-in MCP Apps widget for the renderer tests (D54). System fonts only, no network.
+  The handshake is the one a real widget performs: ui/initialize with an id, then
+  ui/notifications/initialized once the host answered, a draw on ui/notifications/tool-result,
+  then ui/notifications/size-changed once the frame has painted.
+  It draws `structuredContent` shaped { title, subtitle, progress, items: string[] }.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bridge test widget</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --fg: #1b1f24;
+        --muted: #5b6470;
+        --accent: #2457c5;
+        --card: #eef1f5;
+      }
+      :root[data-theme='dark'] {
+        --bg: #11151a;
+        --fg: #eef1f4;
+        --muted: #9aa3ad;
+        --accent: #7aa2ff;
+        --card: #1d232b;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        font:
+          20px/1.35 system-ui,
+          -apple-system,
+          'Segoe UI',
+          Roboto,
+          'Noto Sans',
+          sans-serif;
+      }
+      main {
+        box-sizing: border-box;
+        width: 768px;
+        height: 480px;
+        padding: 32px 40px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 18px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 30px;
+        line-height: 1.25;
+      }
+      ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 12px;
+      }
+      li {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 0 20px;
+        border-radius: 14px;
+        background: var(--card);
+        font-size: 22px;
+      }
+      li b {
+        color: var(--accent);
+        min-width: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header><span id="subtitle"></span><span id="progress"></span></header>
+      <h1 id="title"></h1>
+      <ol id="items"></ol>
+    </main>
+    <script>
+      (() => {
+        let nextId = 1;
+        const pending = new Map();
+        const post = (message) => window.parent.postMessage({ jsonrpc: '2.0', ...message }, '*');
+        const request = (method, params) =>
+          new Promise((resolve, reject) => {
+            const id = nextId++;
+            pending.set(id, { resolve, reject });
+            post({ id, method, params });
+          });
+        const text = (id, value) => {
+          document.getElementById(id).textContent = typeof value === 'string' ? value : '';
+        };
+
+        const draw = (data) => {
+          text('title', data.title);
+          text('subtitle', data.subtitle);
+          text('progress', data.progress);
+          const list = document.getElementById('items');
+          list.replaceChildren();
+          (Array.isArray(data.items) ? data.items : []).forEach((item, index) => {
+            const row = document.createElement('li');
+            const letter = document.createElement('b');
+            letter.textContent = String.fromCharCode(65 + index);
+            row.append(letter, String(item));
+            list.append(row);
+          });
+        };
+
+        window.addEventListener('message', (event) => {
+          if (event.source !== window.parent) return;
+          const message = event.data;
+          if (!message || message.jsonrpc !== '2.0') return;
+          if (message.method === undefined && pending.has(message.id)) {
+            const { resolve, reject } = pending.get(message.id);
+            pending.delete(message.id);
+            if (message.error) reject(message.error);
+            else resolve(message.result);
+            return;
+          }
+          if (message.method === 'ui/notifications/tool-result') {
+            draw(message.params?.structuredContent ?? {});
+            // Two frames: the first lays out, the second has painted.
+            requestAnimationFrame(() =>
+              requestAnimationFrame(() =>
+                post({
+                  method: 'ui/notifications/size-changed',
+                  params: {
+                    width: document.documentElement.scrollWidth,
+                    height: document.documentElement.scrollHeight,
+                  },
+                }),
+              ),
+            );
+          }
+        });
+
+        request('ui/initialize', {
+          protocolVersion: '2026-01-26',
+          appInfo: { name: 'bridge-test-widget', version: '1.0.0' },
+          appCapabilities: {},
+        }).then((result) => {
+          const theme = result && result.hostContext && result.hostContext.theme;
+          document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+          post({ method: 'ui/notifications/initialized' });
+        });
+      })();
+    </script>
+  </body>
+</html>

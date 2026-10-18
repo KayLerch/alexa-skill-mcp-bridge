@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ToolContext } from '@strands-agents/sdk';
 import { createLogger } from '@alexa-mcp-bridge/core';
 import type { BridgeMcpClient } from '../mcp/client.js';
-import { BridgeMcpTool, HiddenArguments, ResultField } from './tools.js';
+import { BridgeMcpTool, HiddenArguments, ResultField, WidgetRecorder } from './tools.js';
 
 /** Hidden arguments (D50): a quiz server's session id is refilled from the last result. */
 
@@ -99,5 +99,63 @@ describe('ResultField (D51)', () => {
     await call(field, result({ say: 'old' }));
     field.begin();
     expect(field.value).toBeUndefined();
+  });
+});
+
+describe('WidgetRecorder (D54)', () => {
+  const widgetResult = (uri?: string, isError = false) =>
+    Promise.resolve({
+      content: [],
+      structuredContent: { title: 't' },
+      isError,
+      ...(uri ? { _meta: { ui: { resourceUri: uri } } } : {}),
+    });
+  const call = async (
+    widgets: WidgetRecorder,
+    reply: Promise<unknown>,
+    declared?: string,
+    name = 'show',
+  ) => {
+    const client = { callTool: () => reply } as unknown as BridgeMcpClient;
+    const logger = createLogger({ service: 'test' }, { write: () => undefined });
+    const tool = new BridgeMcpTool(
+      { ...definition(name), ...(declared ? { uiResourceUri: declared } : {}) },
+      client,
+      logger,
+      undefined,
+      undefined,
+      undefined,
+      widgets,
+    );
+    const context = {
+      toolUse: { toolUseId: 't', name, input: { park: 'yose' } },
+      cancelSignal: new AbortController().signal,
+    } as unknown as ToolContext;
+    const gen = tool.stream(context);
+    let next = await gen.next();
+    while (!next.done) next = await gen.next();
+  };
+
+  it("records the result's widget with the call's input and result", async () => {
+    const widgets = new WidgetRecorder();
+    await call(widgets, widgetResult('ui://a/one.html'));
+    expect(widgets.latest).toMatchObject({
+      resourceUri: 'ui://a/one.html',
+      toolName: 'show',
+      input: { park: 'yose' },
+      result: { structuredContent: { title: 't' } },
+    });
+  });
+
+  it("falls back to the tool's declared widget, ignores errors, and keeps the last widget", async () => {
+    const widgets = new WidgetRecorder();
+    await call(widgets, widgetResult(), 'ui://a/declared.html');
+    expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
+    await call(widgets, widgetResult('ui://a/two.html', true));
+    expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
+    await call(widgets, widgetResult(), undefined, 'plain');
+    expect(widgets.latest?.resourceUri).toBe('ui://a/declared.html');
+    widgets.begin();
+    expect(widgets.latest).toBeUndefined();
   });
 });
