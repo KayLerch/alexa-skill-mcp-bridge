@@ -35,7 +35,10 @@ describe('progressive response', () => {
   it('enqueues one "One moment." at 1.5 s when the agent answers at 2 s', async () => {
     const { bridge } = setup(2000);
     const enqueue = vi.fn(async () => undefined);
-    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), { type: 'turn', utterance: { text: 'hi' } });
+    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), {
+      type: 'turn',
+      utterance: { text: 'hi' },
+    });
     await vi.advanceTimersByTimeAsync(1499);
     expect(enqueue).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -52,7 +55,10 @@ describe('progressive response', () => {
   it('sends nothing when the agent answers at 1 s', async () => {
     const { bridge } = setup(1000);
     const enqueue = vi.fn(async () => undefined);
-    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), { type: 'turn', utterance: { text: 'hi' } });
+    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), {
+      type: 'turn',
+      utterance: { text: 'hi' },
+    });
     await vi.advanceTimersByTimeAsync(5000);
     await result;
     expect(enqueue).not.toHaveBeenCalled();
@@ -61,7 +67,10 @@ describe('progressive response', () => {
   it('is off at 0', async () => {
     const { bridge } = setup(3000, { progressiveAfterMs: 0 });
     const enqueue = vi.fn(async () => undefined);
-    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), { type: 'turn', utterance: { text: 'hi' } });
+    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), {
+      type: 'turn',
+      utterance: { text: 'hi' },
+    });
     await vi.advanceTimersByTimeAsync(3000);
     await result;
     expect(enqueue).not.toHaveBeenCalled();
@@ -75,7 +84,10 @@ describe('progressive response', () => {
       vi.fn(() => new Promise<void>(() => undefined)),
     ]) {
       const { bridge, lines } = setup(2000);
-      const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), { type: 'turn', utterance: { text: 'hi' } });
+      const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), {
+        type: 'turn',
+        utterance: { text: 'hi' },
+      });
       await vi.advanceTimersByTimeAsync(2000);
       expect((await result).speech).toBe('Hi.');
       expect(enqueue).toHaveBeenCalledTimes(1);
@@ -85,7 +97,10 @@ describe('progressive response', () => {
 
   it('does nothing without a directive service (no API client)', async () => {
     const { bridge } = setup(2000);
-    const result = bridge.turn(handlerInput({ intent: 'X' }), { type: 'turn', utterance: { text: 'hi' } });
+    const result = bridge.turn(handlerInput({ intent: 'X' }), {
+      type: 'turn',
+      utterance: { text: 'hi' },
+    });
     await vi.advanceTimersByTimeAsync(2000);
     expect((await result).speech).toBe('Hi.');
   });
@@ -95,13 +110,14 @@ describe('progressive response', () => {
       mcp: { url: 'https://example.com/mcp', auth: { type: 'alexaAccountLinking' } },
       skill: { invocationName: 'hotel helper' },
     });
-    const invoke = vi.fn(
-      () => new Promise<TurnOutput>((r) => setTimeout(() => r(done), 3000)),
-    );
+    const invoke = vi.fn(() => new Promise<TurnOutput>((r) => setTimeout(() => r(done), 3000)));
     const logger = createLogger({}, { level: 'debug', write: () => undefined });
     const bridge = new BridgeClient({ config: linking, runtimeArn: 'arn:test', logger, invoke });
     const enqueue = vi.fn(async () => undefined);
-    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), { type: 'turn', utterance: { text: 'hi' } });
+    const result = bridge.turn(handlerInput({ intent: 'X', enqueue }), {
+      type: 'turn',
+      utterance: { text: 'hi' },
+    });
     await vi.advanceTimersByTimeAsync(3000);
     await result;
     expect(enqueue).not.toHaveBeenCalled();
