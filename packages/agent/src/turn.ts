@@ -39,7 +39,12 @@ export async function runTurn(
     stateBefore: session.state,
   });
   const deadlineMs = Math.max(250, invocation.budgetMs - DEADLINE_MARGIN_MS);
-  const identity: SessionIdentity = { actorId: invocation.actorId, locale: invocation.locale };
+  const identity: SessionIdentity = {
+    actorId: invocation.actorId,
+    locale: invocation.locale,
+    timeZone: invocation.timeZone,
+  };
+  session.updateTimeZone(invocation.timeZone);
   // With account linking, every MCP request from here on carries this invocation's token (D48).
   session.token.set(invocation.userToken);
   // No token means the user is no longer linked: whoever links next starts with a clean slate.

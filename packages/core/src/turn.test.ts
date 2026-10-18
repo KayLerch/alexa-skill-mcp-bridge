@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { linkAccountOutput, turnInputSchema, turnOutputSchema } from './turn.js';
 import { SPOKEN } from './messages.js';
-import { agentInvocationSchema } from './invocation.js';
+import { agentInvocationSchema, isValidTimeZone } from './invocation.js';
 
 describe('turn contract', () => {
   it('round-trips every TurnInput variant', () => {
@@ -80,5 +80,30 @@ describe('agent invocation envelope', () => {
       budgetMs: 6500,
     });
     expect(inv.debug).toBe(false);
+  });
+
+  const base = {
+    turn: { type: 'poll' },
+    actorId: 'a'.repeat(64),
+    sessionId: 'b'.repeat(64),
+    locale: 'en-US',
+    budgetMs: 6500,
+  };
+
+  it('carries an IANA time zone and drops one the Intl API rejects (D53)', () => {
+    expect(agentInvocationSchema.parse({ ...base, timeZone: 'America/Los_Angeles' }).timeZone).toBe(
+      'America/Los_Angeles',
+    );
+    expect(agentInvocationSchema.parse({ ...base, timeZone: 'Mars/Olympus' }).timeZone).toBe(
+      undefined,
+    );
+    expect(agentInvocationSchema.parse(base).timeZone).toBeUndefined();
+  });
+
+  it('isValidTimeZone accepts IANA names only', () => {
+    expect(isValidTimeZone('Europe/Berlin')).toBe(true);
+    expect(isValidTimeZone('UTC')).toBe(true);
+    expect(isValidTimeZone('')).toBe(false);
+    expect(isValidTimeZone('not a zone')).toBe(false);
   });
 });

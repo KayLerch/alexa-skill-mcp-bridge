@@ -2,9 +2,9 @@ import type { HandlerInput } from 'ask-sdk-core';
 import type { Question } from '@alexa-mcp-bridge/core';
 
 /**
- * Typed accessors for the two things the Alexa Skill keeps in Alexa session attributes:
- * the question the user is answering, whether a result is still being worked on, and whether the
- * session is open for an ordinary turn (the agent asked in its own speech, no question parked).
+ * Typed accessors for what the Alexa Skill keeps in Alexa session attributes: the question the
+ * user is answering, whether a result is still being worked on, whether the session is open for an
+ * ordinary turn (the agent asked in its own speech, no question parked), and the device's zone.
  */
 export interface PendingQuestion {
   id: string;
@@ -17,6 +17,8 @@ interface Attributes {
   pendingQuestion?: PendingQuestion;
   awaitingResult?: boolean;
   openTurn?: boolean;
+  /** The device's IANA time zone, or '' once the lookup was tried and gave nothing (D53). */
+  timeZone?: string;
 }
 
 function read(input: HandlerInput): Attributes {
@@ -65,5 +67,16 @@ export function setOpenTurn(input: HandlerInput, open: boolean): void {
   const attrs = read(input);
   if (open) attrs.openTurn = true;
   else delete attrs.openTurn;
+  write(input, attrs);
+}
+
+/** undefined: not looked up yet in this session. '': looked up, no zone. Otherwise the zone. */
+export function getTimeZone(input: HandlerInput): string | undefined {
+  return read(input).timeZone;
+}
+
+export function setTimeZone(input: HandlerInput, timeZone: string): void {
+  const attrs = read(input);
+  attrs.timeZone = timeZone;
   write(input, attrs);
 }

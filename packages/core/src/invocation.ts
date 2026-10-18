@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { turnInputSchema } from './turn.js';
 
+/** True when the Intl API accepts the string as an IANA time zone ("America/Los_Angeles"). */
+export function isValidTimeZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The envelope a frontend sends to the agent container's POST /invocations.
  * Identity fields are already hashed (see hashId); raw frontend ids never appear here.
@@ -20,6 +30,11 @@ export const agentInvocationSchema = z.object({
    * Sent on to the MCP server as a bearer token; never logged.
    */
   userToken: z.string().min(1).optional(),
+  /**
+   * The user's IANA time zone (D53). A string the Intl API rejects is dropped, not an error: a
+   * wrong zone must never cost a turn.
+   */
+  timeZone: z.string().refine(isValidTimeZone).optional().catch(undefined),
 });
 export type AgentInvocation = z.infer<typeof agentInvocationSchema>;
 export type AgentInvocationInput = z.input<typeof agentInvocationSchema>;

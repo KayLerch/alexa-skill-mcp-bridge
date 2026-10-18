@@ -319,3 +319,43 @@ describe('speech.resultField (D51)', () => {
     await session.close();
   });
 });
+
+describe('time zone (D53)', () => {
+  const at = () => new Date('2026-10-18T05:00:00Z');
+
+  async function systemPromptFor(timeZone?: string): Promise<string> {
+    const model = new ScriptedModel([{ text: 'Hello.' }]);
+    const session = new BridgeSession({
+      config: parseConfig({ mcp: { url: server.url } }),
+      model,
+      memory: noopMemory,
+      logger,
+      now: at,
+    });
+    await runTurn(session, {
+      turn: { type: 'turn', utterance: { text: 'hi' } },
+      actorId: hashId('u'),
+      sessionId: hashId('s'),
+      locale: 'en-US',
+      budgetMs: 6500,
+      debug: false,
+      ...(timeZone ? { timeZone } : {}),
+    } satisfies AgentInvocation);
+    await session.close();
+    return model.systemPrompts.at(-1) ?? '';
+  }
+
+  it('computes today in the device zone and names the zone to the model', async () => {
+    const prompt = await systemPromptFor('America/Los_Angeles');
+    expect(prompt).toContain('Today is 2026-10-17');
+    expect(prompt).toContain('America/Los_Angeles');
+    expect(prompt).toMatch(/time zone/);
+  });
+
+  it('without a zone keeps UTC and does not mention one', async () => {
+    const prompt = await systemPromptFor();
+    expect(prompt).toContain('Today is 2026-10-18');
+    expect(prompt).not.toContain('America/');
+    expect(prompt).not.toMatch(/time zone/i);
+  });
+});
