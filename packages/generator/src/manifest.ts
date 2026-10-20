@@ -79,6 +79,17 @@ function shareSlotTypes(
       }
     }
   }
+  // A built-in-typed slot can share a name with a custom-typed one (`kind`: KindType in one
+  // tool, AMAZON.SearchQuery in another). Alexa refuses that too, so rename the later one.
+  const typeOfSlot = new Map<string, string>();
+  for (const tool of tools) {
+    for (const slot of tool.slots) {
+      const bound = typeOfSlot.get(slot.slot);
+      if (bound !== undefined && bound !== slot.slotType)
+        slot.slot = `${slot.slot}${pascalCase(tool.name)}`;
+      typeOfSlot.set(slot.slot, slot.slotType);
+    }
+  }
   for (const t of types.values()) if (t.name === 'YesNoType') shared.set(t.name, t);
   return shared;
 }
