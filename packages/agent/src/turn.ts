@@ -169,8 +169,9 @@ async function answer(
   }
   if (!mapped.ok) {
     log.info('answer not usable; asking again', { questionId, detail: mapped.detail });
+    // The apology is spoken once; the question the frontend stores (and may repeat) stays plain.
     const again = session.queue.toQuestion(current);
-    return question({ ...again, message: `${SPOKEN.questionRepeat} ${again.message}` });
+    return { ...question(again), speech: `${SPOKEN.questionRepeat} ${again.message}` };
   }
 
   const { next } = session.queue.answer(questionId, mapped.value);
