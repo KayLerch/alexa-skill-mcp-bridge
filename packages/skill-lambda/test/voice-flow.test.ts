@@ -122,23 +122,24 @@ describe('mapped built-in intents (D59)', () => {
     ]);
   });
 
-  it('stop calls its tool and speaks its line before the goodbye', async () => {
+  it('stop calls its tool and speaks its ending line as the farewell', async () => {
     const { bridge, turns } = fakeBridge(mapped, () =>
-      done('Trip saved. You planned three parks.'),
+      done('Trip saved. You planned three parks. Goodbye for now.', { endSession: true }),
     );
     const response = await stopHandler(bridge, mapped).handle(
       handlerInput({ intent: 'AMAZON.StopIntent' }),
     );
     expect(turns.map((t) => t.type)).toEqual(['tool']);
     expect(ssmlOf(response)).toBe(
-      `<speak>Trip saved. You planned three parks. ${SPOKEN.goodbye}</speak>`,
+      '<speak>Trip saved. You planned three parks. Goodbye for now.</speak>',
     );
     expect(response.shouldEndSession).toBe(true);
   });
 
-  it('stop says only goodbye when its tool fails, has nothing to say, or throws', async () => {
+  it('stop says only goodbye when its tool fails, has nothing to say, asks a question, or throws', async () => {
     for (const reply of [
       () => done(''),
+      () => done('That trip is already saved. Want to plan another?'),
       () => ({ status: 'error', speech: SPOKEN.error, endSession: true, visual: null }) as const,
       () => {
         throw new Error('boom');

@@ -211,8 +211,9 @@ const bridgeConfigShape = z.object({
       /**
        * Alexa built-in intents mapped to a direct tool call (no model) or to a turn text the
        * agent hears as if the user had said it (D59). Stop, Cancel and NavigateHome take a tool
-       * only: its result field is spoken before the goodbye; an error, an empty field or a
-       * timeout leaves the plain goodbye, and the session ends either way.
+       * only: its result field is the farewell when the result ends the session on its own; an
+       * error, an empty field, a timeout or a closing question leaves the plain goodbye, and the
+       * session ends either way.
        */
       builtIns: z.partialRecord(z.enum(MAPPABLE_BUILT_IN_INTENTS), builtInActionSchema).default({}),
     })

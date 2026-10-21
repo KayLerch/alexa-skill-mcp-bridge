@@ -95,8 +95,10 @@ export function builtInHandler(bridge: BridgeClient, config: BridgeConfig): Requ
 /**
  * Stop, Cancel, NavigateHome: cancel whatever is pending, then goodbye. With a tool mapped in
  * intents.builtIns (D59) that tool is called instead (the direct call drops anything pending
- * too): its result field is spoken before the goodbye when the call answers within the turn
- * budget; an error, an empty field or a timeout leaves the plain goodbye. The session ends.
+ * too): when it answers within the turn budget with a result that would end the session on its
+ * own (speech.endSessionField true, or no closing question without that field), its result field
+ * is the farewell; anything else (an error, an empty field, a timeout, a line that asks a
+ * question) gives the plain goodbye. The session ends either way.
  */
 export function stopHandler(bridge: BridgeClient, config: BridgeConfig): RequestHandler {
   return {
@@ -110,14 +112,18 @@ export function stopHandler(bridge: BridgeClient, config: BridgeConfig): Request
       let said = '';
       try {
         const output = await bridge.turn(input, turn);
-        if (turn.type === 'tool' && output.status === 'done' && !output.linkAccount) {
+        if (
+          turn.type === 'tool' &&
+          output.status === 'done' &&
+          output.endSession &&
+          !output.linkAccount
+        ) {
           said = output.speech;
         }
       } catch {
         // Goodbye regardless: the user asked to leave.
       }
-      const speech = said ? `${said} ${SPOKEN.goodbye}` : SPOKEN.goodbye;
-      return render(input, done('', true), { speech, endSession: true });
+      return render(input, done('', true), { speech: said || SPOKEN.goodbye, endSession: true });
     },
   };
 }
