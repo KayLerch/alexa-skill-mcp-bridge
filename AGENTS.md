@@ -62,7 +62,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 | `npm run agent:dev` | Build and run the container locally on 8080. |
 | `npm run synth` | `cdk synth`. Safe, no AWS calls. |
 | `npm run deploy` | Pre-flight, `cdk deploy`, prints outputs and the cost note. Creates billable resources. |
-| `npm run skill:deploy` | Lambda ARN from `.env` into `skill.json`, `ask deploy` from the root, Alexa Skill id back into `.env`. Creates or updates the Alexa Skill. |
+| `npm run skill:deploy` | Lambda ARN from `.env` into `skill.json`, a profile's listing and icons laid over it for the deploy (D62), `ask deploy` from the root, Alexa Skill id back into `.env`. Creates or updates the Alexa Skill. |
 | `npm run destroy` | `cdk destroy` plus ECR cleanup. Puts the placeholder ARN back into `skill.json` and drops `BRIDGE_LAMBDA_ARN` from `.env`. |
 | `npm run check:leaks` | Staged files (or `-- --all`: tracked plus untracked, what `git add -A` would commit) scanned for account ids, Alexa Skill ids, endpoints, tokens. The pre-commit hook in `.githooks` runs it. |
 

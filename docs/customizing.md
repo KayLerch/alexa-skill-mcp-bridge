@@ -137,6 +137,18 @@ its start screen, and with `speech.endSessionField` it can end the session ("not
 goodbye for now"). When the call fails or has nothing to say, the generated greeting is spoken.
 `skill.help` and `skill.examplePhrases` replace the generated help and the greeting's examples.
 
+## Your Alexa Skill listing
+
+`skill-package/skill.json` ships as the bridge's own development listing. Your name, descriptions,
+example phrases, keywords, category, privacy and terms URLs and icons go into
+`<profile>/skill-package/skill.json`, in the same shape, holding only what differs; icons go into
+`<profile>/skill-package/assets/images/` and are referenced as
+`file://assets/images/en-US_largeIconUri.png` (108×108 and 512×512 PNG for the small and large
+icon). `npm run skill:deploy` merges the listing over the repo's (objects merge, arrays replace;
+the endpoint stays your Lambda), copies the assets in, runs `ask deploy`, and takes both off
+again (D62). A `file://` path that is not in the assets folder stops the deploy before anything is
+uploaded.
+
 ## Let chat write your utterances
 
 The best guess at what people will say to the device is what you say to the bridge while testing:
@@ -156,8 +168,10 @@ model learns their angles instead of yours.
 ## Changing the invocation name or the tools
 
 The invocation name is `skill.invocationName` in `bridge.config.ts`. Change it, run
-`npm run generate`, then `npm run skill:deploy`; the name also appears in `skill-package/skill.json` as the
-Alexa Skill's title, which is not generated, so change it there too.
+`npm run generate`, then `npm run skill:deploy`. The Alexa Skill's listed name is a different
+field, `publishingInformation.locales.<locale>.name` in `skill-package/skill.json`; it is not
+generated, and the way to change it without touching a tracked file is your profile's listing
+(below).
 
 When your MCP server's tools change — a new tool, a renamed argument, a new enum value — the
 manifest and the interaction model both change, so it is `npm run generate` followed by
