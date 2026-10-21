@@ -166,6 +166,29 @@ describe('generate (template utterances)', () => {
   });
 });
 
+describe('direct calls (D57, D59)', () => {
+  it('notes a launch or built-in tool the server does not list', async () => {
+    const config = parseConfig({
+      mcp: { url: server.url },
+      skill: { launch: { tool: 'suggest_trip' } },
+      intents: {
+        builtIns: {
+          'AMAZON.NextIntent': { tool: 'get_weather' },
+          'AMAZON.StopIntent': { tool: 'end_trip' },
+        },
+      },
+    });
+    const result = await generate({ config, paths: paths(), useModel: false });
+    expect(result.notes).toContain(
+      'skill.launch names the tool suggest_trip, which the server does not list',
+    );
+    expect(result.notes).toContain(
+      'intents.builtIns.AMAZON.StopIntent names the tool end_trip, which the server does not list',
+    );
+    expect(result.notes.join('\n')).not.toContain('get_weather');
+  });
+});
+
 describe('examplePhrase', () => {
   it('fills slots with spoken placeholders', () => {
     const phrase = examplePhrase(

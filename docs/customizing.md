@@ -136,6 +136,8 @@ that writes its own welcome ("Welcome back. Say …") speaks it through `speech.
 its start screen, and with `speech.endSessionField` it can end the session ("nothing here yet,
 goodbye for now"). When the call fails or has nothing to say, the generated greeting is spoken.
 `skill.help` and `skill.examplePhrases` replace the generated help and the greeting's examples.
+`npm run generate` notes a launch or mapped tool that your server does not list, and prints the
+example phrases the greeting will use.
 
 ## Your Alexa Skill listing
 

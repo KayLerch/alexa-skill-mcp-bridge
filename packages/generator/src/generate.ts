@@ -68,6 +68,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   if (versionWarning) log(`warning: ${versionWarning}`);
 
   const { manifest: draft, customTypes } = buildManifest(scan, [], config.tools.hiddenArguments);
+  for (const [field, tool] of directCalls(config)) {
+    if (!scan.tools.some((t) => t.name === tool)) {
+      notes.push(`${field} names the tool ${tool}, which the server does not list`);
+    }
+  }
   const models: Record<string, InteractionModel> = {};
   const files: string[] = [];
   let examplePhrases: string[] = [];
@@ -166,6 +171,16 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   files.push(paths.manifest);
 
   return { manifest, models, files, notes };
+}
+
+/** The tools the bridge calls itself (D57, D59), with the config field that names each. */
+function directCalls(config: BridgeConfig): [string, string][] {
+  const calls: [string, string][] = [];
+  if (config.skill.launch) calls.push(['skill.launch', config.skill.launch.tool]);
+  for (const [intent, action] of Object.entries(config.intents.builtIns)) {
+    if (action && 'tool' in action) calls.push([`intents.builtIns.${intent}`, action.tool]);
+  }
+  return calls;
 }
 
 /**
