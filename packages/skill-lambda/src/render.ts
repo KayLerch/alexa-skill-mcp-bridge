@@ -43,7 +43,8 @@ export function render(
   setOpenTurn(input, !endSession && output.status !== 'question');
 
   const reprompt = output.reprompt ?? (output.status === 'question' ? speech : REPROMPT);
-  if (!endSession && speech && options.remember !== false) {
+  // "Still working on it" is not worth repeating; the last real answer is.
+  if (!endSession && speech && output.status !== 'pending' && options.remember !== false) {
     setLastOutput(input, { speech, reprompt });
   }
 

@@ -33,6 +33,25 @@ describe('repeat (D59)', () => {
     expect(repeat.attributesManager.getSessionAttributes()).toEqual(attributes);
   });
 
+  it('never replays "still working": the last real answer stays', async () => {
+    const config = withConfig({});
+    const { bridge } = fakeBridge(config, () => ({
+      status: 'pending',
+      speech: config.skill.stillWorkingMessage,
+      reprompt: config.skill.stillWorkingMessage,
+      endSession: false,
+      visual: null,
+    }));
+    const input = handlerInput({
+      intent: 'AMAZON.NextIntent',
+      sessionAttributes: { lastSpeech: 'Which park?', lastReprompt: 'Which park?' },
+    });
+    await builtInHandler(bridge, config).handle(input);
+    expect(input.attributesManager.getSessionAttributes()).toMatchObject({
+      lastSpeech: 'Which park?',
+    });
+  });
+
   it('a re-ask after a missed answer does not replace what "repeat" replays', async () => {
     const config = withConfig({});
     const { bridge } = fakeBridge(config, () => done(''));
@@ -157,6 +176,18 @@ describe('a missed answer while the session is open (D60)', () => {
 
   it('defaults to "Sorry, I didn\'t catch that."', () => {
     expect(withConfig({}).skill.fallbackWhileOpen).toBe("Sorry, I didn't catch that.");
+  });
+
+  it('with a result still being worked on, the agent turn fetches it first', async () => {
+    const config = withConfig({});
+    const { bridge, turns } = fakeBridge(config, () => done('Here it is. Next?'));
+    await fallbackHandler(bridge, config).handle(
+      handlerInput({
+        intent: 'AMAZON.FallbackIntent',
+        sessionAttributes: { openTurn: true, awaitingResult: true, lastSpeech: 'One moment.' },
+      }),
+    );
+    expect(turns.map((t) => t.type)).toEqual(['poll', 'turn']);
   });
 
   it('without an open turn the agent still asks what was meant', async () => {

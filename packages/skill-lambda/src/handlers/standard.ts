@@ -15,7 +15,12 @@ import {
 import type { BridgeClient } from '../bridge.js';
 import { REPROMPT, helpText } from '../greeting.js';
 import { render, ssml } from '../render.js';
-import { getLastOutput, getPendingQuestion, hasOpenTurn } from '../session-attrs.js';
+import {
+  getLastOutput,
+  getPendingQuestion,
+  hasOpenTurn,
+  isAwaitingResult,
+} from '../session-attrs.js';
 
 const { getRequestType, getIntentName } = askSdk;
 
@@ -124,7 +129,8 @@ export function fallbackHandler(bridge: BridgeClient, config: BridgeConfig): Req
         const speech = `${SPOKEN.questionRepeat} ${pending.message}`;
         return render(input, question(pending, speech), { remember: false });
       }
-      if (hasOpenTurn(input)) {
+      // A result still being worked on is fetched by the agent turn below (poll first).
+      if (hasOpenTurn(input) && !isAwaitingResult(input)) {
         const reprompt = getLastOutput(input)?.reprompt ?? REPROMPT;
         const speech = `${config.skill.fallbackWhileOpen} ${reprompt}`;
         return render(input, { ...done(speech, false), reprompt }, { remember: false });
