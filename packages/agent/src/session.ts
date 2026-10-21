@@ -1,4 +1,12 @@
-import type { Agent, Model } from '@strands-agents/sdk';
+import {
+  Message,
+  TextBlock,
+  ToolResultBlock,
+  ToolUseBlock,
+  type Agent,
+  type JSONValue,
+  type Model,
+} from '@strands-agents/sdk';
 import {
   errorFields,
   type BridgeConfig,
@@ -18,11 +26,14 @@ import {
   ResultField,
   WidgetRecorder,
   askUserTool,
+  callAndRecord,
   mcpTools,
+  toolResultBlockContent,
 } from './agent/tools.js';
+import { renderPrompt } from './agent/prompt.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
-import { BridgeMcpClient } from './mcp/client.js';
+import { BridgeMcpClient, type McpToolDefinition } from './mcp/client.js';
 import { sigV4Fetch } from './mcp/gateway.js';
 import { TokenHolder } from './mcp/token.js';
 import type { MemoryAdapter } from './memory/store.js';
@@ -57,6 +68,15 @@ export interface BridgeSessionOptions {
   renderer?: ScreenRenderer;
 }
 
+/**
+ * How a direct tool call (D57) ended. `ok` carries the result's spoken field, when it has one;
+ * everything else makes the frontend fall back to its own line.
+ */
+export type DirectCallOutcome =
+  | { kind: 'ok'; speech?: string; endsSession: boolean }
+  | { kind: 'unauthorized' }
+  | { kind: 'failed' };
+
 /** A tools/call may sit parked on several spoken answers; the queue enforces the per-answer timeout. */
 const TOOL_CALL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -77,6 +97,7 @@ export class BridgeSession {
   private mcp?: BridgeMcpClient;
   private hiddenArguments?: HiddenArguments;
   private resultField?: ResultField;
+  private definitions: McpToolDefinition[] = [];
   private agent?: Agent;
   private warmup?: Promise<void>;
   private identity?: SessionIdentity;
@@ -173,6 +194,96 @@ export class BridgeSession {
   clearRun(): void {
     this.currentRun = undefined;
     this.state = this.agent ? 'ready' : this.state;
+  }
+
+  /**
+   * Call one tool directly, without the model (D57), with the same bookkeeping as the model's
+   * calls (hidden arguments, result fields, widget). A successful call is added to the agent's
+   * history as if the agent had made it, so the next turn knows what the user heard. Call it only
+   * after `ready()` and while no run is working.
+   */
+  async callDirect(
+    name: string,
+    args: Record<string, unknown>,
+    intent: string | undefined,
+    timeoutMs: number,
+  ): Promise<DirectCallOutcome> {
+    const definition = this.definitions.find((d) => d.name === name);
+    if (!this.mcp || !definition) {
+      this.logger.warn('direct call to a tool the server does not list', { tool: name });
+      return { kind: 'failed' };
+    }
+    this.resultField?.begin();
+    this.widgets.begin();
+    const fields = this.resultField ?? new ResultField();
+    try {
+      const { sent, result } = await callAndRecord(
+        this.mcp,
+        name,
+        args,
+        definition.uiResourceUri,
+        {
+          hidden: this.hiddenArguments,
+          resultField: fields,
+          widgets: this.screen ? this.widgets : undefined,
+        },
+        AbortSignal.timeout(Math.max(1, timeoutMs)),
+      );
+      if (result.isError) {
+        this.logger.warn('direct tool call returned an error result', { tool: name });
+        return { kind: 'failed' };
+      }
+      const speech = fields.value;
+      this.remember(name, sent, result, intent, speech);
+      return { kind: 'ok', ...(speech ? { speech } : {}), endsSession: fields.endsSession };
+    } catch (err) {
+      if (this.accountLinking && isUnauthorized(err)) {
+        this.logger.warn('mcp server refused the account-linked token', { tool: name });
+        return { kind: 'unauthorized' };
+      }
+      this.logger.warn('direct tool call failed', { tool: name, ...errorFields(err) });
+      return { kind: 'failed' };
+    }
+  }
+
+  /** A direct call as four history messages: the frontend's request, the call, its result, the speech. */
+  private remember(
+    name: string,
+    input: Record<string, unknown>,
+    result: Parameters<typeof toolResultBlockContent>[0],
+    intent: string | undefined,
+    speech: string | undefined,
+  ): void {
+    const messages = this.agent?.messages;
+    // The history must alternate; after a run that stopped half way it may end on the user's side.
+    if (!messages || messages.at(-1)?.role === 'user') return;
+    const toolUseId = `direct-${Date.now().toString(36)}`;
+    messages.push(
+      new Message({
+        role: 'user',
+        content: [
+          new TextBlock(renderPrompt('direct-call', { intent: intent ?? 'a request', tool: name })),
+        ],
+      }),
+      new Message({
+        role: 'assistant',
+        content: [new ToolUseBlock({ name, toolUseId, input: input as JSONValue })],
+      }),
+      new Message({
+        role: 'user',
+        content: [
+          new ToolResultBlock({
+            toolUseId,
+            status: 'success',
+            content: [toolResultBlockContent(result)],
+          }),
+        ],
+      }),
+      new Message({
+        role: 'assistant',
+        content: [new TextBlock(speech ?? 'Done.')],
+      }),
+    );
   }
 
   /** HealthyBusy only while a run works past its deadline; a parked question stays Healthy. */
@@ -305,10 +416,11 @@ export class BridgeSession {
     };
     const systemPrompt = buildSystemPrompt(this.promptInputs);
     this.mcp = mcp;
+    this.definitions = definitions;
     this.hiddenArguments = new HiddenArguments(config.tools.hiddenArguments);
-    this.resultField = config.speech.resultField
-      ? new ResultField(config.speech.resultField)
-      : undefined;
+    const { resultField, endSessionField } = config.speech;
+    this.resultField =
+      resultField || endSessionField ? new ResultField(resultField, endSessionField) : undefined;
     this.agent = buildAgent({
       model: this.model,
       tools: [

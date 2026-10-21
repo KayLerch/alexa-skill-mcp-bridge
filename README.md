@@ -205,6 +205,8 @@ On an Alexa+ device with a screen, the bridge shows the MCP Apps widget your ser
 - `visual.enabled` set to `true` in `bridge.config.ts`, then a redeploy: the agent image carries a headless Chromium only when the screen is on at deploy time.
 - `npm run skill:deploy` once, so the Alexa Skill declares the APL interface (`skill-package/skill.json`).
 
+With `skill.launch` set, the launch shows the widget of that tool's result too: the first thing a user sees is your server's own start screen, drawn without a model call (D57).
+
 The agent renders the widget to a JPEG, and the Alexa Skill shows it full screen, best-fit on black. The image cannot be tapped. A speaker gets speech only, and a picture that would push the response past Alexa's 120 KB cap is dropped; the speech always stays. To try it without a device: `npm run chat -- --display 1280x800` saves each rendered screen as a JPEG.
 
 ## Requirements your server must meet

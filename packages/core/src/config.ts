@@ -45,6 +45,13 @@ export const mcpAuthSchema = z
   });
 export type McpAuthConfig = z.output<typeof mcpAuthSchema>;
 
+/** A tool call the bridge makes itself, without the model: the tool's name and fixed arguments. */
+export const directToolCallSchema = z.strictObject({
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()).optional(),
+});
+export type DirectToolCall = z.output<typeof directToolCallSchema>;
+
 const bridgeConfigShape = z.object({
   mcp: z.object({
     url: z.url({
@@ -73,6 +80,12 @@ const bridgeConfigShape = z.object({
       stillWorkingMessage: z
         .string()
         .default("I'm still working on that. Ask me again in a moment."),
+      /**
+       * A tool the agent calls directly on launch, without the model (D57). Its
+       * speech.resultField is spoken, its widget shown, and the session ends only when
+       * speech.endSessionField says so. Unset, or when the call gives nothing to say: the greeting.
+       */
+      launch: directToolCallSchema.optional(),
     })
     .prefault({}),
   agent: z
@@ -146,6 +159,13 @@ const bridgeConfigShape = z.object({
        * successful result has it; otherwise the model's text is spoken as usual.
        */
       resultField: z.string().min(1).optional(),
+      /**
+       * A boolean field of a tool result's structuredContent that ends the session when true
+       * (D58). With it set, a finished turn ends the session only when the run's last successful
+       * result says so; otherwise it stays open. Unset: the session ends when the speech does not
+       * end with a question.
+       */
+      endSessionField: z.string().min(1).optional(),
     })
     .prefault({}),
   elicitation: z

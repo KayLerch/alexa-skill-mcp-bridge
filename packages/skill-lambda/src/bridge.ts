@@ -154,7 +154,13 @@ export class BridgeClient {
     let budgetMs = config.turn.budgetMs - (Date.now() - lookupStarted);
     let prefix = '';
 
-    if (isAwaitingResult(input) && turn.type !== 'poll' && turn.type !== 'cancel') {
+    // A direct tool call (D57) is the user moving on: the agent drops the old run instead.
+    if (
+      isAwaitingResult(input) &&
+      turn.type !== 'poll' &&
+      turn.type !== 'cancel' &&
+      turn.type !== 'tool'
+    ) {
       const started = Date.now();
       const polled = await this.send(call, { type: 'poll' }, budgetMs, log);
       budgetMs -= Date.now() - started;

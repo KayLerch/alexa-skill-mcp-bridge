@@ -95,6 +95,13 @@ come first, and an alias intent with the same name replaces the one here. The sa
 `.env` and `prompt-addendum.md`, a short note for the agent's system prompt (for example "ask one
 quiz question at a time"), up to 2000 UTF-8 bytes, and `bridge.config.json` for any other setting (invocation name, memory, `visual.enabled`, and so on). Nothing in the folder is tracked by this repo.
 
+## The launch and help
+
+`skill.launch` names a tool the agent calls on "Alexa, open …" without the model (D57): a server
+that writes its own welcome ("Welcome back. Say …") speaks it through `speech.resultField` and draws
+its start screen, and with `speech.endSessionField` it can end the session ("nothing here yet,
+goodbye for now"). When the call fails or has nothing to say, the generated greeting is spoken.
+
 ## Let chat write your utterances
 
 The best guess at what people will say to the device is what you say to the bridge while testing:

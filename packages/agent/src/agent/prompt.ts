@@ -15,7 +15,8 @@ export type PromptName =
   | 'elicitation'
   | 'tool-hint'
   | 'fallback'
-  | 'ask-user';
+  | 'ask-user'
+  | 'direct-call';
 
 const cache = new Map<PromptName, string>();
 

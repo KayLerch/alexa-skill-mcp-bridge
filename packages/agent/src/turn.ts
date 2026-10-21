@@ -13,6 +13,7 @@ import { renderPrompt } from './agent/prompt.js';
 import { mapAnswer, spokenText } from './elicitation/answer-mapper.js';
 import { mapAnswerWithModel } from './elicitation/answer-mapper-model.js';
 import type { BridgeSession, SessionIdentity } from './session.js';
+import { cleanSpeech, lastQuestion } from './speech.js';
 import type { RunOutcome } from './turn-run.js';
 
 /**
@@ -78,6 +79,9 @@ export async function runTurn(
 
     case 'poll':
       return poll(session, invocation, deadlineMs, deadlineAt, log);
+
+    case 'tool':
+      return directCall(session, invocation, identity, turn, deadlineAt, log);
 
     case 'cancel':
       return cancel(session, log);
@@ -205,6 +209,79 @@ async function cancel(session: BridgeSession, log: Logger): Promise<TurnOutput> 
   session.clearRun();
   log.info('cancelled');
   return done('');
+}
+
+/**
+ * A tool the frontend asked for by name (D57): the launch tool or a mapped built-in intent. No
+ * model: the bridge calls it, speaks its result field and shows its widget; the session ends only
+ * when the result's end-session field is true. The user has moved on, so a pending question and a
+ * running run are dropped first. Anything that leaves nothing to say (not ready in time, a failed
+ * call, no result field) answers with empty speech and the frontend uses its own line.
+ */
+async function directCall(
+  session: BridgeSession,
+  invocation: AgentInvocation,
+  identity: SessionIdentity,
+  turn: Extract<AgentInvocation['turn'], { type: 'tool' }>,
+  deadlineAt: number,
+  log: Logger,
+): Promise<TurnOutput> {
+  session.queue.cancelAll('direct tool call');
+  const running = session.currentRun;
+  if (running?.isRunning) {
+    running.cancel();
+    await running.waitForOutcome(UNWIND_MS);
+  }
+  if (session.currentRun?.isRunning) {
+    log.info('run still unwinding; skipping the direct call');
+    return done('');
+  }
+  session.clearRun();
+
+  const readiness = await session.ready(identity, Math.max(0, deadlineAt - Date.now()));
+  if (readiness === 'failed') {
+    const needsLink = session.warmupNeedsAccountLink;
+    log.warn('direct call while the session failed to warm up', { needsLink });
+    session.resetWarmup();
+    if (needsLink) {
+      session.forgetConversation();
+      return linkAccountOutput();
+    }
+    return done('');
+  }
+  if (readiness === 'warming') {
+    log.info('direct call while still warming up; nothing to say yet');
+    return done('');
+  }
+
+  const started = Date.now();
+  const outcome = await session.callDirect(
+    turn.tool,
+    turn.arguments ?? {},
+    turn.intent,
+    deadlineAt - Date.now(),
+  );
+  log.info('direct call finished', {
+    tool: turn.tool,
+    outcome: outcome.kind,
+    elapsedMs: Date.now() - started,
+  });
+  if (outcome.kind === 'unauthorized') {
+    session.forgetConversation();
+    return linkAccountOutput();
+  }
+  const speech = outcome.kind === 'ok' ? cleanSpeech(outcome.speech ?? '') : '';
+  if (outcome.kind !== 'ok' || !speech) return done('');
+  const reprompt = lastQuestion(speech);
+  const output: TurnOutput = {
+    status: 'done',
+    speech,
+    ...(!outcome.endsSession && reprompt ? { reprompt } : {}),
+    endSession: outcome.endsSession,
+    visual: null,
+  };
+  const visual = await screen(session, invocation, output, deadlineAt, log);
+  return visual ? { ...output, visual } : output;
 }
 
 /** Stop whatever runs for the previous link, then forget the conversation (D48). */

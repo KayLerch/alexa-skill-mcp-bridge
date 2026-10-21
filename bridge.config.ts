@@ -46,6 +46,10 @@ export default defineConfig({
     // greeting: 'Welcome. Ask me about hotels or the weather.',
     coldStartMessage: "I'm still starting up. Give me a moment and open me again.",
     stillWorkingMessage: "I'm still working on that. Ask me again in a moment.",
+    // A tool the agent calls on launch without the model (D57), for a server that writes its own
+    // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
+    // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.
+    // launch: { tool: 'suggest_visit', arguments: { season: 'spring' } },
   },
 
   agent: {
@@ -97,6 +101,10 @@ export default defineConfig({
     // model's rephrasing, for servers that write their own spoken line (for example 'say'). The
     // reprompt is the last question in it. Unset: the model's text is spoken.
     // resultField: 'say',
+    // A boolean field of a tool result's structuredContent that ends the session when true (D58).
+    // Set: the session stays open after every turn unless the last result says so. Unset: it ends
+    // when the spoken answer does not end with a question.
+    // endSessionField: 'end_session',
   },
 
   elicitation: {

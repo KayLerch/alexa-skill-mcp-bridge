@@ -154,6 +154,21 @@ if (notReady) {
   process.exit(1);
 }
 stdout.write('Connected. ');
+// The Alexa Skill opens with skill.launch when it is set (D57); so does the chat.
+const launch = config.skill.launch;
+if (launch) {
+  stdout.write('\n');
+  const started = Date.now();
+  await show(
+    await bridge.turn({
+      type: 'tool',
+      tool: launch.tool,
+      ...(launch.arguments ? { arguments: launch.arguments } : {}),
+      intent: 'LaunchRequest',
+    }),
+    Date.now() - started,
+  );
+}
 
 for (;;) {
   const line = await ask(pendingQuestion ? 'answer> ' : 'you> ');

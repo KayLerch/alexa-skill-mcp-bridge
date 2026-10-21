@@ -30,7 +30,10 @@ export interface TurnRunOptions {
   input: string;
   logger: Logger;
   debug?: DebugSink;
-  /** speech.resultField (D51): when this run recorded a value, it is spoken instead of the model's text. */
+  /**
+   * speech.resultField (D51): when this run recorded a value, it is spoken instead of the model's
+   * text. speech.endSessionField (D58): when set, the last result's flag ends the session.
+   */
   resultField?: ResultField;
 }
 
@@ -103,15 +106,17 @@ export class TurnRun {
         .filter((block): block is TextBlock => block instanceof TextBlock)
         .map((block) => block.text)
         .join(' ');
-      const fromField = cleanSpeech(this.options.resultField?.value ?? '');
+      const fields = this.options.resultField;
+      const fromField = cleanSpeech(fields?.value ?? '');
       const speech = fromField || cleanSpeech(text) || SPOKEN.notUnderstood;
-      const open = endsWithQuestion(speech);
+      // With speech.endSessionField the server decides (D58); otherwise a question keeps it open.
+      const open = fields?.decidesEnd ? !fields.endsSession : endsWithQuestion(speech);
       // A server's own line carries feedback before its question; only the question is repeated.
-      const reprompt = fromField ? lastQuestion(speech) : speech;
+      const reprompt = fromField || fields?.decidesEnd ? lastQuestion(speech) : speech;
       return this.finish({
         status: 'done',
         speech,
-        ...(open ? { reprompt } : {}),
+        ...(open && reprompt ? { reprompt } : {}),
         endSession: !open,
         visual: null,
       });
