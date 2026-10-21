@@ -146,7 +146,7 @@ describe('account linking in the Alexa Skill Lambda', () => {
 
   it('still says goodbye on stop without a token, without the card; the cancel goes out without one', async () => {
     const { bridge, envelopes } = harness(linking);
-    const response = await stopHandler(bridge).handle(
+    const response = await stopHandler(bridge, linking).handle(
       handlerInput({ intent: 'AMAZON.StopIntent' }),
     );
     expect(response.outputSpeech).toEqual({

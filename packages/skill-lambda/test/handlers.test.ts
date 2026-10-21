@@ -290,7 +290,7 @@ describe('launch', () => {
 describe('stop and fallback', () => {
   it('stop cancels and says goodbye', async () => {
     const { bridge, turns } = fakeBridge(() => done(''));
-    const response = await stopHandler(bridge).handle(
+    const response = await stopHandler(bridge, config).handle(
       handlerInput({ intent: 'AMAZON.StopIntent', sessionAttributes: pendingQuestion }),
     );
     expect(turns[0]).toEqual({ type: 'cancel' });
@@ -305,7 +305,7 @@ describe('stop and fallback', () => {
       intent: 'AMAZON.FallbackIntent',
       sessionAttributes: pendingQuestion,
     });
-    const response = await fallbackHandler(bridge).handle(input);
+    const response = await fallbackHandler(bridge, config).handle(input);
     expect(turns).toEqual([]);
     expect(invoke).not.toHaveBeenCalled();
     expect(response.outputSpeech).toMatchObject({

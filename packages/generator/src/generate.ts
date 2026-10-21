@@ -151,6 +151,8 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         catchAllPhrases: [...overrides.catchAll, ...training.catchAll],
         aliases,
         slotSynonyms: overrides.slotSynonyms,
+        builtIns: Object.keys(config.intents.builtIns),
+        fallbackSensitivity: config.skill.fallbackSensitivity,
       },
     );
     models[locale] = model;

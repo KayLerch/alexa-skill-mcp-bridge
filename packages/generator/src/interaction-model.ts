@@ -32,6 +32,7 @@ export interface InteractionModel {
       invocationName: string;
       intents: AlexaIntent[];
       types: AlexaType[];
+      modelConfiguration?: { fallbackIntentSensitivity: { level: 'LOW' | 'MEDIUM' | 'HIGH' } };
     };
   };
 }
@@ -179,13 +180,21 @@ function catchAllTraining(utterances: string[]): string[] {
   return [...new Set(phrases)].sort().slice(0, 100);
 }
 
+/** Repeat replays the last output and Next is a common "skip" (D59); both always ship. */
 export const STANDARD_INTENTS: AlexaIntent[] = [
   { name: 'AMAZON.HelpIntent' },
   { name: 'AMAZON.StopIntent' },
   { name: 'AMAZON.CancelIntent' },
   { name: 'AMAZON.FallbackIntent' },
   { name: 'AMAZON.NavigateHomeIntent' },
+  { name: 'AMAZON.RepeatIntent' },
+  { name: 'AMAZON.NextIntent' },
 ];
+
+function extraBuiltIns(names: string[]): AlexaIntent[] {
+  const standard = new Set(STANDARD_INTENTS.map((i) => i.name));
+  return [...new Set(names)].filter((n) => !standard.has(n)).map((name) => ({ name }));
+}
 
 export interface InteractionModelOptions {
   /** features.toolIntents: one intent per tool with typed slots. */
@@ -198,6 +207,10 @@ export interface InteractionModelOptions {
   aliases?: { name: string; tool: ManifestTool; samples: string[] }[];
   /** Type name → value → synonyms, from overrides. */
   slotSynonyms?: Record<string, Record<string, string[]>>;
+  /** Built-in intents mapped in intents.builtIns; added when not standard already (D59). */
+  builtIns?: string[];
+  /** skill.fallbackSensitivity: the model's fallbackIntentSensitivity (D60). Unset: Alexa's default. */
+  fallbackSensitivity?: 'LOW' | 'MEDIUM' | 'HIGH' | undefined;
 }
 
 export function buildInteractionModel(
@@ -266,6 +279,7 @@ export function buildInteractionModel(
           ...answerIntents,
           ...requestIntents,
           ...STANDARD_INTENTS,
+          ...extraBuiltIns(options.builtIns ?? []),
         ],
         types: types.map((t) => ({
           name: t.name,
@@ -274,6 +288,13 @@ export function buildInteractionModel(
             name: { value: v.value, ...(v.synonyms?.length ? { synonyms: v.synonyms } : {}) },
           })),
         })),
+        ...(options.fallbackSensitivity
+          ? {
+              modelConfiguration: {
+                fallbackIntentSensitivity: { level: options.fallbackSensitivity },
+              },
+            }
+          : {}),
       },
     },
   };

@@ -3,7 +3,12 @@ import type { Response } from 'ask-sdk-model';
 import type { TurnOutput } from '@alexa-mcp-bridge/core';
 import { MAX_RESPONSE_BYTES, screenDirective, supportsApl } from './apl/screen.js';
 import { REPROMPT } from './greeting.js';
-import { setAwaitingResult, setOpenTurn, setPendingQuestion } from './session-attrs.js';
+import {
+  setAwaitingResult,
+  setLastOutput,
+  setOpenTurn,
+  setPendingQuestion,
+} from './session-attrs.js';
 
 /**
  * TurnOutput → Alexa response. Speech becomes SSML with light escaping, a reprompt keeps the
@@ -17,6 +22,11 @@ export interface RenderOptions {
   /** Override the agent's speech entirely (cold-start, goodbye). */
   speech?: string;
   endSession?: boolean;
+  /**
+   * Keep this response out of "repeat" (D59): a re-ask after a missed answer or a help text
+   * leaves the last real output in place. Default true.
+   */
+  remember?: boolean;
 }
 
 export function render(
@@ -32,10 +42,14 @@ export function render(
   // Open for a spoken answer as an ordinary turn (D49) unless the session ends or a question is parked.
   setOpenTurn(input, !endSession && output.status !== 'question');
 
+  const reprompt = output.reprompt ?? (output.status === 'question' ? speech : REPROMPT);
+  if (!endSession && speech && options.remember !== false) {
+    setLastOutput(input, { speech, reprompt });
+  }
+
   const builder = input.responseBuilder;
   if (speech) builder.speak(ssml(speech));
-  if (!endSession)
-    builder.reprompt(ssml(output.reprompt ?? (output.status === 'question' ? speech : REPROMPT)));
+  if (!endSession) builder.reprompt(ssml(reprompt));
   // The card in the Alexa app is where the user links their account (D48).
   if (output.linkAccount) builder.withLinkAccountCard();
   const response = builder.withShouldEndSession(endSession).getResponse();

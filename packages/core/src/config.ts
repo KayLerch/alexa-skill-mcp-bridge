@@ -52,6 +52,30 @@ export const directToolCallSchema = z.strictObject({
 });
 export type DirectToolCall = z.output<typeof directToolCallSchema>;
 
+/** What a mapped built-in intent does: a direct tool call, or a text the agent hears (D59). */
+export const builtInActionSchema = z.union([
+  directToolCallSchema,
+  z.strictObject({ text: z.string().trim().min(1) }),
+]);
+export type BuiltInAction = z.output<typeof builtInActionSchema>;
+
+/** Built-ins that end the session whatever the mapping does. */
+export const SESSION_ENDING_INTENTS = [
+  'AMAZON.StopIntent',
+  'AMAZON.CancelIntent',
+  'AMAZON.NavigateHomeIntent',
+] as const;
+
+/** Built-in intents `intents.builtIns` may map. Repeat and Help have fixed behaviour. */
+export const MAPPABLE_BUILT_IN_INTENTS = [
+  'AMAZON.NextIntent',
+  'AMAZON.PreviousIntent',
+  'AMAZON.StartOverIntent',
+  'AMAZON.MoreIntent',
+  ...SESSION_ENDING_INTENTS,
+] as const;
+export type MappableBuiltInIntent = (typeof MAPPABLE_BUILT_IN_INTENTS)[number];
+
 const bridgeConfigShape = z.object({
   mcp: z.object({
     url: z.url({
@@ -86,6 +110,16 @@ const bridgeConfigShape = z.object({
        * speech.endSessionField says so. Unset, or when the call gives nothing to say: the greeting.
        */
       launch: directToolCallSchema.optional(),
+      /**
+       * Said, followed by the last question again, when Alexa did not catch an answer while the
+       * session is open for one (D60). Never the generic "What would you like to do?".
+       */
+      fallbackWhileOpen: z.string().trim().min(1).default("Sorry, I didn't catch that."),
+      /**
+       * How readily Alexa sends an utterance to AMAZON.FallbackIntent instead of the closest
+       * intent: the interaction model's fallbackIntentSensitivity. Unset: Alexa's default (LOW).
+       */
+      fallbackSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
     })
     .prefault({}),
   agent: z
@@ -168,6 +202,16 @@ const bridgeConfigShape = z.object({
       endSessionField: z.string().min(1).optional(),
     })
     .prefault({}),
+  intents: z
+    .object({
+      /**
+       * Alexa built-in intents mapped to a direct tool call (no model) or to a turn text the
+       * agent hears as if the user had said it (D59). Stop, Cancel and NavigateHome take a tool
+       * only: it runs, errors are ignored, and the session ends with the goodbye.
+       */
+      builtIns: z.partialRecord(z.enum(MAPPABLE_BUILT_IN_INTENTS), builtInActionSchema).default({}),
+    })
+    .prefault({}),
   elicitation: z
     .object({
       /** A parked question is cancelled after this long without an answer. */
@@ -219,6 +263,18 @@ const bridgeConfigShape = z.object({
 });
 
 export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) => {
+  // A goodbye intent cannot hand the turn to the model: the session ends right after it.
+  for (const intent of SESSION_ENDING_INTENTS) {
+    const action = config.intents.builtIns[intent];
+    if (action && !('tool' in action)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['intents', 'builtIns', intent],
+        message:
+          'takes a tool ({ "tool": "...", "arguments": {...} }), not a text: the session ends right after it.',
+      });
+    }
+  }
   // The Gateway authenticates the agent with SigV4 and has no way to pass the user's token on.
   if (config.features.gateway && config.mcp.auth.type === 'alexaAccountLinking') {
     ctx.addIssue({

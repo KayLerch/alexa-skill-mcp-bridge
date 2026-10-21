@@ -4,7 +4,8 @@ import type { Question } from '@alexa-mcp-bridge/core';
 /**
  * Typed accessors for what the Alexa Skill keeps in Alexa session attributes: the question the
  * user is answering, whether a result is still being worked on, whether the session is open for an
- * ordinary turn (the agent asked in its own speech, no question parked), and the device's zone.
+ * ordinary turn (the agent asked in its own speech, no question parked), the device's zone, and
+ * the last thing the user heard.
  */
 export interface PendingQuestion {
   id: string;
@@ -19,6 +20,9 @@ interface Attributes {
   openTurn?: boolean;
   /** The device's IANA time zone, or '' once the lookup was tried and gave nothing (D53). */
   timeZone?: string;
+  /** What the user heard last and its reprompt, for "repeat" and a missed answer (D59, D60). */
+  lastSpeech?: string;
+  lastReprompt?: string;
 }
 
 function read(input: HandlerInput): Attributes {
@@ -78,5 +82,23 @@ export function getTimeZone(input: HandlerInput): string | undefined {
 export function setTimeZone(input: HandlerInput, timeZone: string): void {
   const attrs = read(input);
   attrs.timeZone = timeZone;
+  write(input, attrs);
+}
+
+export interface LastOutput {
+  speech: string;
+  reprompt: string;
+}
+
+/** The last spoken output of an open session, or undefined before the first one. */
+export function getLastOutput(input: HandlerInput): LastOutput | undefined {
+  const { lastSpeech, lastReprompt } = read(input);
+  return lastSpeech ? { speech: lastSpeech, reprompt: lastReprompt ?? lastSpeech } : undefined;
+}
+
+export function setLastOutput(input: HandlerInput, output: LastOutput): void {
+  const attrs = read(input);
+  attrs.lastSpeech = output.speech;
+  attrs.lastReprompt = output.reprompt;
   write(input, attrs);
 }

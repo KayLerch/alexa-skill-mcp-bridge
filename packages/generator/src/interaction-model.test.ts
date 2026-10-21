@@ -93,4 +93,23 @@ describe('buildInteractionModel', () => {
       );
     }
   });
+
+  it('always ships Repeat and Next, and adds a mapped built-in once (D59)', () => {
+    const model = buildInteractionModel(manifest, utterances, types, 'bridge demo', {
+      builtIns: ['AMAZON.NextIntent', 'AMAZON.StartOverIntent', 'AMAZON.StopIntent'],
+    }).interactionModel.languageModel;
+    const names = model.intents.map((i) => i.name);
+    expect(names).toContain('AMAZON.RepeatIntent');
+    expect(names.filter((n) => n === 'AMAZON.NextIntent')).toHaveLength(1);
+    expect(names.filter((n) => n === 'AMAZON.StopIntent')).toHaveLength(1);
+    expect(names).toContain('AMAZON.StartOverIntent');
+  });
+
+  it('sets the fallback sensitivity only when configured (D60)', () => {
+    expect(build(true).modelConfiguration).toBeUndefined();
+    const model = buildInteractionModel(manifest, utterances, types, 'bridge demo', {
+      fallbackSensitivity: 'LOW',
+    }).interactionModel.languageModel;
+    expect(model.modelConfiguration).toEqual({ fallbackIntentSensitivity: { level: 'LOW' } });
+  });
 });

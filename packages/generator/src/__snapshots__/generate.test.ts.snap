@@ -292,6 +292,12 @@ exports[`generate (template utterances) > matches the snapshot for the hotels an
         {
           "name": "AMAZON.NavigateHomeIntent",
         },
+        {
+          "name": "AMAZON.RepeatIntent",
+        },
+        {
+          "name": "AMAZON.NextIntent",
+        },
       ],
       "invocationName": "bridge demo",
       "types": [

@@ -10,6 +10,8 @@ export const SPOKEN = {
   urlElicitationDeclined:
     "That step needs a link to be opened, which I can't do by voice. Let's try something else.",
   questionRepeat: 'Sorry, I still need an answer.',
+  /** A mapped built-in intent's tool gave nothing to say (D59); the last question follows. */
+  notDone: "Sorry, that didn't work.",
   oneMoment: 'One moment.',
   linkAccount: 'Please link your account in the Alexa app, then ask me again.',
 } as const;

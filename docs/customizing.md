@@ -95,6 +95,40 @@ come first, and an alias intent with the same name replaces the one here. The sa
 `.env` and `prompt-addendum.md`, a short note for the agent's system prompt (for example "ask one
 quiz question at a time"), up to 2000 UTF-8 bytes, and `bridge.config.json` for any other setting (invocation name, memory, `visual.enabled`, and so on). Nothing in the folder is tracked by this repo.
 
+### Answers while a question is open
+
+A server that asks its own questions in its spoken line (a quiz, a guided form) gets answers the
+tool intents cannot know: "I don't know", "about twenty miles", "the second one". Short ones often
+land in `AMAZON.FallbackIntent`, which carries no text. Two levers:
+
+- Put answer-shaped phrases into `catchAll` (`"i don't know"`, `"no idea"`, `"about twenty
+miles"`, `"the second one"`): they teach the catch-all what answers sound like, and the whole
+  phrase reaches the agent as text.
+- `skill.fallbackSensitivity` sets how readily Alexa gives up on the nearest intent. Whatever still
+  lands in Fallback while the session is open is asked again: `skill.fallbackWhileOpen` ("Sorry, I
+  didn't catch that.") and the last question, never a generic "What would you like to do?" (D60).
+
+## Built-in intents: repeat, next, stop
+
+The generated model always has `AMAZON.RepeatIntent` and `AMAZON.NextIntent` beside help, stop,
+cancel and fallback. "Repeat" replays the last thing the user heard, from the session, with no
+agent call. The others go to the agent as the word itself unless you map them in
+`intents.builtIns` ([config](config.md#intents)):
+
+```json
+"intents": {
+  "builtIns": {
+    "AMAZON.NextIntent": { "tool": "skip_park" },
+    "AMAZON.StartOverIntent": { "text": "start a new trip" },
+    "AMAZON.StopIntent": { "tool": "save_trip" }
+  }
+}
+```
+
+A `tool` mapping is called directly, without the model, and spoken like the launch tool below; a
+`text` mapping is a turn the agent hears. Stop, Cancel and NavigateHome take a tool only: it runs,
+errors are ignored, and the session ends with "Goodbye."
+
 ## The launch and help
 
 `skill.launch` names a tool the agent calls on "Alexa, open …" without the model (D57): a server

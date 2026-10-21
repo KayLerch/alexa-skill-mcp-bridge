@@ -50,6 +50,11 @@ export default defineConfig({
     // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
     // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.
     // launch: { tool: 'suggest_visit', arguments: { season: 'spring' } },
+    // Said before the last question again when Alexa misses an answer while the session is open (D60).
+    fallbackWhileOpen: "Sorry, I didn't catch that.",
+    // The interaction model's fallbackIntentSensitivity: 'LOW' | 'MEDIUM' | 'HIGH'. Unset: Alexa's
+    // default. Higher sends more unclear speech to "didn't catch that" instead of the nearest intent.
+    // fallbackSensitivity: 'LOW',
   },
 
   agent: {
@@ -105,6 +110,18 @@ export default defineConfig({
     // Set: the session stays open after every turn unless the last result says so. Unset: it ends
     // when the spoken answer does not end with a question.
     // endSessionField: 'end_session',
+  },
+
+  intents: {
+    // Alexa's built-in intents mapped to a tool the bridge calls without the model, or to a
+    // text the agent hears (D59). "Repeat" always replays the last answer and needs no mapping.
+    // Stop, Cancel and NavigateHome take a tool only; it runs, and the goodbye follows.
+    // builtIns: {
+    //   'AMAZON.NextIntent': { tool: 'skip_park' },
+    //   'AMAZON.StartOverIntent': { text: 'start over' },
+    //   'AMAZON.StopIntent': { tool: 'save_trip' },
+    // },
+    builtIns: {},
   },
 
   elicitation: {
