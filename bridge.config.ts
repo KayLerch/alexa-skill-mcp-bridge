@@ -119,7 +119,7 @@ export default defineConfig({
   intents: {
     // Alexa's built-in intents mapped to a tool the bridge calls without the model, or to a
     // text the agent hears (D59). "Repeat" always replays the last answer and needs no mapping.
-    // Stop, Cancel and NavigateHome take a tool only; it runs, and the goodbye follows.
+    // Stop, Cancel and NavigateHome take a tool only; its line is spoken, then the goodbye.
     // builtIns: {
     //   'AMAZON.NextIntent': { tool: 'skip_park' },
     //   'AMAZON.StartOverIntent': { text: 'start over' },

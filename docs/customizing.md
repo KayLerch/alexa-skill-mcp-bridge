@@ -126,8 +126,9 @@ agent call. The others go to the agent as the word itself unless you map them in
 ```
 
 A `tool` mapping is called directly, without the model, and spoken like the launch tool below; a
-`text` mapping is a turn the agent hears. Stop, Cancel and NavigateHome take a tool only: it runs,
-errors are ignored, and the session ends with "Goodbye."
+`text` mapping is a turn the agent hears. Stop, Cancel and NavigateHome take a tool only: its result
+field is spoken before "Goodbye." when it answers in time; an error, an empty field or a timeout
+leaves the plain goodbye, and the session ends either way.
 
 ## The launch and help
 

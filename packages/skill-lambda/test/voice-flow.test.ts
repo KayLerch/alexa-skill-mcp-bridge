@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { SPOKEN } from '@alexa-mcp-bridge/core';
+import { SPOKEN, createLogger } from '@alexa-mcp-bridge/core';
+import { BridgeClient } from '../src/bridge.js';
 import { launchHandler } from '../src/handlers/launch.js';
 import {
   builtInHandler,
@@ -121,9 +122,23 @@ describe('mapped built-in intents (D59)', () => {
     ]);
   });
 
-  it('stop calls its tool, then says goodbye whatever the tool answered', async () => {
+  it('stop calls its tool and speaks its line before the goodbye', async () => {
+    const { bridge, turns } = fakeBridge(mapped, () =>
+      done('Trip saved. You planned three parks.'),
+    );
+    const response = await stopHandler(bridge, mapped).handle(
+      handlerInput({ intent: 'AMAZON.StopIntent' }),
+    );
+    expect(turns.map((t) => t.type)).toEqual(['tool']);
+    expect(ssmlOf(response)).toBe(
+      `<speak>Trip saved. You planned three parks. ${SPOKEN.goodbye}</speak>`,
+    );
+    expect(response.shouldEndSession).toBe(true);
+  });
+
+  it('stop says only goodbye when its tool fails, has nothing to say, or throws', async () => {
     for (const reply of [
-      () => done('Trip saved. Want another?'),
+      () => done(''),
       () => ({ status: 'error', speech: SPOKEN.error, endSession: true, visual: null }) as const,
       () => {
         throw new Error('boom');
@@ -137,6 +152,29 @@ describe('mapped built-in intents (D59)', () => {
       expect(ssmlOf(response)).toBe(`<speak>${SPOKEN.goodbye}</speak>`);
       expect(response.shouldEndSession).toBe(true);
     }
+  });
+
+  it('stop says only goodbye when its tool runs past the turn budget', async () => {
+    const tight = withConfig({
+      turn: { budgetMs: 1000, progressiveAfterMs: 0 },
+      intents: { builtIns: { 'AMAZON.StopIntent': { tool: 'end_trip' } } },
+    });
+    const bridge = new BridgeClient({
+      config: tight,
+      runtimeArn: 'arn:test',
+      logger: createLogger({}, { write: () => undefined }),
+      invoke: (_envelope, _session, signal) =>
+        new Promise((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('aborted'))),
+        ),
+    });
+    const started = Date.now();
+    const response = await stopHandler(bridge, tight).handle(
+      handlerInput({ intent: 'AMAZON.StopIntent' }),
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+    expect(ssmlOf(response)).toBe(`<speak>${SPOKEN.goodbye}</speak>`);
+    expect(response.shouldEndSession).toBe(true);
   });
 
   it('cancel without a mapping still sends a cancel', async () => {
