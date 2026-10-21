@@ -101,7 +101,10 @@ const SPOKEN_SLOT: Record<string, { name: string; type: string }> = {
 /**
  * A quiz's question is the agent's own speech, not a parked elicitation (D49). An answer intent
  * with no pending question while the session is open is an ordinary turn carrying what the user
- * said, verbatim ("the fourteenth", not the resolved date).
+ * said. Alexa gives the words for a free-text or custom slot ("the blue one", "stargazing"), and
+ * those go on as heard, never the resolved value. For AMAZON.DATE and AMAZON.NUMBER it gives only
+ * its resolved value ("2026-10-14" for "the fourteenth", "14"), so that is what the agent hears
+ * (D64); a server that grades spoken answers should accept ISO dates and digits.
  */
 export function openAnswerHandler(bridge: BridgeClient): RequestHandler {
   return {

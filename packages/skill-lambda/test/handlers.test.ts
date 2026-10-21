@@ -137,17 +137,25 @@ describe('answer intents', () => {
 describe('answers without a pending question', () => {
   const open = { openTurn: true };
 
+  // Alexa sends the words for custom and free-text slots, only its resolved value for DATE and
+  // NUMBER ("the fourteenth" arrives as 2026-10-14): what it sends is what goes on (D64).
   it.each([
-    ['NumberAnswerIntent', 'number', 'four', 'four'],
-    ['DateAnswerIntent', 'date', 'the fourteenth', 'the fourteenth'],
-    ['ChoiceAnswerIntent', 'choice', 'b', 'b'],
+    ['NumberAnswerIntent', 'number', '4', '4'],
+    ['DateAnswerIntent', 'date', '2026-10-14', '2026-10-14'],
+    ['ChoiceAnswerIntent', 'choice', 'the blue one', 'the blue one'],
     ['FreeTextAnswerIntent', 'answer', 'the suite', 'the suite'],
-  ])('%s becomes a turn with the spoken words', async (intent, slotName, spoken, text) => {
+  ])('%s becomes a turn with what Alexa gives', async (intent, slotName, spoken, text) => {
     const { bridge, turns } = fakeBridge(() => done('Next.'));
     const handler = openAnswerHandler(bridge);
     const input = handlerInput({
       intent,
-      slots: { [slotName]: slot(slotName, spoken) },
+      slots: {
+        [slotName]: slot(
+          slotName,
+          spoken,
+          intent === 'ChoiceAnswerIntent' ? { name: 'blue', id: 'BLUE' } : undefined,
+        ),
+      },
       sessionAttributes: open,
     });
     expect(handler.canHandle(input)).toBe(true);
