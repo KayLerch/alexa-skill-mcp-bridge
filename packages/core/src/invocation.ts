@@ -38,7 +38,8 @@ export const agentInvocationSchema = z.object({
   debug: z.boolean().default(false),
   /**
    * The user's account-linked token, when mcp.auth.type is 'alexaAccountLinking' (D48).
-   * Sent on to the MCP server as a bearer token; never logged.
+   * Sent on to the MCP server as a bearer token; never logged. Over HTTP it travels in
+   * USER_TOKEN_HEADER, never in the payload (D63); the agent server fills it in from there.
    */
   userToken: z.string().min(1).optional(),
   /**
@@ -51,3 +52,24 @@ export const agentInvocationSchema = z.object({
 });
 export type AgentInvocation = z.infer<typeof agentInvocationSchema>;
 export type AgentInvocationInput = z.input<typeof agentInvocationSchema>;
+
+/**
+ * The HTTP header that carries the account-linked token to the agent runtime (D63): a custom
+ * header AgentCore Runtime passes through once the runtime allow-lists it. The payload, which
+ * the runtime's request logs record, never holds the token.
+ */
+export const USER_TOKEN_HEADER = 'X-Amzn-Bedrock-AgentCore-Runtime-Custom-User-Token';
+
+/**
+ * An AWS SDK build-step middleware that sets USER_TOKEN_HEADER on the outgoing request.
+ * Structural, so core stays free of the SDK: `command.middlewareStack.add(userTokenMiddleware(t),
+ * { step: 'build', name: 'bridgeUserToken' })`.
+ */
+export function userTokenMiddleware(token: string) {
+  return <A extends { request: unknown }, R>(next: (args: A) => Promise<R>) =>
+    async (args: A): Promise<R> => {
+      const request = args.request as { headers?: Record<string, string> };
+      if (request.headers) request.headers[USER_TOKEN_HEADER] = token;
+      return next(args);
+    };
+}

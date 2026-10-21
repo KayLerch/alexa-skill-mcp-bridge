@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { parseConfig } from '@alexa-mcp-bridge/core';
+import { USER_TOKEN_HEADER, parseConfig } from '@alexa-mcp-bridge/core';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,19 @@ describe('AlexaMcpBridgeStack', () => {
     expect(configs[0] ?? configs[1]).not.toContain('promptAddendum');
     const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
     expect(JSON.stringify(runtimes)).toContain('Ask one question at a time.');
+  });
+
+  it('allow-lists the token header on the runtime only with account linking (D63)', () => {
+    const runtimeProps = (overrides: Record<string, unknown>) =>
+      Object.values(synth(overrides).template.findResources('AWS::BedrockAgentCore::Runtime'))[0]
+        ?.Properties as Record<string, unknown>;
+    expect(runtimeProps({}).RequestHeaderConfiguration).toBeUndefined();
+    const linked = runtimeProps({
+      mcp: { url: 'https://example.com/mcp', auth: { type: 'alexaAccountLinking' } },
+    });
+    expect(linked.RequestHeaderConfiguration).toEqual({
+      RequestHeaderAllowlist: [USER_TOKEN_HEADER],
+    });
   });
 
   it('builds the agent image without a browser unless visual.enabled is on (D54)', () => {

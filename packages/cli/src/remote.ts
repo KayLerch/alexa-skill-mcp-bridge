@@ -10,6 +10,7 @@ import {
   type Display,
   type TurnInput,
   type TurnOutput,
+  userTokenMiddleware,
 } from '@alexa-mcp-bridge/core';
 import type { Bridge, BridgeIdentity } from './bridge.js';
 
@@ -46,27 +47,31 @@ export function createRemoteBridge(options: RemoteBridgeOptions): Bridge {
       const aborter = new AbortController();
       const timer = setTimeout(() => aborter.abort(), options.budgetMs);
       try {
-        const response = await client.send(
-          new InvokeAgentRuntimeCommand({
-            agentRuntimeArn: runtimeArn,
-            runtimeSessionId: options.identity.actorId,
-            contentType: 'application/json',
-            accept: 'application/json',
-            payload: Buffer.from(
-              JSON.stringify({
-                turn,
-                actorId: options.identity.actorId,
-                sessionId: options.identity.sessionId,
-                locale: options.identity.locale,
-                budgetMs: options.budgetMs,
-                debug: options.debug,
-                ...(options.userToken ? { userToken: options.userToken } : {}),
-                ...(options.display ? { display: options.display } : {}),
-              }),
-            ),
-          }),
-          { abortSignal: aborter.signal },
-        );
+        const command = new InvokeAgentRuntimeCommand({
+          agentRuntimeArn: runtimeArn,
+          runtimeSessionId: options.identity.actorId,
+          contentType: 'application/json',
+          accept: 'application/json',
+          payload: Buffer.from(
+            JSON.stringify({
+              turn,
+              actorId: options.identity.actorId,
+              sessionId: options.identity.sessionId,
+              locale: options.identity.locale,
+              budgetMs: options.budgetMs,
+              debug: options.debug,
+              ...(options.display ? { display: options.display } : {}),
+            }),
+          ),
+        });
+        // As the Alexa Skill Lambda does: the token in a header, never in the logged payload (D63).
+        if (options.userToken) {
+          command.middlewareStack.add(userTokenMiddleware(options.userToken), {
+            step: 'build',
+            name: 'bridgeUserToken',
+          });
+        }
+        const response = await client.send(command, { abortSignal: aborter.signal });
         const body = await response.response?.transformToString();
         return turnOutputSchema.parse(JSON.parse(body ?? '{}'));
       } catch (err) {

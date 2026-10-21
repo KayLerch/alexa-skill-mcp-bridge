@@ -8,6 +8,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import {
   ALEXA_PLUS_PROTOCOL_VERSION,
+  USER_TOKEN_HEADER,
   serializeConfig,
   type BridgeConfig,
 } from '@alexa-mcp-bridge/core';
@@ -79,6 +80,10 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
         maxLifetime: cdk.Duration.hours(config.runtime.maxLifetimeHours),
       },
       environmentVariables: runtimeEnv,
+      // With account linking the user's token arrives in this header, not the logged payload (D63).
+      ...(config.mcp.auth.type === 'alexaAccountLinking'
+        ? { requestHeaderConfiguration: { allowlistedHeaders: [USER_TOKEN_HEADER] } }
+        : {}),
       loggingConfigs: [
         {
           logType: agentcore.LogType.APPLICATION_LOGS,

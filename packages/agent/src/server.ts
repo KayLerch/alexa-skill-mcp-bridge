@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Model } from '@strands-agents/sdk';
 import {
   SPOKEN,
+  USER_TOKEN_HEADER,
   agentInvocationSchema,
   errorFields,
   type BridgeConfig,
@@ -62,10 +63,14 @@ export function createAgentServer(options: AgentServerOptions): AgentServer {
         json(res, 400, { error: 'invalid invocation', issues: parsed.error.issues });
         return;
       }
+      // The token comes in its header only (D63); one in the payload is ignored.
+      const { userToken: _ignored, ...envelope } = parsed.data;
+      const userToken = headerValue(req, USER_TOKEN_HEADER);
+      const invocation = { ...envelope, ...(userToken ? { userToken } : {}) };
       const startedAt = Date.now();
       let output: TurnOutput;
       try {
-        output = await runTurn(session, parsed.data);
+        output = await runTurn(session, invocation);
       } catch (err) {
         logger.error('turn failed', errorFields(err));
         output = { status: 'error', speech: SPOKEN.error, endSession: false, visual: null };
@@ -100,6 +105,12 @@ export function createAgentServer(options: AgentServerOptions): AgentServer {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
+}
+
+function headerValue(req: IncomingMessage, name: string): string | undefined {
+  const value = req.headers[name.toLowerCase()];
+  const first = Array.isArray(value) ? value[0] : value;
+  return first?.trim() || undefined;
 }
 
 async function readJson(req: IncomingMessage): Promise<unknown> {

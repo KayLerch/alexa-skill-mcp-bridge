@@ -1,3 +1,5 @@
+import { USER_TOKEN_HEADER } from './invocation.js';
+
 /** JSON-lines logger. One line per event, safe for CloudWatch, no dependencies. */
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -26,7 +28,10 @@ export function createLogger(bindings: LogFields = {}, options: LoggerOptions = 
   const emit = (lvl: LogLevel, msg: string, fields?: LogFields) => {
     if (LEVELS[lvl] < threshold) return;
     write(
-      JSON.stringify({ level: lvl, time: new Date().toISOString(), msg, ...bindings, ...fields }),
+      JSON.stringify(
+        { level: lvl, time: new Date().toISOString(), msg, ...bindings, ...fields },
+        redact,
+      ),
     );
   };
 
@@ -37,6 +42,22 @@ export function createLogger(bindings: LogFields = {}, options: LoggerOptions = 
     error: (msg, fields) => emit('error', msg, fields),
     child: (more) => createLogger({ ...bindings, ...more }, { level, write }),
   };
+}
+
+/**
+ * Field names whose value never reaches a log line, at any depth (D63): a token passed into a
+ * log call by mistake is written as "[redacted]".
+ */
+const SECRET_KEYS = new Set([
+  'usertoken',
+  'accesstoken',
+  'authorization',
+  'token',
+  USER_TOKEN_HEADER.toLowerCase(),
+]);
+
+function redact(key: string, value: unknown): unknown {
+  return key && SECRET_KEYS.has(key.toLowerCase()) && value !== undefined ? '[redacted]' : value;
 }
 
 function levelFromEnv(): LogLevel {

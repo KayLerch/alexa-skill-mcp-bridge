@@ -221,7 +221,7 @@ The agent renders the widget to a JPEG, and the Alexa Skill shows it full screen
 
 ## Per-user sign-in
 
-When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged.
+When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged: the Alexa Skill Lambda hands it to the agent runtime in an allow-listed request header, not in the payload the runtime's request logs record (D63).
 
 A user who has not linked yet, or whose token your server refuses with HTTP 401, hears "Please link your account in the Alexa app, then ask me again." and gets the link card in the Alexa app. Either way the agent drops the conversation it holds for that Alexa user, so whoever links next starts clean.
 
