@@ -110,6 +110,10 @@ const bridgeConfigShape = z.object({
        * speech.endSessionField says so. Unset, or when the call gives nothing to say: the greeting.
        */
       launch: directToolCallSchema.optional(),
+      /** Spoken for "help". Unset: the server's tools and example phrases, generated. */
+      help: z.string().trim().min(1).optional(),
+      /** Example phrases for the greeting and help. Unset: two generated from the tool manifest. */
+      examplePhrases: z.array(z.string().trim().min(1)).min(1).optional(),
       /**
        * Said, followed by the last question again, when Alexa did not catch an answer while the
        * session is open for one (D60). Never the generic "What would you like to do?".

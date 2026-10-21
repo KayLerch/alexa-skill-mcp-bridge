@@ -50,6 +50,10 @@ export default defineConfig({
     // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
     // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.
     // launch: { tool: 'suggest_visit', arguments: { season: 'spring' } },
+    // Spoken for "help". Unset: the server's tools and the example phrases, generated.
+    // help: 'Say "find a park for hiking", or name a park. What would you like?',
+    // Example phrases for the greeting and the generated help. Unset: two from the tool manifest.
+    // examplePhrases: ['find a park for hiking', 'is yosemite open in january'],
     // Said before the last question again when Alexa misses an answer while the session is open (D60).
     fallbackWhileOpen: "Sorry, I didn't catch that.",
     // The interaction model's fallbackIntentSensitivity: 'LOW' | 'MEDIUM' | 'HIGH'. Unset: Alexa's

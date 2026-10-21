@@ -168,23 +168,53 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   return { manifest, models, files, notes };
 }
 
-/** The first utterance with its slots filled with spoken placeholders, for the greeting (plan D3). */
+/**
+ * A phrase for the greeting and help (plan D3): the first utterance whose slots all have a
+ * value a listener would say, else the first one without slots, else the tool's name. A free-text
+ * slot is filled only from the argument's JSON Schema `examples` or `default`, never with a
+ * placeholder such as "some destination" (D61).
+ */
 export function examplePhrase(tool: ManifestTool, utterances: string[]): string {
-  const withSlots =
-    utterances.find((u) => u.includes('{')) ?? utterances[0] ?? spokenWords(tool.name);
-  return withSlots.replace(/\{([^{}]*)\}/g, (_m, slotName: string) => {
-    const slot = tool.slots.find((s) => s.slot === slotName);
-    switch (slot?.slotType) {
-      case 'AMAZON.DATE':
-        return 'tomorrow';
-      case 'AMAZON.NUMBER':
-        return 'two';
-      case 'YesNoType':
-        return 'yes';
-      case 'AMAZON.SearchQuery':
-        return `some ${spokenWords(slot.argument)}`;
-      default:
-        return slot?.customType?.values[0]?.value ?? spokenWords(slot?.argument ?? slotName);
-    }
-  });
+  const fill = (utterance: string): string | undefined => {
+    let complete = true;
+    const phrase = utterance.replace(/\{([^{}]*)\}/g, (_m, slotName: string) => {
+      const value = exampleValue(tool, slotName);
+      if (value === undefined) complete = false;
+      return value ?? '';
+    });
+    return complete ? phrase : undefined;
+  };
+  for (const utterance of utterances.filter((u) => u.includes('{'))) {
+    const phrase = fill(utterance);
+    if (phrase) return phrase;
+  }
+  return utterances.find((u) => !u.includes('{')) ?? spokenWords(tool.name);
+}
+
+function exampleValue(tool: ManifestTool, slotName: string): string | undefined {
+  const slot = tool.slots.find((s) => s.slot === slotName);
+  if (!slot) return undefined;
+  switch (slot.slotType) {
+    case 'AMAZON.DATE':
+      return 'tomorrow';
+    case 'AMAZON.NUMBER':
+      return 'two';
+    case 'YesNoType':
+      return 'yes';
+    case 'AMAZON.SearchQuery':
+      return schemaExample(tool.inputSchema, slot.argument);
+    default:
+      return slot.customType?.values[0]?.value;
+  }
+}
+
+/** The argument's own example, as the server's schema states it: `examples[0]`, else `default`. */
+function schemaExample(inputSchema: Record<string, unknown>, argument: string): string | undefined {
+  const properties = inputSchema.properties as Record<string, Record<string, unknown>> | undefined;
+  const property = properties?.[argument];
+  const examples = property?.examples;
+  const candidate = Array.isArray(examples) ? examples[0] : property?.default;
+  return typeof candidate === 'string' && candidate.trim()
+    ? candidate.trim().toLowerCase()
+    : undefined;
 }

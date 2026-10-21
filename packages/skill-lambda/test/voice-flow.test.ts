@@ -4,15 +4,17 @@ import { launchHandler } from '../src/handlers/launch.js';
 import {
   builtInHandler,
   fallbackHandler,
+  helpHandler,
   repeatHandler,
   stopHandler,
 } from '../src/handlers/standard.js';
+import { greeting, helpText } from '../src/greeting.js';
 import { config as baseConfig, handlerInput, manifest } from './helpers.js';
 import { LINE, done, fakeBridge, launchConfig, repromptOf, ssmlOf, withConfig } from './voice.js';
 
 /**
  * The voice flow around the agent's turns: repeat and mapped built-in intents (D59), a missed
- * answer while the session is open (D60).
+ * answer while the session is open (D60), help and examples from config (D61).
  */
 describe('repeat (D59)', () => {
   it('replays what the user heard last without calling the agent', async () => {
@@ -162,5 +164,24 @@ describe('a missed answer while the session is open (D60)', () => {
     const { bridge, turns } = fakeBridge(config, () => done('What would you like to do?'));
     await fallbackHandler(bridge, config).handle(handlerInput({ intent: 'AMAZON.FallbackIntent' }));
     expect(turns).toEqual([{ type: 'turn', utterance: { intent: 'AMAZON.FallbackIntent' } }]);
+  });
+});
+
+describe('help and examples from config (D61)', () => {
+  it('speaks skill.help', async () => {
+    const config = withConfig({ skill: { help: 'Say "plan Zion". What would you like?' } });
+    expect(helpText(config, manifest)).toBe('Say "plan Zion". What would you like?');
+    const response = await helpHandler(config, manifest).handle(
+      handlerInput({ intent: 'AMAZON.HelpIntent' }),
+    );
+    expect(ssmlOf(response)).toContain('Say &quot;plan Zion&quot;.');
+  });
+
+  it('greets with skill.examplePhrases instead of the generated ones', () => {
+    const config = withConfig({ skill: { examplePhrases: ['plan zion', 'find a quiet park'] } });
+    expect(greeting(config, manifest)).toBe(
+      'Welcome to hotels and weather. For example, say "plan zion" or "find a quiet park". What would you like to do?',
+    );
+    expect(helpText(config, manifest)).toContain('"plan zion" or "find a quiet park"');
   });
 });

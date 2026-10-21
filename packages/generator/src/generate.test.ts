@@ -188,6 +188,27 @@ describe('examplePhrase', () => {
     );
     expect(phrase).toBe('search hotels guests two');
   });
+
+  const findPark = (inputSchema: Record<string, unknown>) => ({
+    name: 'find_park',
+    intent: 'FindParkIntent',
+    slots: [{ argument: 'query', slot: 'query', slotType: 'AMAZON.SearchQuery', required: true }],
+    elicitedArguments: [],
+    inputSchema,
+  });
+
+  it('never fills a free-text slot with a placeholder (D61)', () => {
+    const phrase = examplePhrase(findPark({}), ['find a park for {query}', 'find me a park']);
+    expect(phrase).toBe('find me a park');
+    expect(examplePhrase(findPark({}), ['find a park for {query}'])).toBe('find park');
+  });
+
+  it("fills a free-text slot from the schema's own example", () => {
+    const schema = { properties: { query: { type: 'string', examples: ['Quiet Lakes'] } } };
+    expect(examplePhrase(findPark(schema), ['find a park for {query}'])).toBe(
+      'find a park for quiet lakes',
+    );
+  });
 });
 
 describe('combineOverrides', () => {

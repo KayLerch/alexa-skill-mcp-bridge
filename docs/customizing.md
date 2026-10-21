@@ -135,6 +135,7 @@ errors are ignored, and the session ends with "Goodbye."
 that writes its own welcome ("Welcome back. Say …") speaks it through `speech.resultField` and draws
 its start screen, and with `speech.endSessionField` it can end the session ("nothing here yet,
 goodbye for now"). When the call fails or has nothing to say, the generated greeting is spoken.
+`skill.help` and `skill.examplePhrases` replace the generated help and the greeting's examples.
 
 ## Let chat write your utterances
 
