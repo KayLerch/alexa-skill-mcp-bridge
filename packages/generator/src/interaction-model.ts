@@ -359,7 +359,13 @@ export function buildInteractionModel(
     ? new Set<string>(options.answerIntents.map((k) => ANSWER_INTENT_NAMES[k]))
     : undefined;
   const answerIntents = (choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS)
-    .filter((intent) => !keep || keep.has(intent.name))
+    // Only the four named intents are optional; AMAZON.YesIntent and NoIntent always ship.
+    .filter(
+      (intent) =>
+        !keep ||
+        keep.has(intent.name) ||
+        !(Object.values(ANSWER_INTENT_NAMES) as string[]).includes(intent.name),
+    )
     .map((intent) => {
       const extra = options.answerSamples?.[intent.name];
       return extra?.length && intent.samples

@@ -86,6 +86,8 @@ describe('buildInteractionModel', () => {
       answerIntents: ['choice'],
     }).interactionModel.languageModel.intents.map((i) => i.name);
     expect(names).toContain('ChoiceAnswerIntent');
+    // "yes" and "no" are not answer intents to drop: without them they fall to Fallback.
+    expect(names).toEqual(expect.arrayContaining(['AMAZON.YesIntent', 'AMAZON.NoIntent']));
     expect(names).not.toContain('DateAnswerIntent');
     expect(names).not.toContain('NumberAnswerIntent');
     expect(names).not.toContain('FreeTextAnswerIntent');
