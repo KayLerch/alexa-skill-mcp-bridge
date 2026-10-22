@@ -87,6 +87,10 @@ export default defineConfig({
     // How many options a question reads aloud. Past this it names a few as examples instead;
     // the answer still accepts anything the tool's schema allows. Nobody wants twelve months read out.
     maxChoicesSpoken: 3,
+    // A string field of a tool result's structuredContent to speak word for word instead of the
+    // model's rephrasing, for servers that write their own spoken line (for example 'say'). The
+    // reprompt is the last question in it. Unset: the model's text is spoken.
+    // resultField: 'say',
   },
 
   elicitation: {

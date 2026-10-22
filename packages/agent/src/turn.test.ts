@@ -241,3 +241,81 @@ describe('overrun and poll', () => {
     }
   }, 30_000);
 });
+
+describe('speech.resultField (D51)', () => {
+  const weather: ScriptStep = { toolUse: { name: 'get_weather', input: { city: 'Berlin' } } };
+
+  it('speaks the last result field verbatim and ignores the model text', async () => {
+    const { session, send } = harness([weather, { text: 'The model rephrased it.' }], {
+      speech: { resultField: 'city' },
+    });
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    const out = await send({ type: 'turn', utterance: { text: 'weather in Berlin' } });
+    expect(out).toMatchObject({ status: 'done', speech: 'Berlin', endSession: true });
+    await session.close();
+  });
+
+  it('speaks a server line verbatim and reprompts with the question alone', async () => {
+    const say = 'Correct! Next, from the standup: who chose Adyen?';
+    const { session, send } = harness(
+      [
+        {
+          toolUse: {
+            name: 'search_hotels',
+            input: { destination: say, checkIn: '2026-10-05', checkOut: '2026-10-07', guests: 2 },
+          },
+        },
+        { text: 'The model rephrased it.' },
+      ],
+      { speech: { resultField: 'destination' } },
+    );
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    const out = await send({ type: 'turn', utterance: { text: 'quiz me' } });
+    expect(out).toMatchObject({
+      status: 'done',
+      speech: say,
+      reprompt: 'Next, from the standup: who chose Adyen?',
+      endSession: false,
+    });
+    await session.close();
+  });
+
+  it('keeps the model text when the run called no tool', async () => {
+    const { session, send } = harness([{ text: 'Hello there.' }], {
+      speech: { resultField: 'city' },
+    });
+    const out = await send({ type: 'turn', utterance: { text: 'hi' } });
+    expect(out.speech).toBe('Hello there.');
+    await session.close();
+  });
+
+  it('keeps the model text when the field is not a string', async () => {
+    const { session, send } = harness([weather, { text: 'Model words.' }], {
+      speech: { resultField: 'highC' },
+    });
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    const out = await send({ type: 'turn', utterance: { text: 'weather' } });
+    expect(out.speech).toBe('Model words.');
+    await session.close();
+  });
+
+  it("does not carry an earlier run's field into a later turn", async () => {
+    const { session, send } = harness([weather, { text: 'one' }, { text: 'Second turn text.' }], {
+      speech: { resultField: 'city' },
+    });
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    expect((await send({ type: 'turn', utterance: { text: 'weather' } })).speech).toBe('Berlin');
+    expect((await send({ type: 'turn', utterance: { text: 'thanks' } })).speech).toBe(
+      'Second turn text.',
+    );
+    await session.close();
+  });
+
+  it('without the setting the model text is spoken', async () => {
+    const { session, send } = harness([weather, { text: 'Berlin is partly cloudy.' }]);
+    await session.ready({ actorId: 'a', locale: 'en-US' }, 5000);
+    const out = await send({ type: 'turn', utterance: { text: 'weather' } });
+    expect(out.speech).toBe('Berlin is partly cloudy.');
+    await session.close();
+  });
+});

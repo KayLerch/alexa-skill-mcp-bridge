@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ToolContext } from '@strands-agents/sdk';
 import { createLogger } from '@alexa-mcp-bridge/core';
 import type { BridgeMcpClient } from '../mcp/client.js';
-import { BridgeMcpTool, HiddenArguments } from './tools.js';
+import { BridgeMcpTool, HiddenArguments, ResultField } from './tools.js';
 
 /** Hidden arguments (D50): a quiz server's session id is refilled from the last result. */
 
@@ -56,5 +56,48 @@ describe('BridgeMcpTool hidden arguments', () => {
     const { calls, run } = setup();
     await run('submit_answer', { answer: 'B' });
     expect(calls[0]?.args).toEqual({ answer: 'B' });
+  });
+});
+
+describe('ResultField (D51)', () => {
+  const result = (structuredContent: unknown, isError = false) =>
+    Promise.resolve({ content: [], structuredContent, isError });
+  const call = async (field: ResultField, reply: Promise<unknown>) => {
+    const client = { callTool: () => reply } as unknown as BridgeMcpClient;
+    const logger = createLogger({ service: 'test' }, { write: () => undefined });
+    const tool = new BridgeMcpTool(definition('t'), client, logger, undefined, undefined, field);
+    const context = {
+      toolUse: { toolUseId: 't', name: 't', input: {} },
+      cancelSignal: new AbortController().signal,
+    } as unknown as ToolContext;
+    const gen = tool.stream(context);
+    let next = await gen.next();
+    while (!next.done) next = await gen.next();
+  };
+
+  it('keeps the string of the last successful result', async () => {
+    const field = new ResultField('say');
+    await call(field, result({ say: 'first' }));
+    await call(field, result({ say: 'second' }));
+    expect(field.value).toBe('second');
+  });
+
+  it('ignores error results, non-strings and empty strings', async () => {
+    const field = new ResultField('say');
+    await call(field, result({ say: 'kept' }));
+    await call(field, result({ say: 'from an error' }, true));
+    expect(field.value).toBe('kept');
+    await call(field, result({ say: 42 }));
+    expect(field.value).toBeUndefined();
+    await call(field, result({ say: 'back' }));
+    await call(field, result({ say: '  ' }));
+    expect(field.value).toBeUndefined();
+  });
+
+  it('begin() forgets the earlier run', async () => {
+    const field = new ResultField('say');
+    await call(field, result({ say: 'old' }));
+    field.begin();
+    expect(field.value).toBeUndefined();
   });
 });

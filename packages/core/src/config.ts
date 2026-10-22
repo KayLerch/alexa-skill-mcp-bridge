@@ -118,6 +118,12 @@ const bridgeConfigShape = z.object({
        * examples; the answer mapper still accepts any value the schema allows.
        */
       maxChoicesSpoken: z.number().int().min(1).max(10).default(3),
+      /**
+       * A string field of a tool result's structuredContent to speak verbatim (D51), for servers
+       * that write their own spoken line. The model's rephrasing is ignored when the run's last
+       * successful result has it; otherwise the model's text is spoken as usual.
+       */
+      resultField: z.string().min(1).optional(),
     })
     .prefault({}),
   elicitation: z

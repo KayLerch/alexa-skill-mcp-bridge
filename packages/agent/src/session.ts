@@ -2,7 +2,7 @@ import type { Agent, Model } from '@strands-agents/sdk';
 import { errorFields, type BridgeConfig, type Logger } from '@alexa-mcp-bridge/core';
 import { buildAgent } from './agent/build-agent.js';
 import { buildSystemPrompt, formatToolList, type SystemPromptVars } from './agent/prompt.js';
-import { HiddenArguments, askUserTool, mcpTools } from './agent/tools.js';
+import { HiddenArguments, ResultField, askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
 import { BridgeMcpClient } from './mcp/client.js';
@@ -50,6 +50,7 @@ export class BridgeSession {
   currentRun?: TurnRun;
   private mcp?: BridgeMcpClient;
   private hiddenArguments?: HiddenArguments;
+  private resultField?: ResultField;
   private agent?: Agent;
   private warmup?: Promise<void>;
   private identity?: SessionIdentity;
@@ -119,10 +120,12 @@ export class BridgeSession {
   }
 
   startRun(input: string, debug: boolean): TurnRun {
+    this.resultField?.begin();
     const run = new TurnRun({
       agent: this.agent as Agent,
       queue: this.queue,
       input,
+      ...(this.resultField ? { resultField: this.resultField } : {}),
       logger: this.logger,
       ...(debug ? { debug: { toolCalls: [], modelCalls: 0 } } : {}),
     });
@@ -227,6 +230,9 @@ export class BridgeSession {
     const systemPrompt = buildSystemPrompt(this.promptInputs);
     this.mcp = mcp;
     this.hiddenArguments = new HiddenArguments(config.tools.hiddenArguments);
+    this.resultField = config.speech.resultField
+      ? new ResultField(config.speech.resultField)
+      : undefined;
     this.agent = buildAgent({
       model: this.model,
       tools: [
@@ -236,6 +242,7 @@ export class BridgeSession {
           logger,
           this.accountLinking ? () => this.onUnauthorized() : undefined,
           this.hiddenArguments,
+          this.resultField,
         ),
         askUserTool(this.queue),
       ],

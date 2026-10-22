@@ -48,6 +48,34 @@ export class HiddenArguments {
   }
 }
 
+/**
+ * The result field to speak verbatim (D51). Holds the string field of the run's latest
+ * successful tool result; `begin()` runs at the start of every run so nothing leaks across turns.
+ */
+export class ResultField {
+  private latest?: string;
+
+  constructor(private readonly name: string) {}
+
+  begin(): void {
+    this.latest = undefined;
+  }
+
+  /** Each successful result replaces the value; one without a usable string clears it. */
+  record(structured: unknown): void {
+    const record =
+      structured && typeof structured === 'object' && !Array.isArray(structured)
+        ? (structured as Record<string, unknown>)
+        : {};
+    const value = record[this.name];
+    this.latest = typeof value === 'string' && value.trim() ? value : undefined;
+  }
+
+  get value(): string | undefined {
+    return this.latest;
+  }
+}
+
 /** An MCP tool as a Strands tool. Prefers structuredContent, keeps text, never leaks raw errors. */
 export class BridgeMcpTool extends Tool {
   readonly name: string;
@@ -60,6 +88,7 @@ export class BridgeMcpTool extends Tool {
     private readonly logger: Logger,
     private readonly onUnauthorized?: () => void,
     private readonly hidden?: HiddenArguments,
+    private readonly resultField?: ResultField,
   ) {
     super();
     this.name = definition.name;
@@ -81,7 +110,10 @@ export class BridgeMcpTool extends Tool {
       const result = await this.client.callTool(this.name, this.hidden?.fill(args) ?? args, {
         signal: context.cancelSignal,
       });
-      if (!result.isError) this.hidden?.remember(result.structuredContent);
+      if (!result.isError) {
+        this.hidden?.remember(result.structuredContent);
+        this.resultField?.record(result.structuredContent);
+      }
       // One block only. Nova collapses its context on a result that mixes json and text
       // (measured: 545 input tokens instead of 1712, empty answer; see plan D28).
       const text = toolResultText(result);
@@ -129,8 +161,11 @@ export function mcpTools(
   logger: Logger,
   onUnauthorized?: () => void,
   hidden?: HiddenArguments,
+  resultField?: ResultField,
 ): Tool[] {
-  return definitions.map((d) => new BridgeMcpTool(d, client, logger, onUnauthorized, hidden));
+  return definitions.map(
+    (d) => new BridgeMcpTool(d, client, logger, onUnauthorized, hidden, resultField),
+  );
 }
 
 const askUserInput = z.object({

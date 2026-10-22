@@ -8,8 +8,9 @@ import {
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
 import type { DebugSink } from './agent/build-agent.js';
+import type { ResultField } from './agent/tools.js';
 import type { QuestionQueue } from './elicitation/queue.js';
-import { cleanSpeech, endsWithQuestion } from './speech.js';
+import { cleanSpeech, endsWithQuestion, lastQuestion } from './speech.js';
 
 /**
  * One execution of the agent loop. It keeps running across frontend turns: a question parks
@@ -29,6 +30,8 @@ export interface TurnRunOptions {
   input: string;
   logger: Logger;
   debug?: DebugSink;
+  /** speech.resultField (D51): when this run recorded a value, it is spoken instead of the model's text. */
+  resultField?: ResultField;
 }
 
 export class TurnRun {
@@ -100,12 +103,15 @@ export class TurnRun {
         .filter((block): block is TextBlock => block instanceof TextBlock)
         .map((block) => block.text)
         .join(' ');
-      const speech = cleanSpeech(text) || SPOKEN.notUnderstood;
+      const fromField = cleanSpeech(this.options.resultField?.value ?? '');
+      const speech = fromField || cleanSpeech(text) || SPOKEN.notUnderstood;
       const open = endsWithQuestion(speech);
+      // A server's own line carries feedback before its question; only the question is repeated.
+      const reprompt = fromField ? lastQuestion(speech) : speech;
       return this.finish({
         status: 'done',
         speech,
-        ...(open ? { reprompt: speech } : {}),
+        ...(open ? { reprompt } : {}),
         endSession: !open,
         visual: null,
       });
