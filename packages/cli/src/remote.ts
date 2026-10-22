@@ -28,7 +28,9 @@ export interface RemoteBridgeOptions {
 
 /**
  * `chat --remote`: the same REPL through InvokeAgentRuntime against the deployed runtime.
- * runtimeSessionId is the hashed user id, exactly what the Alexa Skill Lambda sends.
+ * runtimeSessionId is the hashed user id. The Alexa Skill Lambda also keys it on the runtime
+ * version (runtimeSessionFor), so its users reach new code at their next turn after a deploy;
+ * a `chat --remote` session keeps the old code until it idles out.
  */
 export function createRemoteBridge(options: RemoteBridgeOptions): Bridge {
   const runtimeArn = options.runtimeArn ?? process.env.AGENT_RUNTIME_ARN ?? runtimeArnFromOutputs();

@@ -46,6 +46,7 @@ export interface FakeRequest {
   intent?: string;
   slots?: Record<string, Slot>;
   sessionAttributes?: Record<string, unknown>;
+  sessionId?: string;
   /** The account-linked token Alexa puts on the request once the user has linked. */
   accessToken?: string;
   /** Test seam for ASK's directive service (Progressive Response). */
@@ -83,7 +84,7 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
     version: '1.0',
     session: {
       new: type === 'LaunchRequest',
-      sessionId: 'amzn1.echo-api.session.abc',
+      sessionId: fake.sessionId ?? 'amzn1.echo-api.session.abc',
       application: { applicationId: 'amzn1.ask.skill.x' },
       user: { userId: 'amzn1.ask.account.USER' },
       attributes: fake.sessionAttributes ?? {},

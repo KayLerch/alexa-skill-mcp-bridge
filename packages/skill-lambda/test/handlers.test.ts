@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger, type TurnInput, type TurnOutput } from '@alexa-mcp-bridge/core';
-import { BridgeClient } from '../src/bridge.js';
+import { BridgeClient, runtimeSessionFor } from '../src/bridge.js';
 import {
   answerHandler,
   answerHintFor,
@@ -312,6 +312,34 @@ describe('stop and fallback', () => {
       ssml: expect.stringContaining('How many guests?'),
     });
     expect(input.attributesManager.getSessionAttributes()).toMatchObject(pendingQuestion);
+  });
+});
+
+describe('runtime session', () => {
+  it('keeps a user on one session, and moves them to a new one when the runtime is redeployed', async () => {
+    const sessions: string[] = [];
+    const turnOn = (runtimeVersion: string | undefined, sessionId: string) =>
+      new BridgeClient({
+        config,
+        runtimeArn: 'arn',
+        runtimeVersion,
+        logger,
+        invoke: async (_envelope, runtimeSession) => {
+          sessions.push(runtimeSession);
+          return done('ok');
+        },
+      }).turn(handlerInput({ intent: 'GetWeatherIntent', sessionId }), {
+        type: 'turn',
+        utterance: { text: 'hi' },
+      });
+    await turnOn('5', 'alexa-session-1');
+    await turnOn('5', 'alexa-session-2');
+    await turnOn('6', 'alexa-session-2');
+    expect(sessions[0]).toBe(sessions[1]);
+    expect(sessions[2]).not.toBe(sessions[1]);
+    // AgentCore wants at least 33 characters.
+    expect((sessions[2] ?? '').length).toBeGreaterThanOrEqual(33);
+    expect(runtimeSessionFor('actor')).toBe('actor');
   });
 });
 

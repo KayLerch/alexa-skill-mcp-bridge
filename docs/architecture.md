@@ -13,7 +13,7 @@ The bridge lets a developer test an MCP server on a physical Alexa+ device as if
 Where each part of that lives, and what it is called in the code:
 
 - The Alexa Skill Lambda is `packages/skill-lambda`. It calls `InvokeAgentRuntime` with the runtime session id set to
-  `hash(userId)` and an `AgentInvocation` payload, and renders the returned `TurnOutput`
+  `hash(hash(userId):runtimeVersion)` and an `AgentInvocation` payload, and renders the returned `TurnOutput`
   (`status`, `speech`, `question?`, `endSession`, `visual`) as SSML. `visual` is the screen (D54) and is not shown yet.
 - The agent is `packages/agent`: `BridgeSession` holds the Strands Agent on Nova 2 Lite, `BridgeMcpClient` speaks
   Streamable HTTP to the MCP server, `QuestionQueue` holds parked elicitations and `ask_user` questions, and
@@ -23,7 +23,7 @@ Where each part of that lives, and what it is called in the code:
 
 `packages/core` owns every type that crosses a boundary. A frontend sends a `TurnInput` (`warmup`, `turn`, `answer`, `poll`, `cancel`) wrapped in an `AgentInvocation` (hashed actor and session ids, locale, budget) and gets a `TurnOutput` back. The Alexa Skill is one frontend; the CLI harness is another; a web frontend would be a third without touching the agent.
 
-Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user id is the AgentCore runtime session id (64 hex characters, no dots) and the Memory actor id; the hashed Alexa session id is the Memory session id. Logs everywhere carry hashed ids only.
+Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user id is the Memory actor id; the hashed Alexa session id is the Memory session id. The AgentCore runtime session id is the hash of the user id and the runtime version the stack deployed (`AGENT_RUNTIME_VERSION`; 64 hex characters, no dots): one session per user, so a parked question survives a new Alexa session, and a new one after each deploy, so a user who keeps talking reaches the new code at their next turn instead of keeping the old microVM for up to `runtime.maxLifetimeHours`. Memory carries over because it lives in AgentCore Memory, not the microVM. Logs everywhere carry hashed ids only.
 
 ## One turn, top to bottom
 

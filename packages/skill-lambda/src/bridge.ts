@@ -32,6 +32,8 @@ import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
 export interface BridgeClientOptions {
   config: BridgeConfig;
   runtimeArn: string;
+  /** The runtime version this deploy runs (AGENT_RUNTIME_VERSION); see runtimeSessionFor. */
+  runtimeVersion?: string;
   logger: Logger;
   client?: BedrockAgentCoreClient;
   /** Test seam: replaces the network call. */
@@ -226,7 +228,11 @@ export class BridgeClient {
     const timer = setTimeout(() => aborter.abort(), budgetMs);
     const started = Date.now();
     try {
-      const output = await this.invoke(envelope, call.actorId, aborter.signal);
+      const output = await this.invoke(
+        envelope,
+        runtimeSessionFor(call.actorId, this.options.runtimeVersion),
+        aborter.signal,
+      );
       log.info('agent answered', { status: output.status, elapsedMs: Date.now() - started });
       return output;
     } catch (err) {
@@ -240,6 +246,18 @@ export class BridgeClient {
       clearTimeout(timer);
     }
   }
+}
+
+/**
+ * The runtime session a user's turns go to: one per user, so a parked question or a long run
+ * survives a new Alexa session. AgentCore keeps a session's microVM, and the code it started
+ * with, until it idles out or reaches its max lifetime (8 hours), so a user who keeps talking
+ * would keep the code from before a deploy for that long. Keying on the runtime version too
+ * moves every user to the new code at the first turn after a deploy; memory is in AgentCore
+ * Memory, not the microVM, so it carries over. Only an in-flight question is left behind.
+ */
+export function runtimeSessionFor(actorId: string, runtimeVersion?: string): string {
+  return runtimeVersion ? hashId(`${actorId}:${runtimeVersion}`) : actorId;
 }
 
 interface Identity {

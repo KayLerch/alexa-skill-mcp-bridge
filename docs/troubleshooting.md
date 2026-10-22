@@ -40,7 +40,7 @@ Until `skill.id` is set, any Alexa Skill could invoke the Lambda (the ASK SDK al
 
 ## "runtimeSessionId" errors
 
-The runtime session id must be at least 33 characters and contain no dots. The bridge uses a SHA-256 hex of the Alexa user id (64 characters). If you drive the runtime yourself, hash your ids with `hashId()` from `@alexa-mcp-bridge/core`.
+The runtime session id must be at least 33 characters and contain no dots. The bridge uses a SHA-256 hex of the Alexa user id and the runtime version (64 characters). If you drive the runtime yourself, hash your ids with `hashId()` from `@alexa-mcp-bridge/core`.
 
 ## `npm install` fails with "Cannot read properties of null (reading 'edgesOut')"
 
