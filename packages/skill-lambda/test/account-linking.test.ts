@@ -1,6 +1,9 @@
+import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
+import { BedrockAgentCoreClient } from '@aws-sdk/client-bedrock-agentcore';
 import {
   SPOKEN,
+  USER_TOKEN_HEADER,
   createLogger,
   parseConfig,
   type AgentInvocationInput,
@@ -45,10 +48,19 @@ function harness(
   const lines: string[] = [];
   const logger = createLogger({}, { level: 'debug', write: (line) => lines.push(line) });
   const envelopes: AgentInvocationInput[] = [];
-  const invoke = vi.fn(async (envelope: AgentInvocationInput) => {
-    envelopes.push(envelope);
-    return reply(envelope);
-  });
+  // The token travels beside the envelope (D63); the tests read it as part of what was sent.
+  const invoke = vi.fn(
+    async (
+      envelope: AgentInvocationInput,
+      _session: string,
+      _signal: AbortSignal,
+      userToken?: string,
+    ) => {
+      const sent = { ...envelope, ...(userToken ? { userToken } : {}) };
+      envelopes.push(sent);
+      return reply(sent);
+    },
+  );
   const bridge = new BridgeClient({ config, runtimeArn: 'arn:test', logger, invoke });
   return { bridge, invoke, envelopes, lines };
 }
@@ -146,7 +158,7 @@ describe('account linking in the Alexa Skill Lambda', () => {
 
   it('still says goodbye on stop without a token, without the card; the cancel goes out without one', async () => {
     const { bridge, envelopes } = harness(linking);
-    const response = await stopHandler(bridge).handle(
+    const response = await stopHandler(bridge, linking).handle(
       handlerInput({ intent: 'AMAZON.StopIntent' }),
     );
     expect(response.outputSpeech).toEqual({
@@ -250,5 +262,58 @@ describe('render', () => {
     });
     expect(linked.card).toEqual({ type: 'LinkAccount' });
     expect(render(handlerInput(), done('Hi.')).card).toBeUndefined();
+  });
+});
+
+describe('the token on the wire (D63)', () => {
+  it('goes to InvokeAgentRuntime in its header; the payload the runtime logs holds no token', async () => {
+    const requests: { headers: Record<string, string>; body: string }[] = [];
+    const client = new BedrockAgentCoreClient({
+      region: 'us-east-1',
+      credentials: { accessKeyId: 'AKIDTEST', secretAccessKey: 'secret' },
+      requestHandler: {
+        handle: async (request: { headers: Record<string, string>; body?: unknown }) => {
+          const body = request.body as Uint8Array | string | undefined;
+          requests.push({
+            headers: request.headers,
+            body: typeof body === 'string' ? body : Buffer.from(body ?? []).toString('utf8'),
+          });
+          return {
+            response: {
+              statusCode: 200,
+              headers: { 'content-type': 'application/json' },
+              body: Readable.from([Buffer.from(JSON.stringify(done('Hi.')))]),
+            },
+          };
+        },
+      },
+    });
+    const lines: string[] = [];
+    const bridge = new BridgeClient({
+      config: linking,
+      runtimeArn: 'arn:aws:bedrock-agentcore:us-east-1:123456789012:runtime/test-abc',
+      logger: createLogger({}, { level: 'debug', write: (line) => lines.push(line) }),
+      client,
+    });
+    const response = await toolIntentHandler(bridge, manifest).handle(searchHotels(TOKEN));
+    expect(response.outputSpeech).toEqual({ type: 'SSML', ssml: '<speak>Hi.</speak>' });
+    expect(requests).toHaveLength(1);
+    const [sent] = requests as [(typeof requests)[number]];
+    expect(sent.body).toContain('"turn"');
+    expect(sent.body).not.toContain(TOKEN);
+    expect(sent.body).not.toContain('userToken');
+    const header = Object.entries(sent.headers).find(
+      ([name]) => name.toLowerCase() === USER_TOKEN_HEADER.toLowerCase(),
+    );
+    expect(header?.[1]).toBe(TOKEN);
+    for (const line of lines) expect(line).not.toContain(TOKEN);
+  });
+
+  it('is redacted from any log line that names it', () => {
+    const lines: string[] = [];
+    const logger = createLogger({}, { write: (line) => lines.push(line) });
+    logger.info('oops', { userToken: TOKEN, nested: { authorization: `Bearer ${TOKEN}` } });
+    expect(lines.join('\n')).not.toContain(TOKEN);
+    expect(lines[0]).toContain('[redacted]');
   });
 });

@@ -46,6 +46,19 @@ export default defineConfig({
     // greeting: 'Welcome. Ask me about hotels or the weather.',
     coldStartMessage: "I'm still starting up. Give me a moment and open me again.",
     stillWorkingMessage: "I'm still working on that. Ask me again in a moment.",
+    // A tool the agent calls on launch without the model (D57), for a server that writes its own
+    // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
+    // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.
+    // launch: { tool: 'suggest_visit', arguments: { season: 'spring' } },
+    // Spoken for "help". Unset: the server's tools and the example phrases, generated.
+    // help: 'Say "find a park for hiking", or name a park. What would you like?',
+    // Example phrases for the greeting and the generated help. Unset: two from the tool manifest.
+    // examplePhrases: ['find a park for hiking', 'is yosemite open in january'],
+    // Said before the last question again when Alexa misses an answer while the session is open (D60).
+    fallbackWhileOpen: "Sorry, I didn't catch that.",
+    // The interaction model's fallbackIntentSensitivity: 'LOW' | 'MEDIUM' | 'HIGH'. Unset: Alexa's
+    // default. Higher sends more unclear speech to "didn't catch that" instead of the nearest intent.
+    // fallbackSensitivity: 'LOW',
   },
 
   agent: {
@@ -97,6 +110,22 @@ export default defineConfig({
     // model's rephrasing, for servers that write their own spoken line (for example 'say'). The
     // reprompt is the last question in it. Unset: the model's text is spoken.
     // resultField: 'say',
+    // A boolean field of a tool result's structuredContent that ends the session when true (D58).
+    // Set: the session stays open after every turn unless the last result says so. Unset: it ends
+    // when the spoken answer does not end with a question.
+    // endSessionField: 'end_session',
+  },
+
+  intents: {
+    // Alexa's built-in intents mapped to a tool the bridge calls without the model, or to a
+    // text the agent hears (D59). "Repeat" always replays the last answer and needs no mapping.
+    // Stop, Cancel and NavigateHome take a tool only; a line that ends the session is the farewell, else the goodbye.
+    // builtIns: {
+    //   'AMAZON.NextIntent': { tool: 'skip_park' },
+    //   'AMAZON.StartOverIntent': { text: 'start over' },
+    //   'AMAZON.StopIntent': { tool: 'save_trip' },
+    // },
+    builtIns: {},
   },
 
   elicitation: {
@@ -133,6 +162,17 @@ export default defineConfig({
     // Chromium in the agent container at warm-up, which adds about 340 MB of memory per session.
     // The browser is built into the agent image only when this is on: change it, then npm run deploy.
     enabled: false,
+    // How long the screen should stay up without activity (APL settings.idleTimeout, D68), in
+    // milliseconds, at least 10000. A recommendation: the device may bound it.
+    idleTimeoutMs: 60000,
+  },
+
+  answers: {
+    // Extra one-word answers for questions the server asks in its own speech (D67): a canonical
+    // value and the spoken synonyms that resolve to it. "bee" then reaches the server as "b".
+    // Lowercase words only, no digits. Read by npm run generate only.
+    // choices: { a: ['ay', 'option a'], b: ['bee', 'be', 'option b'], c: ['see', 'sea', 'option c'] },
+    choices: {},
   },
 
   aws: {

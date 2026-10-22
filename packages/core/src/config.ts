@@ -45,6 +45,50 @@ export const mcpAuthSchema = z
   });
 export type McpAuthConfig = z.output<typeof mcpAuthSchema>;
 
+/** A tool call the bridge makes itself, without the model: the tool's name and fixed arguments. */
+export const directToolCallSchema = z.strictObject({
+  tool: z.string().min(1),
+  arguments: z.record(z.string(), z.unknown()).optional(),
+});
+export type DirectToolCall = z.output<typeof directToolCallSchema>;
+
+/** What a mapped built-in intent does: a direct tool call, or a text the agent hears (D59). */
+export const builtInActionSchema = z.union([
+  directToolCallSchema,
+  z.strictObject({ text: z.string().trim().min(1) }),
+]);
+export type BuiltInAction = z.output<typeof builtInActionSchema>;
+
+/** Built-ins that end the session whatever the mapping does. */
+export const SESSION_ENDING_INTENTS = [
+  'AMAZON.StopIntent',
+  'AMAZON.CancelIntent',
+  'AMAZON.NavigateHomeIntent',
+] as const;
+
+/** Built-in intents `intents.builtIns` may map. Repeat and Help have fixed behaviour. */
+export const MAPPABLE_BUILT_IN_INTENTS = [
+  'AMAZON.NextIntent',
+  'AMAZON.PreviousIntent',
+  'AMAZON.StartOverIntent',
+  'AMAZON.MoreIntent',
+  ...SESSION_ENDING_INTENTS,
+] as const;
+export type MappableBuiltInIntent = (typeof MAPPABLE_BUILT_IN_INTENTS)[number];
+
+/**
+ * A value Alexa accepts in a custom slot type and a sample utterance: lowercase words of letters
+ * with apostrophes, joined by single spaces or hyphens. No digits, no other punctuation.
+ */
+export const SPOKEN_WORDS = /^[a-z']+(?:[ -][a-z']+)*$/;
+const spokenWords = z
+  .string()
+  .max(140)
+  .regex(SPOKEN_WORDS, 'lowercase words: letters, apostrophes, spaces and hyphens, no digits');
+
+/** The default `visual.idleTimeoutMs`: how long the screen asks to stay up without activity. */
+export const SCREEN_IDLE_TIMEOUT_MS = 60_000;
+
 const bridgeConfigShape = z.object({
   mcp: z.object({
     url: z.url({
@@ -73,6 +117,26 @@ const bridgeConfigShape = z.object({
       stillWorkingMessage: z
         .string()
         .default("I'm still working on that. Ask me again in a moment."),
+      /**
+       * A tool the agent calls directly on launch, without the model (D57). Its
+       * speech.resultField is spoken, its widget shown, and the session ends only when
+       * speech.endSessionField says so. Unset, or when the call gives nothing to say: the greeting.
+       */
+      launch: directToolCallSchema.optional(),
+      /** Spoken for "help". Unset: the server's tools and example phrases, generated. */
+      help: z.string().trim().min(1).optional(),
+      /** Example phrases for the greeting and help. Unset: two generated from the tool manifest. */
+      examplePhrases: z.array(z.string().trim().min(1)).min(1).optional(),
+      /**
+       * Said, followed by the last question again, when Alexa did not catch an answer while the
+       * session is open for one (D60). Never the generic "What would you like to do?".
+       */
+      fallbackWhileOpen: z.string().trim().min(1).default("Sorry, I didn't catch that."),
+      /**
+       * How readily Alexa sends an utterance to AMAZON.FallbackIntent instead of the closest
+       * intent: the interaction model's fallbackIntentSensitivity. Unset: Alexa's default (LOW).
+       */
+      fallbackSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
     })
     .prefault({}),
   agent: z
@@ -90,8 +154,8 @@ const bridgeConfigShape = z.object({
       /**
        * Extra guidance for the MCP server this bridge talks to, appended to the system prompt
        * under "Server-specific guidance". Normally filled from <BRIDGE_PROFILE_DIR>/prompt-addendum.md
-       * at load time (D56); it travels inside BRIDGE_CONFIG, so the deployed agent has it too.
-       * Capped at 2000 UTF-8 bytes because BRIDGE_CONFIG is an environment variable.
+       * at load time (D56); the deployed agent gets it as BRIDGE_PROMPT_ADDENDUM, its own variable.
+       * Capped at 2000 UTF-8 bytes because AgentCore caps a runtime variable at 2048 characters.
        */
       promptAddendum: z
         .string()
@@ -146,6 +210,25 @@ const bridgeConfigShape = z.object({
        * successful result has it; otherwise the model's text is spoken as usual.
        */
       resultField: z.string().min(1).optional(),
+      /**
+       * A boolean field of a tool result's structuredContent that ends the session when true
+       * (D58). With it set, a finished turn ends the session only when the run's last successful
+       * result says so; otherwise it stays open. Unset: the session ends when the speech does not
+       * end with a question.
+       */
+      endSessionField: z.string().min(1).optional(),
+    })
+    .prefault({}),
+  intents: z
+    .object({
+      /**
+       * Alexa built-in intents mapped to a direct tool call (no model) or to a turn text the
+       * agent hears as if the user had said it (D59). Stop, Cancel and NavigateHome take a tool
+       * only: its result field is the farewell when the result ends the session on its own; an
+       * error, an empty field, a timeout or a closing question leaves the plain goodbye, and the
+       * session ends either way.
+       */
+      builtIns: z.partialRecord(z.enum(MAPPABLE_BUILT_IN_INTENTS), builtInActionSchema).default({}),
     })
     .prefault({}),
   elicitation: z
@@ -188,6 +271,30 @@ const bridgeConfigShape = z.object({
        * with a screen (D54). Starts a headless Chromium in the agent container at warm-up.
        */
       enabled: z.boolean().default(false),
+      /**
+       * How long the screen should stay up without activity, in milliseconds: the APL
+       * document's settings.idleTimeout (D68). A recommendation; the device may bound it.
+       */
+      idleTimeoutMs: z.number().int().min(10_000).default(SCREEN_IDLE_TIMEOUT_MS),
+    })
+    .prefault({}),
+  answers: z
+    .object({
+      /**
+       * Extra values for the answer-choice slot type (D67): a canonical value and the spoken
+       * synonyms that resolve to it, e.g. { b: ['bee', 'option b'] }. "bee" then reaches the
+       * agent as "b". Read by the generator only; change it, then npm run generate.
+       */
+      choices: z.record(spokenWords, z.array(spokenWords)).default({}),
+      /**
+       * Which of the bridge's own answer intents ship (D69); unset ships all four. With tool
+       * intents off, ['choice'] leaves every other answer to the catch-all, word for word: a date
+       * or number intent would rewrite "on friday" as an ISO date. Read by the generator only.
+       */
+      intents: z
+        .array(z.enum(['date', 'number', 'freeText', 'choice']))
+        .min(1)
+        .optional(),
     })
     .prefault({}),
   aws: z
@@ -199,6 +306,32 @@ const bridgeConfigShape = z.object({
 });
 
 export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) => {
+  // One spoken phrase resolves to one choice: Alexa would pick either, silently.
+  const owner = new Map<string, string>();
+  for (const [choice, synonyms] of Object.entries(config.answers.choices)) {
+    for (const synonym of synonyms) {
+      const message =
+        synonym in config.answers.choices && synonym !== choice
+          ? `"${synonym}" is itself a choice`
+          : owner.has(synonym) && owner.get(synonym) !== choice
+            ? `"${synonym}" is already a synonym of "${owner.get(synonym)}"`
+            : undefined;
+      if (message) ctx.addIssue({ code: 'custom', path: ['answers', 'choices', choice], message });
+      if (!owner.has(synonym)) owner.set(synonym, choice);
+    }
+  }
+  // A goodbye intent cannot hand the turn to the model: the session ends right after it.
+  for (const intent of SESSION_ENDING_INTENTS) {
+    const action = config.intents.builtIns[intent];
+    if (action && !('tool' in action)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['intents', 'builtIns', intent],
+        message:
+          'takes a tool ({ "tool": "...", "arguments": {...} }), not a text: the session ends right after it.',
+      });
+    }
+  }
   // The Gateway authenticates the agent with SigV4 and has no way to pass the user's token on.
   if (config.features.gateway && config.mcp.auth.type === 'alexaAccountLinking') {
     ctx.addIssue({
@@ -236,6 +369,14 @@ export function parseConfig(raw: unknown): BridgeConfig {
 
 export const CONFIG_FILE_NAME = 'bridge.config.ts';
 export const CONFIG_ENV_VAR = 'BRIDGE_CONFIG';
+/**
+ * The agent runtime gets the prompt addendum in a variable of its own, as a JSON string:
+ * AgentCore caps each runtime environment variable at 2048 characters (the addendum alone may
+ * be 2000 bytes) and refuses control characters such as newlines.
+ */
+export const PROMPT_ADDENDUM_ENV_VAR = 'BRIDGE_PROMPT_ADDENDUM';
+/** AgentCore Runtime's limit on one environment variable's value, in characters. */
+export const RUNTIME_ENV_VALUE_MAX = 2048;
 export const ENV_FILE_NAME = '.env';
 
 /**
@@ -445,7 +586,10 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
   }
 }
 
-/** Load config from the BRIDGE_CONFIG env var. Used by the Lambda and the container. */
+/**
+ * Load config from the BRIDGE_CONFIG env var, plus the prompt addendum from
+ * BRIDGE_PROMPT_ADDENDUM when set. Used by the Lambda and the container.
+ */
 export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const raw = env[CONFIG_ENV_VAR];
   if (!raw) {
@@ -458,6 +602,18 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BridgeC
     parsed = JSON.parse(raw);
   } catch {
     throw new ConfigError(`${CONFIG_ENV_VAR} is not valid JSON.`);
+  }
+  const encoded = env[PROMPT_ADDENDUM_ENV_VAR];
+  if (encoded && parsed && typeof parsed === 'object') {
+    // A JSON string, because AgentCore refuses control characters such as newlines in a value.
+    let addendum: unknown;
+    try {
+      addendum = JSON.parse(encoded);
+    } catch {
+      throw new ConfigError(`${PROMPT_ADDENDUM_ENV_VAR} is not a JSON string.`);
+    }
+    const withAgent = parsed as { agent?: Record<string, unknown> };
+    withAgent.agent = { ...withAgent.agent, promptAddendum: addendum };
   }
   return parseConfig(parsed);
 }

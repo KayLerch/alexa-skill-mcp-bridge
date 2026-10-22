@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { parseConfig } from '@alexa-mcp-bridge/core';
+import { USER_TOKEN_HEADER, parseConfig } from '@alexa-mcp-bridge/core';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,13 +39,61 @@ function imageBuildArgs(overrides: Record<string, unknown> = {}): Record<string,
 
 describe('AlexaMcpBridgeStack', () => {
   it('keeps the prompt addendum out of the Alexa Skill Lambda but in the agent runtime (D56)', () => {
-    const { template } = synth({ agent: { promptAddendum: 'Ask one question at a time.' } });
+    const { template } = synth({
+      agent: { promptAddendum: 'Ask one question at a time.\n- Speak say.' },
+    });
     const lambdas = Object.values(template.findResources('AWS::Lambda::Function'));
     const configs = lambdas.map((f) => f.Properties.Environment?.Variables?.BRIDGE_CONFIG);
     expect(configs.filter(Boolean)).toHaveLength(1);
     expect(configs[0] ?? configs[1]).not.toContain('promptAddendum');
     const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
-    expect(JSON.stringify(runtimes)).toContain('Ask one question at a time.');
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    // JSON-encoded: AgentCore refuses control characters such as the newline in a value.
+    expect(env.BRIDGE_PROMPT_ADDENDUM).toBe('"Ask one question at a time.\\n- Speak say."');
+    expect(env.BRIDGE_PROMPT_ADDENDUM).not.toMatch(/[\u0000-\u001f\u007f]/);
+    expect(env.BRIDGE_CONFIG).not.toContain('promptAddendum');
+  });
+
+  it("fits every runtime variable under AgentCore's 2048-character cap, with a full addendum", () => {
+    const { template } = synth({
+      agent: { promptAddendum: 'x'.repeat(2000) },
+      skill: { help: 'h'.repeat(400), examplePhrases: ['quiz me', 'quiz me on yesterday'] },
+    });
+    const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    for (const value of Object.values(env)) {
+      if (typeof value === 'string') expect(value.length).toBeLessThanOrEqual(2048);
+    }
+  });
+
+  it('keeps answers.choices, which only the generator reads, out of the deployed config (D67)', () => {
+    const { template } = synth({ answers: { choices: { b: ['bee', 'option b'] } } });
+    const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    expect(env.BRIDGE_CONFIG).not.toContain('option b');
+    const lambdas = Object.values(template.findResources('AWS::Lambda::Function'));
+    for (const f of lambdas) {
+      expect(f.Properties.Environment?.Variables?.BRIDGE_CONFIG ?? '').not.toContain('option b');
+    }
+  });
+
+  it('names the variable and its size when a runtime variable is still too long', () => {
+    expect(() => synth({ skill: { help: 'h'.repeat(2100) } })).toThrowError(
+      /BRIDGE_CONFIG .* 2048/,
+    );
+  });
+
+  it('allow-lists the token header on the runtime only with account linking (D63)', () => {
+    const runtimeProps = (overrides: Record<string, unknown>) =>
+      Object.values(synth(overrides).template.findResources('AWS::BedrockAgentCore::Runtime'))[0]
+        ?.Properties as Record<string, unknown>;
+    expect(runtimeProps({}).RequestHeaderConfiguration).toBeUndefined();
+    const linked = runtimeProps({
+      mcp: { url: 'https://example.com/mcp', auth: { type: 'alexaAccountLinking' } },
+    });
+    expect(linked.RequestHeaderConfiguration).toEqual({
+      RequestHeaderAllowlist: [USER_TOKEN_HEADER],
+    });
   });
 
   it('builds the agent image without a browser unless visual.enabled is on (D54)', () => {

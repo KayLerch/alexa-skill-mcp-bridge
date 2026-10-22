@@ -46,9 +46,10 @@ try {
       )?.samples?.length ?? 0;
     console.log(`  ${tool.intent} ← ${tool.name} (${slots}${elicited}), ${count} utterances`);
   }
-  console.log(
-    `\nGreeting examples: ${result.manifest.examplePhrases.map((p) => `"${p}"`).join(', ')}`,
-  );
+  // skill.examplePhrases wins over the generated ones in the greeting and help (D61).
+  const examples = config.skill.examplePhrases ?? result.manifest.examplePhrases;
+  const source = config.skill.examplePhrases ? ' (skill.examplePhrases)' : '';
+  console.log(`\nGreeting examples${source}: ${examples.map((p) => `"${p}"`).join(', ')}`);
   for (const note of result.notes) console.log(`note: ${note}`);
   console.log(`\nWrote:\n${result.files.map((f) => `  ${f}`).join('\n')}`);
   console.log(

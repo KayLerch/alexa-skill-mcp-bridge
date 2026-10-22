@@ -116,6 +116,19 @@ describe('answer intents', () => {
     ).toEqual({ text: 'the suite' });
   });
 
+  it('answer a pending question with the resolved choice, else the words (D67)', () => {
+    const choice = (resolved?: { name: string; id: string }) =>
+      answerHintFor(
+        handlerInput({
+          intent: 'ChoiceAnswerIntent',
+          slots: { choice: slot('choice', 'bee', resolved) },
+        }),
+        'ChoiceAnswerIntent',
+      ).text;
+    expect(choice({ name: 'b', id: 'b' })).toBe('b');
+    expect(choice()).toBe('bee');
+  });
+
   it('yes and no without a pending question become turns', async () => {
     const { bridge, turns } = fakeBridge(() => done('Okay.'));
     const handler = yesNoTurnHandler(bridge);
@@ -137,17 +150,20 @@ describe('answer intents', () => {
 describe('answers without a pending question', () => {
   const open = { openTurn: true };
 
+  // A custom slot that entity resolution matched passes its canonical value ("bee" → "b", D67),
+  // else the words; DATE and NUMBER give only their resolved value (D64); free text its words.
   it.each([
-    ['NumberAnswerIntent', 'number', 'four', 'four'],
-    ['DateAnswerIntent', 'date', 'the fourteenth', 'the fourteenth'],
-    ['ChoiceAnswerIntent', 'choice', 'b', 'b'],
-    ['FreeTextAnswerIntent', 'answer', 'the suite', 'the suite'],
-  ])('%s becomes a turn with the spoken words', async (intent, slotName, spoken, text) => {
+    ['NumberAnswerIntent', 'number', '4', undefined, '4'],
+    ['DateAnswerIntent', 'date', '2026-10-14', undefined, '2026-10-14'],
+    ['ChoiceAnswerIntent', 'choice', 'bee', { name: 'b', id: 'b' }, 'b'],
+    ['ChoiceAnswerIntent', 'choice', 'the blue one', undefined, 'the blue one'],
+    ['FreeTextAnswerIntent', 'answer', 'the suite', undefined, 'the suite'],
+  ])('%s (%s: "%s") becomes a turn', async (intent, slotName, spoken, resolved, text) => {
     const { bridge, turns } = fakeBridge(() => done('Next.'));
     const handler = openAnswerHandler(bridge);
     const input = handlerInput({
       intent,
-      slots: { [slotName]: slot(slotName, spoken) },
+      slots: { [slotName]: slot(slotName, spoken, resolved) },
       sessionAttributes: open,
     });
     expect(handler.canHandle(input)).toBe(true);
@@ -290,7 +306,7 @@ describe('launch', () => {
 describe('stop and fallback', () => {
   it('stop cancels and says goodbye', async () => {
     const { bridge, turns } = fakeBridge(() => done(''));
-    const response = await stopHandler(bridge).handle(
+    const response = await stopHandler(bridge, config).handle(
       handlerInput({ intent: 'AMAZON.StopIntent', sessionAttributes: pendingQuestion }),
     );
     expect(turns[0]).toEqual({ type: 'cancel' });
@@ -305,7 +321,7 @@ describe('stop and fallback', () => {
       intent: 'AMAZON.FallbackIntent',
       sessionAttributes: pendingQuestion,
     });
-    const response = await fallbackHandler(bridge).handle(input);
+    const response = await fallbackHandler(bridge, config).handle(input);
     expect(turns).toEqual([]);
     expect(invoke).not.toHaveBeenCalled();
     expect(response.outputSpeech).toMatchObject({

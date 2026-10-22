@@ -155,7 +155,7 @@ Additional prerequisites:
 Then, from the repo root:
 
 1. `npm run doctor -- --track skill`
-2. `npm run skill:deploy` creates the Alexa Skill with the generated interaction model. It takes the Lambda ARN that `npm run deploy` wrote into `.env` (`BRIDGE_LAMBDA_ARN`), puts it into `skill-package/skill.json`, runs `ask deploy` from the repo root, and records the new Alexa Skill id in `.env` as `BRIDGE_SKILL_ID`. The `skill.json` edit stays local: it carries your AWS account id, and the pre-commit hook stops you from committing it. If you would rather not use the script, paste the ARN into `skill.json` at `apis.custom.endpoint.uri` yourself and run `ask deploy` from the repo root.
+2. `npm run skill:deploy` creates the Alexa Skill with the generated interaction model. It takes the Lambda ARN that `npm run deploy` wrote into `.env` (`BRIDGE_LAMBDA_ARN`), puts it into `skill-package/skill.json`, runs `ask deploy` from the repo root, and records the new Alexa Skill id in `.env` as `BRIDGE_SKILL_ID`. With a profile folder, your listing and icons from `<profile>/skill-package/` are laid over `skill.json` for the deploy and taken off again ([docs/customizing.md](docs/customizing.md#your-alexa-skill-listing)). The `skill.json` edit stays local: it carries your AWS account id, and the pre-commit hook stops you from committing it. If you would rather not use the script, paste the ARN into `skill.json` at `apis.custom.endpoint.uri` yourself and run `ask deploy` from the repo root.
 3. **Optional but recommended:** run `npm run deploy` once more. With `BRIDGE_SKILL_ID` in `.env` it locks the Lambda to your Alexa Skill; until then any Alexa Skill that knows your function ARN can invoke it.
 4. In the [Alexa developer console](https://developer.amazon.com/alexa/console/ask), open the Alexa Skill named 'bridge demo', go to Test, and set testing to Development.
 5. Talk to it, either way:
@@ -205,6 +205,8 @@ On an Alexa+ device with a screen, the bridge shows the MCP Apps widget your ser
 - `visual.enabled` set to `true` in `bridge.config.ts`, then a redeploy: the agent image carries a headless Chromium only when the screen is on at deploy time.
 - `npm run skill:deploy` once, so the Alexa Skill declares the APL interface (`skill-package/skill.json`).
 
+With `skill.launch` set, the launch shows the widget of that tool's result too: the first thing a user sees is your server's own start screen, drawn without a model call (D57).
+
 The agent renders the widget to a JPEG, and the Alexa Skill shows it full screen, best-fit on black. The image cannot be tapped. A speaker gets speech only, and a picture that would push the response past Alexa's 120 KB cap is dropped; the speech always stays. To try it without a device: `npm run chat -- --display 1280x800` saves each rendered screen as a JPEG.
 
 ## Requirements your server must meet
@@ -219,7 +221,7 @@ The agent renders the widget to a JPEG, and the Alexa Skill shows it full screen
 
 ## Per-user sign-in
 
-When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged.
+When your MCP server needs to know who is talking, for example because it takes the user from a verified token, set `BRIDGE_MCP_AUTH_TYPE=alexaAccountLinking` in `.env`. There is no secret: each user links their account with your authorization server once, in the Alexa app, and from then on Alexa puts their token on every request. The bridge sends it to your server as `Authorization: Bearer <token>` on every request, read fresh each time, so a refreshed token needs no reconnect. The token is never logged: the Alexa Skill Lambda hands it to the agent runtime in an allow-listed request header, not in the payload the runtime's request logs record (D63).
 
 A user who has not linked yet, or whose token your server refuses with HTTP 401, hears "Please link your account in the Alexa app, then ask me again." and gets the link card in the Alexa app. Either way the agent drops the conversation it holds for that Alexa user, so whoever links next starts clean.
 

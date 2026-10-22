@@ -116,6 +116,15 @@ describe('question and answer', () => {
     expect(bad.status).toBe('question');
     expect(bad.question?.id).toBe(first.question?.id);
     expect(bad.speech).toMatch(/still need an answer/);
+    // The apology is spoken, never stored: a frontend that repeats the question says it once.
+    expect(bad.question?.message).not.toMatch(/still need an answer/);
+    expect(bad.reprompt).toBe(bad.question?.message);
+    const worse = await send({
+      type: 'answer',
+      questionId: first.question?.id as string,
+      answer: { text: 'eleven' },
+    });
+    expect(worse.speech.match(/still need an answer/g)).toHaveLength(1);
     await send({ type: 'cancel' });
     await session.close();
   });

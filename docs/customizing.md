@@ -28,9 +28,11 @@ You get more than one intent per tool. For a server whose tools take `park`, `mo
 - **`SpokenRequestIntent`**, a catch-all: a custom slot type seeded with phrases, which Alexa
   matches loosely and passes through verbatim. Anything the tool intents do not recognise reaches
   the agent as text instead of dying in Fallback. `features.catchAll` turns it off.
-- **`ChoiceAnswerIntent`**, one slot type holding every enum value of every tool, so a one-word
-  reply to any question the bridge asks — "stargazing", "January", "Yosemite" — has a home.
-  Without it a bare word goes to Fallback and the Lambda can only repeat the question.
+- **`ChoiceAnswerIntent`**, one slot type holding every enum value of every tool plus your
+  `answers.choices`, so a reply to any question the bridge asks — "stargazing", "January",
+  "Yosemite" — has a home, alone or inside a sentence ("i think it's yosemite", "option b", "go
+  with january"). Without it a bare word goes to Fallback and the Lambda can only repeat the
+  question.
 - The **answer intents** for yes/no, dates, numbers and free text, and the standard intents.
 
 Measured against Alexa's own NLU on 2026-09-05 with the national parks model: tool intents win
@@ -55,6 +57,12 @@ skipped with a note, so overrides for several example servers can live in one fi
 Slot names are the tool's argument names in braces. Alexa's rules apply: lowercase words, no
 digits, and an `AMAZON.SearchQuery` slot must stand alone behind a carrier phrase. A sample that
 breaks them is rejected with a note naming it.
+
+The bridge's own answer intents take extra samples the same way: `ChoiceAnswerIntent` (slot
+`{choice}`), `FreeTextAnswerIntent` (`{answer}`), `DateAnswerIntent` (`{date}`) and
+`NumberAnswerIntent` (`{number}`), for example `"ChoiceAnswerIntent": ["my pick is {choice}"]`.
+Alexa refuses one sample string in two intents, so a sample a tool intent already has is kept
+there and dropped from the answer intent (D67).
 
 ### Synonyms for slot values
 
@@ -95,6 +103,82 @@ come first, and an alias intent with the same name replaces the one here. The sa
 `.env` and `prompt-addendum.md`, a short note for the agent's system prompt (for example "ask one
 quiz question at a time"), up to 2000 UTF-8 bytes, and `bridge.config.json` for any other setting (invocation name, memory, `visual.enabled`, and so on). Nothing in the folder is tracked by this repo.
 
+### Answers while a question is open
+
+A server that asks its own questions in its spoken line (a quiz, a guided form) gets answers the
+tool intents cannot know: "I don't know", "about twenty miles", "the second one". Short ones often
+land in `AMAZON.FallbackIntent`, which carries no text. Three levers:
+
+- Put answer-shaped phrases into `catchAll` (`"i don't know"`, `"no idea"`, `"about twenty
+miles"`, `"the second one"`): they teach the catch-all what answers sound like, and the whole
+  phrase reaches the agent as text.
+- Give spoken one-word answers a canonical value with `answers.choices`
+  ([config](config.md#answers)). A server that offers "A, B or C" in its own speech sets, in
+  `bridge.config.ts` or a profile's `bridge.config.json`:
+
+  ```json
+  "answers": {
+    "choices": {
+      "a": ["ay", "option a", "letter a", "the first one"],
+      "b": ["bee", "be", "option b", "letter b", "the second one"],
+      "c": ["see", "sea", "option c", "letter c", "the third one"]
+    }
+  }
+  ```
+
+  then `npm run generate` and `npm run skill:deploy`. "Bee", "option b" and "i think it's b"
+  reach `ChoiceAnswerIntent`, and the server receives the canonical "b", whichever words Alexa
+  heard (D67). Letters kept in `catchAll` as well do no harm, but they are no longer needed there.
+
+- `skill.fallbackSensitivity` sets how readily Alexa gives up on the nearest intent. Whatever still
+  lands in Fallback while the session is open is asked again: `skill.fallbackWhileOpen` ("Sorry, I
+  didn't catch that.") and the last question, never a generic "What would you like to do?" (D60).
+
+## Built-in intents: repeat, next, stop
+
+The generated model always has `AMAZON.RepeatIntent` and `AMAZON.NextIntent` beside help, stop,
+cancel and fallback. "Repeat" replays the last thing the user heard, from the session, with no
+agent call. The others go to the agent as the word itself unless you map them in
+`intents.builtIns` ([config](config.md#intents)):
+
+```json
+"intents": {
+  "builtIns": {
+    "AMAZON.NextIntent": { "tool": "skip_park" },
+    "AMAZON.StartOverIntent": { "text": "start a new trip" },
+    "AMAZON.StopIntent": { "tool": "save_trip" }
+  }
+}
+```
+
+A `tool` mapping is called directly, without the model, and spoken like the launch tool below; a
+`text` mapping is a turn the agent hears. Stop, Cancel and NavigateHome take a tool only: its result
+field is the farewell when it answers in time with a result that ends the session on its own (the
+end-session field true, or no closing question without one); an error, an empty field, a timeout or
+a line that asks a question leaves the plain "Goodbye.", and the session ends either way.
+
+## The launch and help
+
+`skill.launch` names a tool the agent calls on "Alexa, open …" without the model (D57): a server
+that writes its own welcome ("Welcome back. Say …") speaks it through `speech.resultField` and draws
+its start screen, and with `speech.endSessionField` it can end the session ("nothing here yet,
+goodbye for now"). When the call fails or has nothing to say, the generated greeting is spoken.
+`skill.help` and `skill.examplePhrases` replace the generated help and the greeting's examples.
+`npm run generate` notes a launch or mapped tool that your server does not list, and prints the
+example phrases the greeting will use.
+
+## Your Alexa Skill listing
+
+`skill-package/skill.json` ships as the bridge's own development listing. Your name, descriptions,
+example phrases, keywords, category, privacy and terms URLs and icons go into
+`<profile>/skill-package/skill.json`, in the same shape, holding only what differs; icons go into
+`<profile>/skill-package/assets/images/` and are referenced as
+`file://assets/images/en-US_largeIconUri.png` (108×108 and 512×512 PNG for the small and large
+icon). `npm run skill:deploy` merges the listing over the repo's (objects merge, arrays replace;
+the endpoint stays your Lambda), copies the assets in, runs `ask deploy`, and takes both off
+again (D62). A `file://` path that is not in the assets folder stops the deploy before anything is
+uploaded.
+
 ## Let chat write your utterances
 
 The best guess at what people will say to the device is what you say to the bridge while testing:
@@ -114,8 +198,10 @@ model learns their angles instead of yours.
 ## Changing the invocation name or the tools
 
 The invocation name is `skill.invocationName` in `bridge.config.ts`. Change it, run
-`npm run generate`, then `npm run skill:deploy`; the name also appears in `skill-package/skill.json` as the
-Alexa Skill's title, which is not generated, so change it there too.
+`npm run generate`, then `npm run skill:deploy`. The Alexa Skill's listed name is a different
+field, `publishingInformation.locales.<locale>.name` in `skill-package/skill.json`; it is not
+generated, and the way to change it without touching a tracked file is your profile's listing
+(below).
 
 When your MCP server's tools change — a new tool, a renamed argument, a new enum value — the
 manifest and the interaction model both change, so it is `npm run generate` followed by

@@ -57,30 +57,48 @@ function isMissing(value: unknown): boolean {
 }
 
 /**
- * The result field to speak verbatim (D51). Holds the string field of the run's latest
- * successful tool result; `begin()` runs at the start of every run so nothing leaks across turns.
+ * The fields of the run's latest successful tool result the bridge reads itself: the string to
+ * speak verbatim (speech.resultField, D51) and the flag that ends the session
+ * (speech.endSessionField, D58). `begin()` runs at the start of every run so nothing leaks across
+ * turns.
  */
 export class ResultField {
   private latest?: string;
+  private ends = false;
 
-  constructor(private readonly name: string) {}
+  constructor(
+    private readonly name?: string,
+    private readonly endSessionName?: string,
+  ) {}
 
   begin(): void {
     this.latest = undefined;
+    this.ends = false;
   }
 
-  /** Each successful result replaces the value; one without a usable string clears it. */
+  /** Each successful result replaces both values; one without a usable field clears it. */
   record(structured: unknown): void {
     const record =
       structured && typeof structured === 'object' && !Array.isArray(structured)
         ? (structured as Record<string, unknown>)
         : {};
-    const value = record[this.name];
+    const value = this.name ? record[this.name] : undefined;
     this.latest = typeof value === 'string' && value.trim() ? value : undefined;
+    this.ends = this.endSessionName ? record[this.endSessionName] === true : false;
   }
 
   get value(): string | undefined {
     return this.latest;
+  }
+
+  /** True when speech.endSessionField is set: the result, not the trailing "?", ends the session. */
+  get decidesEnd(): boolean {
+    return this.endSessionName !== undefined;
+  }
+
+  /** The latest result's end-session flag; false unless it is exactly `true`. */
+  get endsSession(): boolean {
+    return this.ends;
   }
 }
 
@@ -118,6 +136,53 @@ export class WidgetRecorder {
   }
 }
 
+/** What a successful tool call leaves behind for the rest of the run. */
+export interface ToolCallRecorders {
+  hidden?: HiddenArguments | undefined;
+  resultField?: ResultField | undefined;
+  widgets?: WidgetRecorder | undefined;
+}
+
+/**
+ * One tools/call with the bridge's bookkeeping: hidden arguments filled in (D50), and from a
+ * successful result the hidden values, the result fields (D51, D58) and the widget (D54)
+ * recorded. Used by the model's tool calls and by direct calls (D57) alike. Throws what the MCP
+ * client throws.
+ */
+export async function callAndRecord(
+  client: BridgeMcpClient,
+  name: string,
+  args: Record<string, unknown>,
+  toolResourceUri: string | undefined,
+  recorders: ToolCallRecorders,
+  signal?: AbortSignal,
+): Promise<{ sent: Record<string, unknown>; result: McpToolResult; resourceUri?: string }> {
+  const sent = recorders.hidden?.fill(args) ?? args;
+  const result = await client.callTool(name, sent, { ...(signal ? { signal } : {}) });
+  // The result names its widget; a tool's own declaration is the fallback.
+  const resourceUri = result._meta?.ui?.resourceUri ?? toolResourceUri;
+  if (!result.isError) {
+    recorders.hidden?.remember(result.structuredContent);
+    recorders.resultField?.record(result.structuredContent);
+    // MCP Apps widgets are ui:// resources; nothing else is read for the screen.
+    if (resourceUri?.startsWith('ui://')) {
+      recorders.widgets?.record({ resourceUri, toolName: name, input: sent, result });
+    }
+  }
+  return { sent, result, ...(resourceUri ? { resourceUri } : {}) };
+}
+
+/**
+ * The one content block a tool result becomes for the model. One block only: Nova collapses its
+ * context on a result that mixes json and text (measured: 545 input tokens instead of 1712,
+ * empty answer; see plan D28).
+ */
+export function toolResultBlockContent(result: McpToolResult): JsonBlock | TextBlock {
+  return !result.isError && result.structuredContent
+    ? new JsonBlock({ json: result.structuredContent as JSONValue })
+    : new TextBlock(toolResultText(result) || 'The tool returned no content.');
+}
+
 /** An MCP tool as a Strands tool. Prefers structuredContent, keeps text, never leaks raw errors. */
 export class BridgeMcpTool extends Tool {
   readonly name: string;
@@ -152,27 +217,15 @@ export class BridgeMcpTool extends Tool {
         ? (input as Record<string, unknown>)
         : {};
     try {
-      const sent = this.hidden?.fill(args) ?? args;
-      const result = await this.client.callTool(this.name, sent, {
-        signal: context.cancelSignal,
-      });
-      // The result names its widget; a tool's own declaration is the fallback.
-      const resourceUri = result._meta?.ui?.resourceUri ?? this.uiResourceUri;
-      if (!result.isError) {
-        this.hidden?.remember(result.structuredContent);
-        this.resultField?.record(result.structuredContent);
-        // MCP Apps widgets are ui:// resources; nothing else is read for the screen.
-        if (resourceUri?.startsWith('ui://')) {
-          this.widgets?.record({ resourceUri, toolName: this.name, input: sent, result });
-        }
-      }
-      // One block only. Nova collapses its context on a result that mixes json and text
-      // (measured: 545 input tokens instead of 1712, empty answer; see plan D28).
-      const text = toolResultText(result);
-      const content: (JsonBlock | TextBlock)[] =
-        !result.isError && result.structuredContent
-          ? [new JsonBlock({ json: result.structuredContent as JSONValue })]
-          : [new TextBlock(text || 'The tool returned no content.')];
+      const { result, resourceUri } = await callAndRecord(
+        this.client,
+        this.name,
+        args,
+        this.uiResourceUri,
+        { hidden: this.hidden, resultField: this.resultField, widgets: this.widgets },
+        context.cancelSignal,
+      );
+      const content = [toolResultBlockContent(result)];
       if (resourceUri) {
         this.logger.debug('tool result carries a ui resource', { tool: this.name, resourceUri });
       }

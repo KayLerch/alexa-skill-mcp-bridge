@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D56 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D68 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
@@ -62,7 +62,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 | `npm run agent:dev` | Build and run the container locally on 8080. |
 | `npm run synth` | `cdk synth`. Safe, no AWS calls. |
 | `npm run deploy` | Pre-flight, `cdk deploy`, prints outputs and the cost note. Creates billable resources. |
-| `npm run skill:deploy` | Lambda ARN from `.env` into `skill.json`, `ask deploy` from the root, Alexa Skill id back into `.env`. Creates or updates the Alexa Skill. |
+| `npm run skill:deploy` | Lambda ARN from `.env` into `skill.json`, a profile's listing and icons laid over it for the deploy (D62), `ask deploy` from the root, Alexa Skill id back into `.env`. Creates or updates the Alexa Skill. |
 | `npm run destroy` | `cdk destroy` plus ECR cleanup. Puts the placeholder ARN back into `skill.json` and drops `BRIDGE_LAMBDA_ARN` from `.env`. |
 | `npm run check:leaks` | Staged files (or `-- --all`: tracked plus untracked, what `git add -A` would commit) scanned for account ids, Alexa Skill ids, endpoints, tokens. The pre-commit hook in `.githooks` runs it. |
 

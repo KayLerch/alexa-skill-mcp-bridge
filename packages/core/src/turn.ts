@@ -43,6 +43,16 @@ export const turnInputSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('turn'), utterance: utteranceHintSchema }),
   z.object({ type: z.literal('answer'), questionId: z.string(), answer: answerHintSchema }),
   z.object({ type: z.literal('poll') }),
+  /**
+   * Call one tool directly, without the model (D57): the launch tool and mapped built-in intents.
+   * `intent` names what the frontend matched, for the conversation record.
+   */
+  z.object({
+    type: z.literal('tool'),
+    tool: z.string().min(1),
+    arguments: z.record(z.string(), z.unknown()).optional(),
+    intent: z.string().optional(),
+  }),
   z.object({ type: z.literal('cancel') }),
 ]);
 export type TurnInput = z.infer<typeof turnInputSchema>;

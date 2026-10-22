@@ -7,6 +7,7 @@ import {
   type Visual,
 } from '@alexa-mcp-bridge/core';
 import { BridgeClient } from '../src/bridge.js';
+import { screenSettingsInterceptor } from '../src/apl/screen.js';
 import { render } from '../src/render.js';
 import { handlerInput } from './helpers.js';
 
@@ -129,5 +130,25 @@ describe('APL screen', () => {
     });
     expect(response.card?.type).toBe('LinkAccount');
     expect(response.directives).toHaveLength(1);
+  });
+
+  const idleTimeoutOf = (response: ReturnType<typeof render>) =>
+    (response.directives?.[0] as unknown as { document: { settings?: { idleTimeout?: number } } })
+      .document.settings?.idleTimeout;
+
+  it('asks the device to keep the screen up for a minute by default (D68)', () => {
+    const response = render(handlerInput({ intent: 'X', screen }), { ...done, visual: visual(10) });
+    expect(idleTimeoutOf(response)).toBe(60000);
+  });
+
+  it('takes visual.idleTimeoutMs from config through a request interceptor', async () => {
+    const input = handlerInput({ intent: 'X', screen });
+    const config = parseConfig({
+      mcp: { url: 'https://example.com/mcp' },
+      visual: { idleTimeoutMs: 120000 },
+    });
+    await screenSettingsInterceptor(config).process(input);
+    const response = render(input, { ...done, visual: visual(10) });
+    expect(idleTimeoutOf(response)).toBe(120000);
   });
 });

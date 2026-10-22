@@ -58,7 +58,8 @@ export function answerHintFor(input: HandlerInput, intentName: string): AnswerHi
       return value ? { slots: { number: value } } : {};
     }
     case 'ChoiceAnswerIntent': {
-      // One word from any enum in any tool: the agent matches it against the pending question.
+      // A value of any tool enum or answers.choices: the canonical value when entity resolution
+      // matched ("b" for "bee", D67), and the agent matches it against the pending question.
       const value = slotValue(getSlot(input.requestEnvelope, 'choice'), 'AnswerChoiceType');
       return value ? { slots: { choice: value }, text: value.resolvedValue ?? value.value } : {};
     }
@@ -101,7 +102,12 @@ const SPOKEN_SLOT: Record<string, { name: string; type: string }> = {
 /**
  * A quiz's question is the agent's own speech, not a parked elicitation (D49). An answer intent
  * with no pending question while the session is open is an ordinary turn carrying what the user
- * said, verbatim ("the fourteenth", not the resolved date).
+ * said, as Alexa gives it:
+ * - a custom slot (ChoiceAnswerIntent): the canonical value when entity resolution matched
+ *   ("b" for "bee", "blue" for "the blue one", D67), else the words as heard;
+ * - free text (AMAZON.SearchQuery): the words as heard;
+ * - AMAZON.DATE and AMAZON.NUMBER: only their resolved value ("2026-10-14" for "the fourteenth",
+ *   "14"), so a server that grades spoken answers should accept ISO dates and digits (D64).
  */
 export function openAnswerHandler(bridge: BridgeClient): RequestHandler {
   return {
@@ -116,10 +122,11 @@ export function openAnswerHandler(bridge: BridgeClient): RequestHandler {
     handle: async (input: HandlerInput) => {
       const intent = getIntentName(input.requestEnvelope);
       const mapping = SPOKEN_SLOT[intent] as { name: string; type: string };
-      const spoken = slotValue(getSlot(input.requestEnvelope, mapping.name), mapping.type)?.value;
+      const value = slotValue(getSlot(input.requestEnvelope, mapping.name), mapping.type);
+      const text = value?.resolvedValue ?? value?.value;
       const output = await bridge.turn(input, {
         type: 'turn',
-        utterance: { ...(spoken ? { text: spoken } : {}) },
+        utterance: { ...(text ? { text } : {}) },
       });
       return render(input, output);
     },

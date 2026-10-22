@@ -21,7 +21,7 @@ Where each part of that lives, and what it is called in the code:
 
 ## The contract
 
-`packages/core` owns every type that crosses a boundary. A frontend sends a `TurnInput` (`warmup`, `turn`, `answer`, `poll`, `cancel`) wrapped in an `AgentInvocation` (hashed actor and session ids, locale, budget) and gets a `TurnOutput` back. The Alexa Skill is one frontend; the CLI harness is another; a web frontend would be a third without touching the agent.
+`packages/core` owns every type that crosses a boundary. A frontend sends a `TurnInput` (`warmup`, `turn`, `answer`, `poll`, `cancel`, `tool`) wrapped in an `AgentInvocation` (hashed actor and session ids, locale, budget) and gets a `TurnOutput` back. The Alexa Skill is one frontend; the CLI harness is another; a web frontend would be a third without touching the agent.
 
 Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user id is the Memory actor id; the hashed Alexa session id is the Memory session id. The AgentCore runtime session id is the hash of the user id and the runtime version the stack deployed (`AGENT_RUNTIME_VERSION`; 64 hex characters, no dots): one session per user, so a parked question survives a new Alexa session, and a new one after each deploy, so a user who keeps talking reaches the new code at their next turn instead of keeping the old microVM for up to `runtime.maxLifetimeHours`. Memory carries over because it lives in AgentCore Memory, not the microVM. Logs everywhere carry hashed ids only.
 
@@ -29,18 +29,19 @@ Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user i
 
 `packages/agent/src/turn.ts` is the story; read it first. The state table:
 
-| Input    | In state                       | Behavior                                                                                                      |
-| -------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `warmup` | `cold`                         | Return `done` at once; MCP `initialize`, `tools/list`, memory hydration run in the background                 |
-| `turn`   | `warming`                      | Wait for warm-up, bounded by the budget; `pending` if it does not finish                                      |
-| `turn`   | `ready`                        | Start a `TurnRun`; `waitForOutcome(deadline)` returns finished, question, or deadline                         |
-| `turn`   | `awaiting-answer`              | The user changed topic: cancel the question, let the tool call unwind (2 s cap), discard, run the new turn    |
-| `turn`   | `overrun`                      | `pending` without starting another run; the Lambda polls first                                                |
-| `answer` | `awaiting-answer`, matching id | Map the answer; more properties left: ask the next one; else resolve the elicitation and wait on the same run |
-| `answer` | stale or unknown id            | Treated as a `turn` with the answer as text; what the user said is never dropped                              |
-| `poll`   | `overrun`                      | The result if ready, else `pending`                                                                           |
-| `poll`   | other                          | `done` with empty speech                                                                                      |
-| `cancel` | any                            | Cancel pending questions, abort the run, `done`                                                               |
+| Input    | In state                       | Behavior                                                                                                                                                                                                                                                                                |
+| -------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `warmup` | `cold`                         | Return `done` at once; MCP `initialize`, `tools/list`, memory hydration run in the background                                                                                                                                                                                           |
+| `turn`   | `warming`                      | Wait for warm-up, bounded by the budget; `pending` if it does not finish                                                                                                                                                                                                                |
+| `turn`   | `ready`                        | Start a `TurnRun`; `waitForOutcome(deadline)` returns finished, question, or deadline                                                                                                                                                                                                   |
+| `turn`   | `awaiting-answer`              | The user changed topic: cancel the question, let the tool call unwind (2 s cap), discard, run the new turn                                                                                                                                                                              |
+| `turn`   | `overrun`                      | `pending` without starting another run; the Lambda polls first                                                                                                                                                                                                                          |
+| `answer` | `awaiting-answer`, matching id | Map the answer; more properties left: ask the next one; else resolve the elicitation and wait on the same run                                                                                                                                                                           |
+| `answer` | stale or unknown id            | Treated as a `turn` with the answer as text; what the user said is never dropped                                                                                                                                                                                                        |
+| `poll`   | `overrun`                      | The result if ready, else `pending`                                                                                                                                                                                                                                                     |
+| `poll`   | other                          | `done` with empty speech                                                                                                                                                                                                                                                                |
+| `cancel` | any                            | Cancel pending questions, abort the run, `done`                                                                                                                                                                                                                                         |
+| `tool`   | any                            | A tool called by name without the model (D57): the launch tool, a mapped built-in intent. Drop a pending question and a running run, wait for warm-up, call it, speak its result field, render its widget; empty speech when it gives nothing to say, so the frontend uses its own line |
 
 `TurnRun.waitForOutcome(deadline)` is the one primitive: whichever comes first of the agent loop finishing, a question becoming current, or the deadline. It serves `turn`, `answer`, and `poll` alike.
 
@@ -54,6 +55,8 @@ With `visual.enabled` on and a frontend that sends `display` (`width`, `height`,
 2. After a `done` run, if the envelope has `display`, a widget was remembered, and at least 1 s of the deadline is left, the agent reads the `ui://` resource (once per URI for the container's life) and hands it to `WidgetRenderer`.
 3. The renderer is a headless Chromium started at warm-up. Its one page is a minimal MCP Apps host (`packages/agent/src/visual/host-page.ts`): the widget runs in a fresh sandboxed iframe at 768×480, gets `ui/initialize` answered with the theme and `displayMode: fullscreen`, then `tool-input` and `tool-result`. On `size-changed` (or after 800 ms, with a warning) the page is shot at `min(width, 1280) / 768` scale as a JPEG, quality 60, or 45 when that passes 90 KB; above that there is no image. The page reaches no network: Chromium's only proxy is a dead port with loopback included, WebRTC may not send UDP outside it, and request interception aborts every request but `data:` and `about:` on top. The widget's frame is removed after the shot.
 4. The render is cut off at the deadline. A widget that throws, a browser that will not start, a resource that will not load: the turn goes out with its speech and `visual: null`. A widget that hangs or crashes its page (the renderer heap is capped at 256 MB) costs one render: the browser is killed and the next render starts a new one.
+
+The Alexa Skill shows the image as one APL `RenderDocument` (D55) whose `settings.idleTimeout` asks the device to keep it up for `visual.idleTimeoutMs`, a minute by default (D68).
 
 The browser is in the agent image only when `visual.enabled` is on at deploy: the stack builds the image with `WITH_SCREEN=1`. With the screen on and no browser in the image, the agent logs one warning and turns carry no visual.
 
@@ -74,7 +77,7 @@ MCP 2025-11-25 delivers elicitation as a server-to-client request on the still-o
 
 1. The agent calls a tool; the server sends `elicitation/create`. The MCP client's request handler hands the params to `QuestionQueue.elicit()`, which plans one spoken question per property (required first) and returns a promise. The tool call is now parked.
 2. `waitForOutcome` sees the question and the turn returns `status: 'question'`. The Lambda speaks it and stores `{id, expects, source, message}` in session attributes; the session stays open with a reprompt.
-3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which fire while a question is pending; with none pending and the session open, a date, number, choice or free-text answer is an ordinary turn carrying the spoken words (D49). The Lambda sends `{type: 'answer', questionId, answer}`.
+3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which fire while a question is pending; with none pending and the session open, a date, number, choice or free-text answer is an ordinary turn carrying the spoken words (D49), or a choice's canonical value when entity resolution matched it ("b" for "bee", D67). The Lambda sends `{type: 'answer', questionId, answer}`.
 4. The agent maps the answer deterministically (yes/no, `AMAZON.DATE`, `AMAZON.NUMBER`, enum with entity resolution, spoken number words). Free text against a typed property goes through one structured-output model call, then the same deterministic validation. An unusable answer re-asks.
 5. When every property has a value the elicitation resolves with `accept`, the tool continues, and the agent phrases the result. "No" to a non-yes/no question declines; stop, session end, a new topic, or the answer timeout cancel.
 6. `ask_user`, the agent's own tool for a missing argument, goes through the same queue, so the frontend sees one kind of question.
@@ -93,12 +96,12 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D56) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D68) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).
 - Reasoning off by default (D20): 4.2 s per turn versus 5.7 s at `low`.
-- `endSession` is true unless the answer ends with a question (D25).
+- `endSession` is true unless the answer ends with a question (D25), or, with `speech.endSessionField` set, only when the server's result says so (D58).
 
 ## Verified against live behavior
 

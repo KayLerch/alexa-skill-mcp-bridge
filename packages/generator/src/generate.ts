@@ -5,7 +5,11 @@ import {
   type ManifestTool,
   type ToolManifest,
 } from '@alexa-mcp-bridge/core';
-import { buildInteractionModel, type InteractionModel } from './interaction-model.js';
+import {
+  answerIntentSlots,
+  buildInteractionModel,
+  type InteractionModel,
+} from './interaction-model.js';
 import { buildManifest } from './manifest.js';
 import { spokenWords } from './names.js';
 import { scanServer, type ScanResult } from './scan.js';
@@ -68,6 +72,11 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   if (versionWarning) log(`warning: ${versionWarning}`);
 
   const { manifest: draft, customTypes } = buildManifest(scan, [], config.tools.hiddenArguments);
+  for (const [field, tool] of directCalls(config)) {
+    if (!scan.tools.some((t) => t.name === tool)) {
+      notes.push(`${field} names the tool ${tool}, which the server does not list`);
+    }
+  }
   const models: Record<string, InteractionModel> = {};
   const files: string[] = [];
   let examplePhrases: string[] = [];
@@ -111,7 +120,18 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         notes.push(`${locale} override for ${tool.intent} rejected: "${r}"`);
       utterancesByIntent[tool.intent] = merged.utterances;
     }
+    // The bridge's own answer intents take extra samples too, checked against their slots.
+    const answerSamples: Record<string, string[]> = {};
     for (const [intent, extra] of Object.entries(overrides.utterances)) {
+      const slots = answerIntentSlots(intent);
+      if (!slots) continue;
+      const merged = mergeOverrides([], extra, slots);
+      for (const r of merged.rejected)
+        notes.push(`${locale} override for ${intent} rejected: "${r}"`);
+      answerSamples[intent] = merged.utterances;
+    }
+    for (const [intent, extra] of Object.entries(overrides.utterances)) {
+      if (answerIntentSlots(intent)) continue;
       if (!utterancesByIntent[intent] && !draft.tools.some((t) => t.intent === intent)) {
         notes.push(
           `${locale} override for unknown intent ${intent} ignored (${extra.length} utterances)`,
@@ -147,12 +167,24 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       config.skill.invocationName,
       {
         toolIntents: config.features.toolIntents,
+        answerIntents: config.answers.intents,
         catchAll: config.features.catchAll,
         catchAllPhrases: [...overrides.catchAll, ...training.catchAll],
         aliases,
         slotSynonyms: overrides.slotSynonyms,
+        builtIns: Object.keys(config.intents.builtIns),
+        fallbackSensitivity: config.skill.fallbackSensitivity,
+        answerSamples,
+        answerChoices: config.answers.choices,
       },
     );
+    const built = new Set(model.interactionModel.languageModel.intents.map((i) => i.name));
+    for (const intent of Object.keys(answerSamples).filter((name) => !built.has(name))) {
+      notes.push(
+        `${locale} override for ${intent} ignored: the model has no answer choices ` +
+          '(no tool enum, no answers.choices)',
+      );
+    }
     models[locale] = model;
     const file = join(paths.interactionModelDir, `${locale}.json`);
     writeGeneratedJson(file, model as unknown as Record<string, unknown>);
@@ -166,23 +198,63 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   return { manifest, models, files, notes };
 }
 
-/** The first utterance with its slots filled with spoken placeholders, for the greeting (plan D3). */
+/** The tools the bridge calls itself (D57, D59), with the config field that names each. */
+function directCalls(config: BridgeConfig): [string, string][] {
+  const calls: [string, string][] = [];
+  if (config.skill.launch) calls.push(['skill.launch', config.skill.launch.tool]);
+  for (const [intent, action] of Object.entries(config.intents.builtIns)) {
+    if (action && 'tool' in action) calls.push([`intents.builtIns.${intent}`, action.tool]);
+  }
+  return calls;
+}
+
+/**
+ * A phrase for the greeting and help (plan D3): the first utterance whose slots all have a
+ * value a listener would say, else the first one without slots, else the tool's name. A free-text
+ * slot is filled only from the argument's JSON Schema `examples` or `default`, never with a
+ * placeholder such as "some destination" (D61).
+ */
 export function examplePhrase(tool: ManifestTool, utterances: string[]): string {
-  const withSlots =
-    utterances.find((u) => u.includes('{')) ?? utterances[0] ?? spokenWords(tool.name);
-  return withSlots.replace(/\{([^{}]*)\}/g, (_m, slotName: string) => {
-    const slot = tool.slots.find((s) => s.slot === slotName);
-    switch (slot?.slotType) {
-      case 'AMAZON.DATE':
-        return 'tomorrow';
-      case 'AMAZON.NUMBER':
-        return 'two';
-      case 'YesNoType':
-        return 'yes';
-      case 'AMAZON.SearchQuery':
-        return `some ${spokenWords(slot.argument)}`;
-      default:
-        return slot?.customType?.values[0]?.value ?? spokenWords(slot?.argument ?? slotName);
-    }
-  });
+  const fill = (utterance: string): string | undefined => {
+    let complete = true;
+    const phrase = utterance.replace(/\{([^{}]*)\}/g, (_m, slotName: string) => {
+      const value = exampleValue(tool, slotName);
+      if (value === undefined) complete = false;
+      return value ?? '';
+    });
+    return complete ? phrase : undefined;
+  };
+  for (const utterance of utterances.filter((u) => u.includes('{'))) {
+    const phrase = fill(utterance);
+    if (phrase) return phrase;
+  }
+  return utterances.find((u) => !u.includes('{')) ?? spokenWords(tool.name);
+}
+
+function exampleValue(tool: ManifestTool, slotName: string): string | undefined {
+  const slot = tool.slots.find((s) => s.slot === slotName);
+  if (!slot) return undefined;
+  switch (slot.slotType) {
+    case 'AMAZON.DATE':
+      return 'tomorrow';
+    case 'AMAZON.NUMBER':
+      return 'two';
+    case 'YesNoType':
+      return 'yes';
+    case 'AMAZON.SearchQuery':
+      return schemaExample(tool.inputSchema, slot.argument);
+    default:
+      return slot.customType?.values[0]?.value;
+  }
+}
+
+/** The argument's own example, as the server's schema states it: `examples[0]`, else `default`. */
+function schemaExample(inputSchema: Record<string, unknown>, argument: string): string | undefined {
+  const properties = inputSchema.properties as Record<string, Record<string, unknown>> | undefined;
+  const property = properties?.[argument];
+  const examples = property?.examples;
+  const candidate = Array.isArray(examples) ? examples[0] : property?.default;
+  return typeof candidate === 'string' && candidate.trim()
+    ? candidate.trim().toLowerCase()
+    : undefined;
 }

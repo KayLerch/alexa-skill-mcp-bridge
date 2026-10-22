@@ -111,7 +111,7 @@ const bridge: Bridge = args.remote
         ...config,
         features: { ...config.features, debug: collect },
         // A display on the command line means: render the screen in this process.
-        visual: { enabled: config.visual.enabled || Boolean(display) },
+        visual: { ...config.visual, enabled: config.visual.enabled || Boolean(display) },
       },
       identity,
       logger,
@@ -154,6 +154,21 @@ if (notReady) {
   process.exit(1);
 }
 stdout.write('Connected. ');
+// The Alexa Skill opens with skill.launch when it is set (D57); so does the chat.
+const launch = config.skill.launch;
+if (launch) {
+  stdout.write('\n');
+  const started = Date.now();
+  await show(
+    await bridge.turn({
+      type: 'tool',
+      tool: launch.tool,
+      ...(launch.arguments ? { arguments: launch.arguments } : {}),
+      intent: 'LaunchRequest',
+    }),
+    Date.now() - started,
+  );
+}
 
 for (;;) {
   const line = await ask(pendingQuestion ? 'answer> ' : 'you> ');

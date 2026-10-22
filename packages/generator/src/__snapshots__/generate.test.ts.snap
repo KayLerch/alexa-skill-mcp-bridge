@@ -8,7 +8,7 @@ exports[`generate (template utterances) > matches the snapshot for the hotels an
   },
   "examplePhrases": [
     "search hotels on tomorrow",
-    "get weather city some city",
+    "get weather",
   ],
   "protocolVersion": "2025-11-25",
   "server": {
@@ -291,6 +291,12 @@ exports[`generate (template utterances) > matches the snapshot for the hotels an
         },
         {
           "name": "AMAZON.NavigateHomeIntent",
+        },
+        {
+          "name": "AMAZON.RepeatIntent",
+        },
+        {
+          "name": "AMAZON.NextIntent",
         },
       ],
       "invocationName": "bridge demo",

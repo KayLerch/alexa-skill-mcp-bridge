@@ -16,6 +16,7 @@ import {
   type Logger,
   type TurnInput,
   type TurnOutput,
+  userTokenMiddleware,
 } from '@alexa-mcp-bridge/core';
 import { displayOf } from './apl/screen.js';
 import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
@@ -26,7 +27,7 @@ import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
  * When a result is outstanding it polls first and speaks that result ahead of the new
  * input (plan D16); the poll's time comes out of the main call's budget.
  * With mcp.auth.type 'alexaAccountLinking' the user's account-linked token rides along on
- * every envelope; without one the user is asked to link, and the agent only hears a cancel
+ * every call, in a header beside the envelope (D63); without one the user is asked to link, and the agent only hears a cancel
  * without a token, which makes it forget the conversation (D48).
  */
 export interface BridgeClientOptions {
@@ -36,11 +37,12 @@ export interface BridgeClientOptions {
   runtimeVersion?: string;
   logger: Logger;
   client?: BedrockAgentCoreClient;
-  /** Test seam: replaces the network call. */
+  /** Test seam: replaces the network call. The token comes apart from the envelope (D63). */
   invoke?: (
     envelope: AgentInvocationInput,
     sessionId: string,
     signal: AbortSignal,
+    userToken?: string,
   ) => Promise<TurnOutput>;
 }
 
@@ -65,17 +67,22 @@ export class BridgeClient {
       options.client ?? new BedrockAgentCoreClient({ region: options.config.aws.region });
     this.invoke =
       options.invoke ??
-      (async (envelope, sessionId, signal) => {
-        const response = await client.send(
-          new InvokeAgentRuntimeCommand({
-            agentRuntimeArn: options.runtimeArn,
-            runtimeSessionId: sessionId,
-            contentType: 'application/json',
-            accept: 'application/json',
-            payload: Buffer.from(JSON.stringify(envelope)),
-          }),
-          { abortSignal: signal },
-        );
+      (async (envelope, sessionId, signal, userToken) => {
+        const command = new InvokeAgentRuntimeCommand({
+          agentRuntimeArn: options.runtimeArn,
+          runtimeSessionId: sessionId,
+          contentType: 'application/json',
+          accept: 'application/json',
+          payload: Buffer.from(JSON.stringify(envelope)),
+        });
+        // The token goes in a header, never the payload the runtime logs (D63).
+        if (userToken) {
+          command.middlewareStack.add(userTokenMiddleware(userToken), {
+            step: 'build',
+            name: 'bridgeUserToken',
+          });
+        }
+        const response = await client.send(command, { abortSignal: signal });
         const body = await response.response?.transformToString();
         return turnOutputSchema.parse(JSON.parse(body ?? '{}'));
       });
@@ -154,7 +161,13 @@ export class BridgeClient {
     let budgetMs = config.turn.budgetMs - (Date.now() - lookupStarted);
     let prefix = '';
 
-    if (isAwaitingResult(input) && turn.type !== 'poll' && turn.type !== 'cancel') {
+    // A direct tool call (D57) is the user moving on: the agent drops the old run instead.
+    if (
+      isAwaitingResult(input) &&
+      turn.type !== 'poll' &&
+      turn.type !== 'cancel' &&
+      turn.type !== 'tool'
+    ) {
       const started = Date.now();
       const polled = await this.send(call, { type: 'poll' }, budgetMs, log);
       budgetMs -= Date.now() - started;
@@ -220,7 +233,6 @@ export class BridgeClient {
       locale: call.locale,
       budgetMs,
       debug: config.features.debug,
-      ...(call.userToken ? { userToken: call.userToken } : {}),
       ...(call.timeZone ? { timeZone: call.timeZone } : {}),
       ...(call.display ? { display: call.display } : {}),
     };
@@ -232,6 +244,7 @@ export class BridgeClient {
         envelope,
         runtimeSessionFor(call.actorId, this.options.runtimeVersion),
         aborter.signal,
+        call.userToken,
       );
       log.info('agent answered', { status: output.status, elapsedMs: Date.now() - started });
       return output;

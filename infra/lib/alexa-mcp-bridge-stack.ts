@@ -8,6 +8,10 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import {
   ALEXA_PLUS_PROTOCOL_VERSION,
+  USER_TOKEN_HEADER,
+  CONFIG_ENV_VAR,
+  PROMPT_ADDENDUM_ENV_VAR,
+  RUNTIME_ENV_VALUE_MAX,
   serializeConfig,
   type BridgeConfig,
 } from '@alexa-mcp-bridge/core';
@@ -29,9 +33,16 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: AlexaMcpBridgeStackProps) {
     super(scope, id, props);
     const { config, repoRoot } = props;
-    const configJson = serializeConfig(config);
-    const { promptAddendum: _addendum, ...agentWithoutAddendum } = config.agent;
-    const lambdaConfigJson = serializeConfig({ ...config, agent: agentWithoutAddendum });
+    // The addendum travels on its own (PROMPT_ADDENDUM_ENV_VAR): the Lambda has no use for it,
+    // and the runtime's variables are capped at RUNTIME_ENV_VALUE_MAX characters each.
+    const { promptAddendum, ...agentWithoutAddendum } = config.agent;
+    // answers.choices and answers.intents shape the interaction model only; the deployed code never
+    // reads them (D67, D69).
+    const configJson = serializeConfig({
+      ...config,
+      agent: agentWithoutAddendum,
+      answers: { choices: {} },
+    });
     const retention = retentionFor(config.aws.logRetentionDays);
 
     // Memory: short-term events always; long-term extraction strategies when memory.longTerm.
@@ -60,10 +71,27 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
     const runtimeEnv: Record<string, string> = {
-      BRIDGE_CONFIG: configJson,
+      [CONFIG_ENV_VAR]: configJson,
+      // JSON-encoded: AgentCore refuses control characters (the addendum's newlines) in a value.
+      ...(promptAddendum ? { [PROMPT_ADDENDUM_ENV_VAR]: JSON.stringify(promptAddendum) } : {}),
       MEMORY_ID: memory.memoryId,
       LOG_LEVEL: config.features.debug ? 'debug' : 'info',
     };
+    for (const [name, value] of Object.entries(runtimeEnv)) {
+      if (cdk.Token.isUnresolved(value)) continue;
+      // eslint-disable-next-line no-control-regex -- the characters AgentCore refuses
+      if (/[\u0000-\u001f\u007f]/.test(value)) {
+        throw new Error(
+          `${name} for the agent runtime holds a control character; AgentCore refuses them.`,
+        );
+      }
+      if (value.length > RUNTIME_ENV_VALUE_MAX) {
+        throw new Error(
+          `${name} for the agent runtime is ${value.length} characters; AgentCore allows ${RUNTIME_ENV_VALUE_MAX}. ` +
+            'Shorten the longest config strings (skill.help, skill.greeting, the messages).',
+        );
+      }
+    }
     const runtime = new agentcore.Runtime(this, 'Runtime', {
       runtimeName: 'alexa_mcp_bridge',
       description: 'Alexa MCP bridge agent',
@@ -79,6 +107,10 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
         maxLifetime: cdk.Duration.hours(config.runtime.maxLifetimeHours),
       },
       environmentVariables: runtimeEnv,
+      // With account linking the user's token arrives in this header, not the logged payload (D63).
+      ...(config.mcp.auth.type === 'alexaAccountLinking'
+        ? { requestHeaderConfiguration: { allowlistedHeaders: [USER_TOKEN_HEADER] } }
+        : {}),
       loggingConfigs: [
         {
           logType: agentcore.LogType.APPLICATION_LOGS,
@@ -156,7 +188,7 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       environment: {
         // The Alexa Skill Lambda has no use for the prompt addendum, and Lambda's environment
         // is capped at 4 KB in total.
-        BRIDGE_CONFIG: lambdaConfigJson,
+        [CONFIG_ENV_VAR]: configJson,
         AGENT_RUNTIME_ARN: runtime.agentRuntimeArn,
         // Changes on every runtime update, so users leave microVMs running the old code.
         AGENT_RUNTIME_VERSION: runtime.agentRuntimeVersion ?? '',

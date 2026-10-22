@@ -27,7 +27,8 @@ describe('parseConfig', () => {
       catchAll: true,
     });
     expect(config.aws).toEqual({ region: 'us-east-1', logRetentionDays: 7 });
-    expect(config.visual).toEqual({ enabled: false });
+    expect(config.visual).toEqual({ enabled: false, idleTimeoutMs: 60000 });
+    expect(config.answers).toEqual({ choices: {} });
   });
 
   it('fails on a missing mcp.url with the field path and the fix', () => {
@@ -63,6 +64,52 @@ describe('parseConfig', () => {
   });
 });
 
+describe('answers.choices (D67)', () => {
+  const withChoices = (choices: unknown) =>
+    parseConfig({ mcp: { url: 'http://x/mcp' }, answers: { choices } });
+
+  it('takes canonical choices with spoken synonyms', () => {
+    const config = withChoices({
+      a: ['ay', 'option a', 'the first one'],
+      b: ['bee', 'be'],
+      "c'est": [],
+    });
+    expect(config.answers.choices.b).toEqual(['bee', 'be']);
+  });
+
+  it.each([
+    [{ A: [] }, /answers\.choices/],
+    [{ a: ['Option A'] }, /answers\.choices\.a/],
+    [{ a: ['option 1'] }, /lowercase words/],
+    [{ 'a.': [] }, /answers\.choices/],
+    [{ a: ['  '] }, /answers\.choices\.a/],
+  ])('refuses what Alexa refuses in a slot value: %j', (choices, message) => {
+    expect(() => withChoices(choices)).toThrowError(message);
+  });
+
+  it('refuses a synonym that belongs to two choices or names another choice', () => {
+    expect(() => withChoices({ a: ['the one'], b: ['the one'] })).toThrowError(
+      /answers\.choices\.b: "the one" is already a synonym of "a"/,
+    );
+    expect(() => withChoices({ a: ['b'], b: [] })).toThrowError(
+      /answers\.choices\.a: "b" is itself a choice/,
+    );
+  });
+});
+
+describe('visual.idleTimeoutMs', () => {
+  it('is at least ten seconds', () => {
+    const config = parseConfig({ mcp: { url: 'http://x/mcp' }, visual: { idleTimeoutMs: 90000 } });
+    expect(config.visual.idleTimeoutMs).toBe(90000);
+    expect(() =>
+      parseConfig({ mcp: { url: 'http://x/mcp' }, visual: { idleTimeoutMs: 5000 } }),
+    ).toThrowError(/visual\.idleTimeoutMs/);
+    expect(() =>
+      parseConfig({ mcp: { url: 'http://x/mcp' }, visual: { idleTimeoutMs: 60000.5 } }),
+    ).toThrowError(/visual\.idleTimeoutMs/);
+  });
+});
+
 describe('env round trip', () => {
   it('serializes and loads back identically', () => {
     const config = parseConfig({ mcp: { url: 'http://x/mcp' }, features: { debug: true } });
@@ -72,6 +119,15 @@ describe('env round trip', () => {
 
   it('explains a missing env var', () => {
     expect(() => loadConfigFromEnv({})).toThrowError(/BRIDGE_CONFIG is not set/);
+  });
+
+  it('takes the prompt addendum from its own env var (AgentCore caps a variable at 2048 characters)', () => {
+    const config = parseConfig({ mcp: { url: 'http://localhost:3000/mcp' } });
+    const loaded = loadConfigFromEnv({
+      BRIDGE_CONFIG: serializeConfig(config),
+      BRIDGE_PROMPT_ADDENDUM: JSON.stringify('Ask one question at a time.\n- Speak say.'),
+    });
+    expect(loaded.agent.promptAddendum).toBe('Ask one question at a time.\n- Speak say.');
   });
 });
 

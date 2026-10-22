@@ -1,13 +1,16 @@
 import askSdk from 'ask-sdk-core';
+import { screenSettingsInterceptor } from './apl/screen.js';
 import { BridgeClient } from './bridge.js';
 import { config, logger, manifest, runtimeArn, runtimeVersion } from './config.js';
 import { answerHandler, openAnswerHandler, yesNoTurnHandler } from './handlers/answers.js';
 import { freeTextHandler } from './handlers/free-text.js';
 import { launchHandler } from './handlers/launch.js';
 import {
+  builtInHandler,
   errorHandler,
   fallbackHandler,
   helpHandler,
+  repeatHandler,
   sessionEndedHandler,
   stopHandler,
 } from './handlers/standard.js';
@@ -28,10 +31,13 @@ const builder = askSdk.SkillBuilders.custom()
     freeTextHandler(bridge),
     yesNoTurnHandler(bridge),
     helpHandler(config, manifest),
-    stopHandler(bridge),
-    fallbackHandler(bridge),
+    repeatHandler(),
+    builtInHandler(bridge, config),
+    stopHandler(bridge, config),
+    fallbackHandler(bridge, config),
     sessionEndedHandler(bridge, logger),
   )
+  .addRequestInterceptors(screenSettingsInterceptor(config))
   .addErrorHandlers(errorHandler(logger))
   .withApiClient(new askSdk.DefaultApiClient())
   .withCustomUserAgent('alexa-skill-mcp-bridge');

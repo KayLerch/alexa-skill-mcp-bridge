@@ -158,11 +158,82 @@ describe('generate (template utterances)', () => {
     rmSync(join(dir, 'profile'), { recursive: true, force: true });
   });
 
+  it("takes overrides for the bridge's own answer intents and checks their slots", async () => {
+    // The hotels server has no enums: the choice intent exists only through answers.choices.
+    const config = parseConfig({ mcp: { url: server.url }, answers: { choices: { a: [] } } });
+    mkdirSync(paths().overridesDir, { recursive: true });
+    writeFileSync(
+      join(paths().overridesDir, 'en-US.utterances.json'),
+      JSON.stringify({
+        ChoiceAnswerIntent: ['my pick is {choice}', 'my pick is {answer}'],
+        NumberAnswerIntent: ['party of {number}'],
+      }),
+    );
+    const result = await generate({ config, paths: paths(), useModel: false });
+    const samples = (name: string) =>
+      result.models['en-US']?.interactionModel.languageModel.intents.find((i) => i.name === name)
+        ?.samples ?? [];
+    expect(samples('ChoiceAnswerIntent')[0]).toBe('my pick is {choice}');
+    expect(samples('NumberAnswerIntent')[0]).toBe('party of {number}');
+    expect(result.notes).toEqual([
+      expect.stringMatching(/override for ChoiceAnswerIntent rejected: "my pick is \{answer\}"/),
+    ]);
+    const plain = await generate({
+      config: parseConfig({ mcp: { url: server.url } }),
+      paths: paths(),
+      useModel: false,
+    });
+    expect(plain.notes).toContainEqual(
+      expect.stringMatching(
+        /override for ChoiceAnswerIntent ignored: the model has no answer choices/,
+      ),
+    );
+    rmSync(paths().overridesDir, { recursive: true, force: true });
+  });
+
+  it('adds answers.choices to the answer choice type (D67)', async () => {
+    const config = parseConfig({
+      mcp: { url: server.url },
+      answers: { choices: { b: ['bee', 'option b'] } },
+    });
+    const result = await generate({ config, paths: paths(), useModel: false });
+    const type = result.models['en-US']?.interactionModel.languageModel.types.find(
+      (t) => t.name === 'AnswerChoiceType',
+    );
+    expect(type?.values).toContainEqual({
+      id: 'b',
+      name: { value: 'b', synonyms: ['bee', 'option b'] },
+    });
+  });
+
   it('matches the snapshot for the hotels and weather server', async () => {
     const config = parseConfig({ mcp: { url: server.url } });
     const result = await generate({ config, paths: paths(), useModel: false });
     expect(result.manifest).toMatchSnapshot();
     expect(result.models['en-US']).toMatchSnapshot();
+  });
+});
+
+describe('direct calls (D57, D59)', () => {
+  it('notes a launch or built-in tool the server does not list', async () => {
+    const config = parseConfig({
+      mcp: { url: server.url },
+      skill: { launch: { tool: 'suggest_trip' } },
+      intents: {
+        builtIns: {
+          'AMAZON.NextIntent': { tool: 'get_weather' },
+          'AMAZON.StopIntent': { tool: 'end_trip' },
+        },
+      },
+    });
+    const result = await generate({ config, paths: paths(), useModel: false });
+    expect(result.notes).toContain(
+      'skill.launch names the tool suggest_trip, which the server does not list',
+    );
+    expect(result.notes).toContain(
+      'intents.builtIns.AMAZON.StopIntent names the tool end_trip, which the server does not list',
+    );
+    expect(result.notes.join('\n')).not.toContain('get_weather');
   });
 });
 
@@ -187,6 +258,27 @@ describe('examplePhrase', () => {
       ['search hotels', 'search hotels guests {guests}'],
     );
     expect(phrase).toBe('search hotels guests two');
+  });
+
+  const findPark = (inputSchema: Record<string, unknown>) => ({
+    name: 'find_park',
+    intent: 'FindParkIntent',
+    slots: [{ argument: 'query', slot: 'query', slotType: 'AMAZON.SearchQuery', required: true }],
+    elicitedArguments: [],
+    inputSchema,
+  });
+
+  it('never fills a free-text slot with a placeholder (D61)', () => {
+    const phrase = examplePhrase(findPark({}), ['find a park for {query}', 'find me a park']);
+    expect(phrase).toBe('find me a park');
+    expect(examplePhrase(findPark({}), ['find a park for {query}'])).toBe('find park');
+  });
+
+  it("fills a free-text slot from the schema's own example", () => {
+    const schema = { properties: { query: { type: 'string', examples: ['Quiet Lakes'] } } };
+    expect(examplePhrase(findPark(schema), ['find a park for {query}'])).toBe(
+      'find a park for quiet lakes',
+    );
   });
 });
 

@@ -9,6 +9,8 @@ import {
   upsertEnv,
   writeSkillEndpoint,
 } from './lib.ts';
+import { stageProfileSkillPackage } from './skill-package.ts';
+import { resolveProfileDir } from '@alexa-mcp-bridge/core';
 
 /**
  * npm run skill:deploy
@@ -16,7 +18,9 @@ import {
  * Deploys the Alexa Skill: puts the Lambda ARN into skill-package/skill.json, runs `ask deploy`
  * from the repo root (where ask-resources.json lives), and records the Alexa Skill id in .env so
  * the next `npm run deploy` can lock the Lambda to it. `npm run deploy` writes the ARN into .env
- * as BRIDGE_LAMBDA_ARN; an ARN pasted into skill.json by hand works too.
+ * as BRIDGE_LAMBDA_ARN; an ARN pasted into skill.json by hand works too. With a profile folder
+ * (BRIDGE_PROFILE_DIR), its skill-package/skill.json and assets/ are laid over the repo's for the
+ * deploy and taken off again afterwards (D62).
  */
 const { root, config } = await loadRepo();
 const locale = config.skill.locales[0] ?? 'en-US';
@@ -57,8 +61,23 @@ if (inSkillJson !== arn) {
   );
 }
 
+const profileDir = resolveProfileDir(root);
+const staged = profileDir ? stageProfileSkillPackage(root, profileDir, arn) : undefined;
+if (staged) {
+  for (const note of staged.notes) console.log(`Profile listing: ${note}`);
+  // Ctrl-C during ask deploy must not leave the profile's listing in tracked files.
+  process.once('SIGINT', () => {
+    staged.restore();
+    process.exit(130);
+  });
+}
 console.log('Deploying the Alexa Skill with ask deploy (from the repo root)...');
-const status = run('ask', ['deploy'], root);
+let status: number;
+try {
+  status = run('ask', ['deploy'], root);
+} finally {
+  staged?.restore();
+}
 if (status !== 0) process.exit(status);
 
 const skillId = deployedSkillId(root);
