@@ -1,6 +1,11 @@
-import type { HandlerInput } from 'ask-sdk-core';
+import type { HandlerInput, RequestInterceptor } from 'ask-sdk-core';
 import type { Directive } from 'ask-sdk-model';
-import type { Display, Visual } from '@alexa-mcp-bridge/core';
+import {
+  SCREEN_IDLE_TIMEOUT_MS,
+  type BridgeConfig,
+  type Display,
+  type Visual,
+} from '@alexa-mcp-bridge/core';
 
 /**
  * The screen of an Alexa+ device (D55). The agent returns the MCP server's widget as a JPEG; the
@@ -21,6 +26,25 @@ interface Viewport {
   currentPixelWidth?: number;
   currentPixelHeight?: number;
   theme?: string;
+}
+
+const IDLE_TIMEOUT_ATTRIBUTE = 'screenIdleTimeoutMs';
+
+/** Hands visual.idleTimeoutMs to render() for this request, which knows no config (D68). */
+export function screenSettingsInterceptor(config: BridgeConfig): RequestInterceptor {
+  return {
+    process: (input: HandlerInput) => {
+      const attributes = input.attributesManager.getRequestAttributes();
+      attributes[IDLE_TIMEOUT_ATTRIBUTE] = config.visual.idleTimeoutMs;
+      input.attributesManager.setRequestAttributes(attributes);
+    },
+  };
+}
+
+/** The screen's idle timeout for this request: the config's, else the default. */
+export function screenIdleTimeoutMs(input: HandlerInput): number {
+  const value: unknown = input.attributesManager.getRequestAttributes()[IDLE_TIMEOUT_ATTRIBUTE];
+  return typeof value === 'number' ? value : SCREEN_IDLE_TIMEOUT_MS;
 }
 
 export function supportsApl(input: HandlerInput): boolean {
@@ -46,14 +70,22 @@ function positive(n: unknown): number | undefined {
   return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined;
 }
 
-/** One RenderDocument: a black screen with the picture best-fit and centred. */
-export function screenDirective(visual: Visual): Directive {
+/**
+ * One RenderDocument: a black screen with the picture best-fit and centred. `settings.idleTimeout`
+ * (document level, milliseconds) asks the device to keep it up that long without activity; the
+ * device's own default took it down too early (D68). A recommendation the device may bound.
+ */
+export function screenDirective(
+  visual: Visual,
+  idleTimeoutMs: number = SCREEN_IDLE_TIMEOUT_MS,
+): Directive {
   return {
     type: 'Alexa.Presentation.APL.RenderDocument',
     token: SCREEN_TOKEN,
     document: {
       type: 'APL',
       version: APL_VERSION,
+      settings: { idleTimeout: idleTimeoutMs },
       mainTemplate: {
         items: [
           {

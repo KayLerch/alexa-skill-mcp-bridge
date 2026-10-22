@@ -162,6 +162,9 @@ export default defineConfig({
     // Chromium in the agent container at warm-up, which adds about 340 MB of memory per session.
     // The browser is built into the agent image only when this is on: change it, then npm run deploy.
     enabled: false,
+    // How long the screen should stay up without activity (APL settings.idleTimeout, D68), in
+    // milliseconds, at least 10000. A recommendation: the device may bound it.
+    idleTimeoutMs: 60000,
   },
 
   answers: {

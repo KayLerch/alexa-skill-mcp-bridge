@@ -1,7 +1,12 @@
 import type { HandlerInput } from 'ask-sdk-core';
 import type { Response } from 'ask-sdk-model';
 import type { TurnOutput } from '@alexa-mcp-bridge/core';
-import { MAX_RESPONSE_BYTES, screenDirective, supportsApl } from './apl/screen.js';
+import {
+  MAX_RESPONSE_BYTES,
+  screenDirective,
+  screenIdleTimeoutMs,
+  supportsApl,
+} from './apl/screen.js';
 import { REPROMPT } from './greeting.js';
 import {
   setAwaitingResult,
@@ -55,7 +60,7 @@ export function render(
   if (output.linkAccount) builder.withLinkAccountCard();
   const response = builder.withShouldEndSession(endSession).getResponse();
   if (output.visual && supportsApl(input)) {
-    const directive = screenDirective(output.visual);
+    const directive = screenDirective(output.visual, screenIdleTimeoutMs(input));
     // Alexa refuses a response over 120 KB; the picture goes, the speech stays (D55).
     const sessionAttributes = input.attributesManager.getSessionAttributes();
     const size = Buffer.byteLength(
