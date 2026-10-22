@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D49 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D50 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 

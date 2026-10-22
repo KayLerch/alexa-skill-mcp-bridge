@@ -27,7 +27,12 @@ type Property = Record<string, unknown> & { type?: string | string[] };
 const DATE_NAME =
   /(^|[^a-z])(date|day|when|check_?in|check_?out|arrival|departure|from|until|till|start|end)($|[^a-z])/i;
 
-export function planSlots(toolName: string, inputSchema: Record<string, unknown>): SlotPlan {
+/** `hidden` names arguments the agent fills itself (D50): never a slot, never elicited. */
+export function planSlots(
+  toolName: string,
+  inputSchema: Record<string, unknown>,
+  hidden: readonly string[] = [],
+): SlotPlan {
   const properties = (inputSchema.properties ?? {}) as Record<string, Property>;
   const required = new Set((inputSchema.required as string[] | undefined) ?? []);
   const slots: ManifestSlot[] = [];
@@ -35,6 +40,7 @@ export function planSlots(toolName: string, inputSchema: Record<string, unknown>
   const freeText: string[] = [];
 
   for (const [argument, schema] of Object.entries(properties)) {
+    if (hidden.includes(argument)) continue;
     const kind = classify(argument, schema);
     if (kind === 'searchQuery') {
       freeText.push(argument);
