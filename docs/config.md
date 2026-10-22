@@ -2,7 +2,7 @@
 
 Everything the bridge needs from you lives in two files: `bridge.config.ts` at the repo root, which holds the settings of the bridge itself and is meant to stay exactly as it ships, and a git-ignored `.env`, which holds the few values that are yours. Every consumer (generator, Alexa Skill Lambda, agent container, CDK app) validates the merged result with the same zod schema at load time and fails early with the field path and the fix. Only `mcp.url` is required, and it has a working default.
 
-After changing anything under `mcp.*`, `skill.invocationName`, or `skill.locales`, run `npm run generate`. After changing anything else that reaches AWS, run `npm run deploy`.
+After changing anything under `mcp.*`, `skill.invocationName`, `skill.locales`, or `answers.choices`, run `npm run generate`. After changing anything else that reaches AWS, run `npm run deploy`.
 
 ## .env: what is yours
 
@@ -186,9 +186,10 @@ there for experiments; [decisions.md](decisions.md) D38 has the measurements.
 
 ### visual
 
-| Field            | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `visual.enabled` | `false` | Render the MCP server's own widget (the MCP Apps `ui://` resource a tool result names in `_meta.ui.resourceUri`, or the tool declares) to a JPEG for a device with a screen (D54). The agent starts a headless Chromium at warm-up and renders after a finished turn that called such a tool, when a second of the turn is left. Off: no browser starts and every turn has `visual: null`. The browser is built into the agent image only when this is on, so changing it needs `npm run deploy`. Costs image size and memory, see [cost.md](cost.md). |
+| Field                  | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `visual.enabled`       | `false` | Render the MCP server's own widget (the MCP Apps `ui://` resource a tool result names in `_meta.ui.resourceUri`, or the tool declares) to a JPEG for a device with a screen (D54). The agent starts a headless Chromium at warm-up and renders after a finished turn that called such a tool, when a second of the turn is left. Off: no browser starts and every turn has `visual: null`. The browser is built into the agent image only when this is on, so changing it needs `npm run deploy`. Costs image size and memory, see [cost.md](cost.md). |
+| `visual.idleTimeoutMs` | `60000` | How long the screen should stay up without activity, in milliseconds, at least `10000`: the APL document's `settings.idleTimeout` (D68). A recommendation the device may bound. Read by the Alexa Skill Lambda, so a change needs `npm run deploy`.                                                                                                                                                                                                                                                                                                    |
 
 What a widget gets is what an Alexa+ device would give it, and no more: a sandboxed iframe of
 768×480 with no network (Chromium's only proxy is a dead port, loopback included, WebRTC may not
@@ -214,6 +215,24 @@ needs a Chromium at `CHROMIUM_PATH`; with `--remote` the deployed config decides
 The browser binary comes from `CHROMIUM_PATH` (default `/usr/bin/chromium-browser`, which the
 agent image installs). It is an environment variable of the container, not a config field;
 set it only to run the renderer outside the image, for example in the agent's tests.
+
+### answers
+
+| Field             | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ----------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `answers.choices` | `{}`    | Extra one-word answers for questions the server asks in its own speech (D67): a canonical value and the spoken synonyms that resolve to it. Each becomes a value of the answer-choice slot type, with the canonical value as its name and id, so "bee" reaches the server as "b". Keys and synonyms are lowercase words (letters, apostrophes, spaces, hyphens; no digits), and a synonym belongs to one choice. Read by `npm run generate` only; the deployed config leaves it out. |
+
+```json
+"answers": {
+  "choices": {
+    "a": ["ay", "option a", "letter a", "the first one"],
+    "b": ["bee", "be", "option b", "letter b", "the second one"],
+    "c": ["see", "sea", "option c", "letter c", "the third one"]
+  }
+}
+```
+
+The server must accept the canonical values (`a`, `b`, `c`) as answers. [customizing.md](customizing.md#answers-while-a-question-is-open) has the rest.
 
 ### aws
 

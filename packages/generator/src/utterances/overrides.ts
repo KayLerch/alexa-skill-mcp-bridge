@@ -15,6 +15,10 @@ import { dedupe, normalizeUtterance, validUtterance } from './validate.js';
  *     "intents": [{ "name": "WhereToGoIntent", "tool": "find_park", "samples": ["where should i go in {month}"] }]
  *   }
  *
+ * Extra samples may also go to the bridge's own answer intents (ChoiceAnswerIntent with {choice},
+ * FreeTextAnswerIntent with {answer}, DateAnswerIntent, NumberAnswerIntent), checked against
+ * their slots (D67).
+ *
  * An entry under "intents" is an extra intent for an existing tool: its slots are the tool's, so
  * samples use the tool's slot names, and the Lambda routes it through the manifest with no code.
  * Keys starting with an underscore are comments.

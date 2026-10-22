@@ -28,9 +28,11 @@ You get more than one intent per tool. For a server whose tools take `park`, `mo
 - **`SpokenRequestIntent`**, a catch-all: a custom slot type seeded with phrases, which Alexa
   matches loosely and passes through verbatim. Anything the tool intents do not recognise reaches
   the agent as text instead of dying in Fallback. `features.catchAll` turns it off.
-- **`ChoiceAnswerIntent`**, one slot type holding every enum value of every tool, so a one-word
-  reply to any question the bridge asks — "stargazing", "January", "Yosemite" — has a home.
-  Without it a bare word goes to Fallback and the Lambda can only repeat the question.
+- **`ChoiceAnswerIntent`**, one slot type holding every enum value of every tool plus your
+  `answers.choices`, so a reply to any question the bridge asks — "stargazing", "January",
+  "Yosemite" — has a home, alone or inside a sentence ("i think it's yosemite", "option b", "go
+  with january"). Without it a bare word goes to Fallback and the Lambda can only repeat the
+  question.
 - The **answer intents** for yes/no, dates, numbers and free text, and the standard intents.
 
 Measured against Alexa's own NLU on 2026-09-05 with the national parks model: tool intents win
@@ -55,6 +57,12 @@ skipped with a note, so overrides for several example servers can live in one fi
 Slot names are the tool's argument names in braces. Alexa's rules apply: lowercase words, no
 digits, and an `AMAZON.SearchQuery` slot must stand alone behind a carrier phrase. A sample that
 breaks them is rejected with a note naming it.
+
+The bridge's own answer intents take extra samples the same way: `ChoiceAnswerIntent` (slot
+`{choice}`), `FreeTextAnswerIntent` (`{answer}`), `DateAnswerIntent` (`{date}`) and
+`NumberAnswerIntent` (`{number}`), for example `"ChoiceAnswerIntent": ["my pick is {choice}"]`.
+Alexa refuses one sample string in two intents, so a sample a tool intent already has is kept
+there and dropped from the answer intent (D67).
 
 ### Synonyms for slot values
 
@@ -99,11 +107,29 @@ quiz question at a time"), up to 2000 UTF-8 bytes, and `bridge.config.json` for 
 
 A server that asks its own questions in its spoken line (a quiz, a guided form) gets answers the
 tool intents cannot know: "I don't know", "about twenty miles", "the second one". Short ones often
-land in `AMAZON.FallbackIntent`, which carries no text. Two levers:
+land in `AMAZON.FallbackIntent`, which carries no text. Three levers:
 
 - Put answer-shaped phrases into `catchAll` (`"i don't know"`, `"no idea"`, `"about twenty
 miles"`, `"the second one"`): they teach the catch-all what answers sound like, and the whole
   phrase reaches the agent as text.
+- Give spoken one-word answers a canonical value with `answers.choices`
+  ([config](config.md#answers)). A server that offers "A, B or C" in its own speech sets, in
+  `bridge.config.ts` or a profile's `bridge.config.json`:
+
+  ```json
+  "answers": {
+    "choices": {
+      "a": ["ay", "option a", "letter a", "the first one"],
+      "b": ["bee", "be", "option b", "letter b", "the second one"],
+      "c": ["see", "sea", "option c", "letter c", "the third one"]
+    }
+  }
+  ```
+
+  then `npm run generate` and `npm run skill:deploy`. "Bee", "option b" and "i think it's b"
+  reach `ChoiceAnswerIntent`, and the server receives the canonical "b", whichever words Alexa
+  heard (D67). Letters kept in `catchAll` as well do no harm, but they are no longer needed there.
+
 - `skill.fallbackSensitivity` sets how readily Alexa gives up on the nearest intent. Whatever still
   lands in Fallback while the session is open is asked again: `skill.fallbackWhileOpen` ("Sorry, I
   didn't catch that.") and the last question, never a generic "What would you like to do?" (D60).

@@ -56,6 +56,8 @@ With `visual.enabled` on and a frontend that sends `display` (`width`, `height`,
 3. The renderer is a headless Chromium started at warm-up. Its one page is a minimal MCP Apps host (`packages/agent/src/visual/host-page.ts`): the widget runs in a fresh sandboxed iframe at 768×480, gets `ui/initialize` answered with the theme and `displayMode: fullscreen`, then `tool-input` and `tool-result`. On `size-changed` (or after 800 ms, with a warning) the page is shot at `min(width, 1280) / 768` scale as a JPEG, quality 60, or 45 when that passes 90 KB; above that there is no image. The page reaches no network: Chromium's only proxy is a dead port with loopback included, WebRTC may not send UDP outside it, and request interception aborts every request but `data:` and `about:` on top. The widget's frame is removed after the shot.
 4. The render is cut off at the deadline. A widget that throws, a browser that will not start, a resource that will not load: the turn goes out with its speech and `visual: null`. A widget that hangs or crashes its page (the renderer heap is capped at 256 MB) costs one render: the browser is killed and the next render starts a new one.
 
+The Alexa Skill shows the image as one APL `RenderDocument` (D55) whose `settings.idleTimeout` asks the device to keep it up for `visual.idleTimeoutMs`, a minute by default (D68).
+
 The browser is in the agent image only when `visual.enabled` is on at deploy: the stack builds the image with `WITH_SCREEN=1`. With the screen on and no browser in the image, the agent logs one warning and turns carry no visual.
 
 The renderer logs a timing and a byte count per image, never the image or the tool result.
@@ -75,7 +77,7 @@ MCP 2025-11-25 delivers elicitation as a server-to-client request on the still-o
 
 1. The agent calls a tool; the server sends `elicitation/create`. The MCP client's request handler hands the params to `QuestionQueue.elicit()`, which plans one spoken question per property (required first) and returns a promise. The tool call is now parked.
 2. `waitForOutcome` sees the question and the turn returns `status: 'question'`. The Lambda speaks it and stores `{id, expects, source, message}` in session attributes; the session stays open with a reprompt.
-3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which fire while a question is pending; with none pending and the session open, a date, number, choice or free-text answer is an ordinary turn carrying the spoken words (D49). The Lambda sends `{type: 'answer', questionId, answer}`.
+3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which fire while a question is pending; with none pending and the session open, a date, number, choice or free-text answer is an ordinary turn carrying the spoken words (D49), or a choice's canonical value when entity resolution matched it ("b" for "bee", D67). The Lambda sends `{type: 'answer', questionId, answer}`.
 4. The agent maps the answer deterministically (yes/no, `AMAZON.DATE`, `AMAZON.NUMBER`, enum with entity resolution, spoken number words). Free text against a typed property goes through one structured-output model call, then the same deterministic validation. An unusable answer re-asks.
 5. When every property has a value the elicitation resolves with `accept`, the tool continues, and the agent phrases the result. "No" to a non-yes/no question declines; stop, session end, a new topic, or the answer timeout cancel.
 6. `ask_user`, the agent's own tool for a missing argument, goes through the same queue, so the frontend sees one kind of question.
@@ -94,7 +96,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D65) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D68) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).
