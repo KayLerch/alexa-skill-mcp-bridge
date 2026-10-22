@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D37 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D48 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
@@ -166,6 +166,6 @@ What travels together, from experience:
 - Before changing the turn flow, read `packages/agent/src/turn.ts` and the state machine table in [docs/architecture.md](docs/architecture.md).
 - Prettier runs on save in CI's `npm run lint`; when editing files programmatically, run `npm run format` first so exact-match edits land on formatted text.
 - A new dependency needs a one-line reason in the commit message. Keep the count low; contributors should not need to learn a framework.
-- Do not widen scope from the README's "Out of scope for v1" list (widgets, web frontend, account linking, other locales, 2026-07-28 elicitation, progressive responses). Leave hooks, do not build them.
+- Do not widen scope from the README's "Out of scope for v1" list (widgets, web frontend, other locales, 2026-07-28 elicitation, progressive responses). Leave hooks, do not build them. Account linking was on that list until D48 lifted it (`mcp.auth.type` `alexaAccountLinking`); the account-linked token is never logged.
 - When you decide something the docs did not decide, append a row to [docs/decisions.md](docs/decisions.md) with its rationale and a "revisit if" condition. When you measure something against live AWS or a new SDK version, append a row to the verification log in the same file.
 - Commit messages describe why, not what. Never commit `bridge.config.ts` changes that contain a real customer URL or an Alexa Skill ID belonging to someone else.

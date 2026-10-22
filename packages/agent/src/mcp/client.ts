@@ -47,7 +47,7 @@ export interface BridgeMcpClientOptions {
   callTimeoutMs: number;
   onElicitation: ElicitationHandler;
   logger: Logger;
-  /** Replacement fetch (SigV4 signing for the Gateway). */
+  /** Replacement fetch (SigV4 signing for the Gateway, the account-linked token). */
   fetch?: FetchLike;
 }
 

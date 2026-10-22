@@ -2,6 +2,7 @@ import { TextBlock, type Agent } from '@strands-agents/sdk';
 import {
   SPOKEN,
   errorFields,
+  linkAccountOutput,
   type Logger,
   type Question,
   type TurnOutput,
@@ -35,8 +36,10 @@ export class TurnRun {
   readonly input: string;
   readonly debug?: DebugSink;
   private readonly aborter = new AbortController();
-  private readonly finished: Promise<TurnOutput>;
+  /** Settles once the agent loop has stopped, however it ended. */
+  readonly finished: Promise<TurnOutput>;
   private settled?: TurnOutput;
+  private linkRequired = false;
 
   constructor(private readonly options: TurnRunOptions) {
     this.input = options.input;
@@ -77,6 +80,12 @@ export class TurnRun {
     this.aborter.abort(new Error('cancelled'));
   }
 
+  /** The MCP server refused the user's token: stop the loop and answer with the link prompt. */
+  requireAccountLink(): void {
+    this.linkRequired = true;
+    this.aborter.abort(new Error('account link required'));
+  }
+
   private async execute(): Promise<TurnOutput> {
     const { agent, logger } = this.options;
     try {
@@ -86,7 +95,7 @@ export class TurnRun {
         lastMessage: result.lastMessage.toJSON(),
         messages: agent.messages.length,
       });
-      if (result.stopReason === 'cancelled') return this.finish(silent());
+      if (result.stopReason === 'cancelled') return this.finish(this.stopped());
       const text = result.lastMessage.content
         .filter((block): block is TextBlock => block instanceof TextBlock)
         .map((block) => block.text)
@@ -101,7 +110,7 @@ export class TurnRun {
         visual: null,
       });
     } catch (err) {
-      if (this.aborter.signal.aborted) return this.finish(silent());
+      if (this.aborter.signal.aborted) return this.finish(this.stopped());
       logger.error('agent loop failed', errorFields(err));
       return this.finish({
         status: 'error',
@@ -110,6 +119,10 @@ export class TurnRun {
         visual: null,
       });
     }
+  }
+
+  private stopped(): TurnOutput {
+    return this.linkRequired ? linkAccountOutput() : silent();
   }
 
   private finish(output: TurnOutput): TurnOutput {

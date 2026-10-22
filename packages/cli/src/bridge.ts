@@ -34,6 +34,8 @@ export interface LocalBridgeOptions {
   debug: boolean;
   model?: Model;
   memory?: MemoryAdapter;
+  /** Stands in for the Alexa account-linked token when mcp.auth.type is alexaAccountLinking. */
+  userToken?: string;
 }
 
 export function createLocalBridge(options: LocalBridgeOptions): Bridge {
@@ -52,6 +54,7 @@ export function createLocalBridge(options: LocalBridgeOptions): Bridge {
         locale: options.identity.locale,
         budgetMs: options.budgetMs,
         debug: options.debug,
+        ...(options.userToken ? { userToken: options.userToken } : {}),
       }),
     close: () => session.close(),
     waitReady: async (timeoutMs) => {

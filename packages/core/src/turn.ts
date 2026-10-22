@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SPOKEN } from './messages.js';
 
 /**
  * The Turn contract: the boundary between any frontend (Alexa Skill, CLI, a future web UI)
@@ -93,5 +94,18 @@ export const turnOutputSchema = z.object({
   visual: z.null(),
   /** Only when features.debug is on. */
   debug: turnDebugSchema.optional(),
+  /** The MCP server needs the user's linked account: the frontend shows how to link it (D48). */
+  linkAccount: z.boolean().optional(),
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
+
+/** The answer when the request has no usable account-linked token. Ends the session. */
+export function linkAccountOutput(): TurnOutput {
+  return {
+    status: 'done',
+    speech: SPOKEN.linkAccount,
+    endSession: true,
+    visual: null,
+    linkAccount: true,
+  };
+}

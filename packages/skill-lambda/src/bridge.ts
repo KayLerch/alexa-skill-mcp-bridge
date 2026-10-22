@@ -7,6 +7,7 @@ import {
   SPOKEN,
   errorFields,
   hashId,
+  linkAccountOutput,
   turnOutputSchema,
   type AgentInvocationInput,
   type BridgeConfig,
@@ -21,6 +22,9 @@ import { isAwaitingResult } from './session-attrs.js';
  * InvokeAgentRuntime inside the turn budget, and turns an abort into 'pending'.
  * When a result is outstanding it polls first and speaks that result ahead of the new
  * input (plan D16); the poll's time comes out of the main call's budget.
+ * With mcp.auth.type 'alexaAccountLinking' the user's account-linked token rides along on
+ * every envelope; without one the user is asked to link, and the agent only hears a cancel
+ * without a token, which makes it forget the conversation (D48).
  */
 export interface BridgeClientOptions {
   config: BridgeConfig;
@@ -70,12 +74,25 @@ export class BridgeClient {
       sessionId: ids.sessionId,
       turnType: turn.type,
     });
+    const linking = config.mcp.auth.type === 'alexaAccountLinking';
+    const userToken = linking ? linkedToken(input) : undefined;
+    if (linking && !userToken) {
+      log.info('no account-linked token on the request; asking the user to link');
+      // A cancel without a token tells the agent the link is gone, so it drops the conversation
+      // before anyone links again (D48). Its answer never changes ours; send() never throws.
+      await this.send(ids, { type: 'cancel' }, config.turn.budgetMs, log);
+      // Stop still just ends the session.
+      return turn.type === 'cancel'
+        ? { status: 'done', speech: '', endSession: true, visual: null }
+        : linkAccountOutput();
+    }
+    const call: Call = { ...ids, ...(userToken ? { userToken } : {}) };
     let budgetMs = config.turn.budgetMs;
     let prefix = '';
 
     if (isAwaitingResult(input) && turn.type !== 'poll' && turn.type !== 'cancel') {
       const started = Date.now();
-      const polled = await this.send(ids, { type: 'poll' }, budgetMs, log);
+      const polled = await this.send(call, { type: 'poll' }, budgetMs, log);
       budgetMs -= Date.now() - started;
       if (polled.status === 'pending') return polled;
       if (polled.status === 'question') return polled;
@@ -89,12 +106,12 @@ export class BridgeClient {
       }
     }
 
-    const output = await this.send(ids, turn, budgetMs, log);
+    const output = await this.send(call, turn, budgetMs, log);
     return prefix ? { ...output, speech: `${prefix} ${output.speech}`.trim() } : output;
   }
 
   private async send(
-    ids: Identity,
+    call: Call,
     turn: TurnInput,
     budgetMs: number,
     log: Logger,
@@ -102,17 +119,18 @@ export class BridgeClient {
     const { config } = this.options;
     const envelope: AgentInvocationInput = {
       turn,
-      actorId: ids.actorId,
-      sessionId: ids.sessionId,
-      locale: ids.locale,
+      actorId: call.actorId,
+      sessionId: call.sessionId,
+      locale: call.locale,
       budgetMs,
       debug: config.features.debug,
+      ...(call.userToken ? { userToken: call.userToken } : {}),
     };
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), budgetMs);
     const started = Date.now();
     try {
-      const output = await this.invoke(envelope, ids.actorId, aborter.signal);
+      const output = await this.invoke(envelope, call.actorId, aborter.signal);
       log.info('agent answered', { status: output.status, elapsedMs: Date.now() - started });
       return output;
     } catch (err) {
@@ -134,6 +152,11 @@ interface Identity {
   locale: string;
 }
 
+/** What one agent call needs: the hashed identity and, with account linking, the user's token. */
+interface Call extends Identity {
+  userToken?: string;
+}
+
 /** Raw Alexa ids are hashed here and never leave the Lambda. */
 export function identity(input: HandlerInput): Identity {
   const envelope = input.requestEnvelope;
@@ -141,6 +164,12 @@ export function identity(input: HandlerInput): Identity {
   const sessionId = envelope.session?.sessionId ?? `${userId}:${envelope.request.requestId}`;
   const locale = (envelope.request as { locale?: string }).locale ?? 'en-US';
   return { actorId: hashId(userId), sessionId: hashId(sessionId), locale };
+}
+
+/** The token Alexa adds once the user has linked their account. Passed on, never logged. */
+export function linkedToken(input: HandlerInput): string | undefined {
+  const token = input.requestEnvelope.context.System.user.accessToken;
+  return token ? token : undefined;
 }
 
 function pending(config: BridgeConfig): TurnOutput {

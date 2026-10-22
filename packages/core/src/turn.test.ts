@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { turnInputSchema, turnOutputSchema } from './turn.js';
+import { linkAccountOutput, turnInputSchema, turnOutputSchema } from './turn.js';
+import { SPOKEN } from './messages.js';
 import { agentInvocationSchema } from './invocation.js';
 
 describe('turn contract', () => {
@@ -33,6 +34,27 @@ describe('turn contract', () => {
     const base = { status: 'done', speech: 'hi', endSession: false };
     expect(turnOutputSchema.parse({ ...base, visual: null }).visual).toBeNull();
     expect(() => turnOutputSchema.parse({ ...base, visual: {} })).toThrow();
+  });
+
+  it('carries the account-link flag and the user token at the edges', () => {
+    const out = turnOutputSchema.parse({ ...linkAccountOutput() });
+    expect(out).toEqual({
+      status: 'done',
+      speech: SPOKEN.linkAccount,
+      endSession: true,
+      visual: null,
+      linkAccount: true,
+    });
+    const envelope = {
+      turn: { type: 'warmup' },
+      actorId: 'a',
+      sessionId: 's',
+      locale: 'en-US',
+      budgetMs: 6500,
+    };
+    expect(agentInvocationSchema.parse({ ...envelope, userToken: 't' }).userToken).toBe('t');
+    expect(agentInvocationSchema.parse(envelope).userToken).toBeUndefined();
+    expect(() => agentInvocationSchema.parse({ ...envelope, userToken: '' })).toThrow();
   });
 
   it('parses a question output', () => {

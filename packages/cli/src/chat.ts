@@ -75,6 +75,10 @@ const identity = {
 // Recording needs the tool calls to label what was said, so it collects debug output even
 // when nothing prints it.
 const collect = debug || Boolean(args.record);
+// With account linking there is no Alexa request to carry the user's token, so MCP_SECRET_VALUE
+// stands in for it: a token of your own account on the MCP server.
+const userToken =
+  config.mcp.auth.type === 'alexaAccountLinking' ? process.env.MCP_SECRET_VALUE : undefined;
 const bridge: Bridge = args.remote
   ? createRemoteBridge({
       identity,
@@ -82,6 +86,7 @@ const bridge: Bridge = args.remote
       debug: collect,
       region: config.aws.region,
       stillWorkingMessage: config.skill.stillWorkingMessage,
+      ...(userToken ? { userToken } : {}),
     })
   : createLocalBridge({
       config: { ...config, features: { ...config.features, debug: collect } },
@@ -89,6 +94,7 @@ const bridge: Bridge = args.remote
       logger,
       budgetMs,
       debug: collect,
+      ...(userToken ? { userToken } : {}),
     });
 
 // Lines come through the async iterator so piped input (scripts, smoke tests) works as well

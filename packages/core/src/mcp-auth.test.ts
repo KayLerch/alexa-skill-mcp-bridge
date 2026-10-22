@@ -21,6 +21,13 @@ describe('buildAuthHeaders', () => {
     );
   });
 
+  it('sends the account-linked token as a bearer token, and nothing without one', () => {
+    expect(buildAuthHeaders({ type: 'alexaAccountLinking' }, 'user-tok')).toEqual({
+      Authorization: 'Bearer user-tok',
+    });
+    expect(buildAuthHeaders({ type: 'alexaAccountLinking' })).toEqual({});
+  });
+
   it('fails clearly when the secret value is missing', () => {
     expect(() => buildAuthHeaders({ type: 'bearer', secretName: 'my-secret' })).toThrowError(
       /secret name: my-secret/,

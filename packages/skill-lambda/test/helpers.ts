@@ -46,6 +46,8 @@ export interface FakeRequest {
   intent?: string;
   slots?: Record<string, Slot>;
   sessionAttributes?: Record<string, unknown>;
+  /** The account-linked token Alexa puts on the request once the user has linked. */
+  accessToken?: string;
 }
 
 export function handlerInput(fake: FakeRequest = {}): HandlerInput {
@@ -77,7 +79,10 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
     context: {
       System: {
         application: { applicationId: 'amzn1.ask.skill.x' },
-        user: { userId: 'amzn1.ask.account.USER' },
+        user: {
+          userId: 'amzn1.ask.account.USER',
+          ...(fake.accessToken ? { accessToken: fake.accessToken } : {}),
+        },
         apiEndpoint: 'https://api.amazonalexa.com',
       },
     },

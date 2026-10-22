@@ -74,7 +74,9 @@ function explainConnectError(config: BridgeConfig, err: unknown): string {
       `${config.mcp.url} refused the connection (${message.split('\n')[0]}). ` +
       (config.mcp.auth.type === 'none'
         ? 'The server needs auth: set mcp.auth in bridge.config.ts and create the secret.'
-        : `Check the secret ${config.mcp.auth.secretName ?? ''} and mcp.auth.type (${config.mcp.auth.type}).`)
+        : config.mcp.auth.type === 'alexaAccountLinking'
+          ? 'The server wants a user token to list its tools: set MCP_SECRET_VALUE to a token of your own account for the scan.'
+          : `Check the secret ${config.mcp.auth.secretName ?? ''} and mcp.auth.type (${config.mcp.auth.type}).`)
     );
   }
   if (/ECONNREFUSED|ENOTFOUND|fetch failed|EAI_AGAIN/i.test(message)) {

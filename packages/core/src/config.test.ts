@@ -44,6 +44,17 @@ describe('parseConfig', () => {
     expect(ok.mcp.auth.secretName).toBe('s');
   });
 
+  it('accepts alexaAccountLinking without a secret name and refuses it behind the Gateway', () => {
+    const ok = parseConfig({ mcp: { url: 'http://x/mcp', auth: { type: 'alexaAccountLinking' } } });
+    expect(ok.mcp.auth.type).toBe('alexaAccountLinking');
+    expect(() =>
+      parseConfig({
+        mcp: { url: 'http://x/mcp', auth: { type: 'alexaAccountLinking' } },
+        features: { gateway: true },
+      }),
+    ).toThrowError(/features\.gateway: .*alexaAccountLinking/);
+  });
+
   it('validates the Alexa Skill id shape', () => {
     expect(() => parseConfig({ mcp: { url: 'http://x/mcp' }, skill: { id: 'nope' } })).toThrowError(
       /skill\.id/,

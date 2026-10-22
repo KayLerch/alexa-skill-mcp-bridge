@@ -12,13 +12,13 @@ This repo is public and every clone edits the same tracked config file, which is
 cp .env.example .env      # .env is git-ignored; .env.example is not
 ```
 
-| Variable                 | Sets                  | Why it is here                                                      |
-| ------------------------ | --------------------- | ------------------------------------------------------------------- |
-| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often |
-| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`                |
-| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                 |
-| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill      |
-| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                    |
+| Variable                 | Sets                  | Why it is here                                                              |
+| ------------------------ | --------------------- | --------------------------------------------------------------------------- |
+| `BRIDGE_MCP_URL`         | `mcp.url`             | Your endpoint, and for device tests a tunnel URL that changes often         |
+| `BRIDGE_MCP_AUTH_TYPE`   | `mcp.auth.type`       | `none`, `bearer`, `apiKey`, `oauthClientCredentials`, `alexaAccountLinking` |
+| `BRIDGE_MCP_SECRET_NAME` | `mcp.auth.secretName` | The Secrets Manager secret **name**                                         |
+| `BRIDGE_SKILL_ID`        | `skill.id`            | Written by `npm run skill:deploy`; identifies your Alexa Skill              |
+| `BRIDGE_AWS_REGION`      | `aws.region`          | Only us-east-1 has been verified                                            |
 
 A real environment variable wins over the file, so one-off runs and CI still work: `BRIDGE_MCP_URL=https://staging.example.com/mcp npm run chat`. Everything else stays in `bridge.config.ts`, where it is typed and commented.
 
@@ -41,19 +41,19 @@ BRIDGE_MCP_AUTH_TYPE=bearer
 BRIDGE_MCP_SECRET_NAME=alexa-mcp-bridge/mcp-token
 ```
 
-The CDK stack grants the runtime read access to that secret; the agent fetches the value at startup. For local runs, `MCP_SECRET_VALUE` in `.env` (or in front of the command) skips Secrets Manager: `MCP_SECRET_VALUE=the-token npm run chat`. Never put a token in `mcp.url` itself; `npm run check:leaks` looks for that.
+The CDK stack grants the runtime read access to that secret; the agent fetches the value at startup. For local runs, `MCP_SECRET_VALUE` in `.env` (or in front of the command) skips Secrets Manager: `MCP_SECRET_VALUE=the-token npm run chat`. With `alexaAccountLinking` there is no secret: `MCP_SECRET_VALUE` then stands in for the linked token in `npm run chat` and `npm run generate` (a token of your own account), and without it both go out unauthenticated. Never put a token in `mcp.url` itself; `npm run check:leaks` looks for that.
 
 ## Fields
 
 ### mcp
 
-| Field             | Default     | Effect                                                                                                                                      |
-| ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `url`             | required    | The MCP server's Streamable HTTP endpoint. Must be reachable from AWS for device tests.                                                     |
-| `auth.type`       | `none`      | `none`, `bearer` (Authorization header), `apiKey` (custom header), or `oauthClientCredentials` (the MCP SDK's client-credentials provider). |
-| `auth.secretName` | unset       | Secrets Manager secret holding the token, the key, or `{"clientId": "...", "clientSecret": "..."}`. Required for every type but `none`.     |
-| `auth.headerName` | `x-api-key` | Header for `apiKey`.                                                                                                                        |
-| `auth.scopes`     | unset       | OAuth scopes for `oauthClientCredentials`.                                                                                                  |
+| Field             | Default     | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`             | required    | The MCP server's Streamable HTTP endpoint. Must be reachable from AWS for device tests.                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `auth.type`       | `none`      | `none`, `bearer` (Authorization header), `apiKey` (custom header), `oauthClientCredentials` (the MCP SDK's client-credentials provider), or `alexaAccountLinking` (each user's own token from Alexa account linking, sent as a bearer token on every request; a user who has not linked hears how to and gets the link card; not with `features.gateway`; memory is keyed by the Alexa user, so turn it off when the server's data belongs to the linked account; see the README's "Per-user sign-in", D48). |
+| `auth.secretName` | unset       | Secrets Manager secret holding the token, the key, or `{"clientId": "...", "clientSecret": "..."}`. Required for every type but `none` and `alexaAccountLinking`.                                                                                                                                                                                                                                                                                                                                            |
+| `auth.headerName` | `x-api-key` | Header for `apiKey`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `auth.scopes`     | unset       | OAuth scopes for `oauthClientCredentials`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 There is no protocol-version field. The bridge speaks whatever the MCP SDK negotiates at
 `initialize`. A server below **2025-11-25** still works here, but `npm run generate`, `npm run doctor`,
@@ -117,7 +117,7 @@ is still a paragraph.
 
 | Field         | Default | Effect                                                                                                                                                                                                                                                                                    |
 | ------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `gateway`     | `false` | Route MCP traffic through an AgentCore Gateway. Adds a hop and per-call billing; the client signs with SigV4. See [architecture.md](architecture.md).                                                                                                                                     |
+| `gateway`     | `false` | Route MCP traffic through an AgentCore Gateway. Adds a hop and per-call billing; the client signs with SigV4. Not with `mcp.auth.type` `alexaAccountLinking`: the Gateway cannot pass the user's token on. See [architecture.md](architecture.md).                                        |
 | `debug`       | `false` | Tool calls and timings in every response and in the logs, including tool arguments.                                                                                                                                                                                                       |
 | `toolIntents` | `true`  | One Alexa intent per MCP tool, with typed slots and entity resolution. Off: a single catch-all intent hands the whole spoken phrase to the agent, and the interaction model stops depending on your tool schemas, so a tool change needs `npm run deploy` but no `ask deploy`. See below. |
 | `catchAll`    | `true`  | A bare-phrase intent beside the tool intents, so a request they do not recognise still reaches the agent as text instead of dying in Alexa's fallback, which carries none. Details in [customizing.md](customizing.md).                                                                   |

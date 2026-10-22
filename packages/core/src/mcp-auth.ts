@@ -13,6 +13,9 @@ export function buildAuthHeaders(auth: McpAuthConfig, secret?: string): Record<s
       return {};
     case 'bearer':
       return { Authorization: `Bearer ${requireSecret(auth, secret)}` };
+    case 'alexaAccountLinking':
+      // The secret is the user's own token here; without one the request goes out unauthenticated.
+      return secret ? { Authorization: `Bearer ${secret}` } : {};
     case 'apiKey':
       return { [auth.headerName ?? 'x-api-key']: requireSecret(auth, secret) };
   }
