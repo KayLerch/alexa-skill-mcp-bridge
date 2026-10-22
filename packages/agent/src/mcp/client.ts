@@ -1,5 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import {
+  StreamableHTTPClientTransport,
+  StreamableHTTPError,
+} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
   ElicitRequestSchema,
   type ElicitRequestParams,
@@ -94,6 +97,25 @@ export class BridgeMcpClient {
     name: string,
     args: Record<string, unknown>,
     options: { signal?: AbortSignal } = {},
+  ): Promise<McpToolResult> {
+    try {
+      return await this.callToolOnce(name, args, options);
+    } catch (err) {
+      // 404 means the server no longer knows this session (it restarted or was redeployed);
+      // MCP says the client must initialize a new one. Once, so a real 404 still surfaces.
+      if (!(err instanceof StreamableHTTPError) || err.code !== 404) throw err;
+      this.options.logger.warn('mcp session expired on the server; reconnecting');
+      const stale = this.client;
+      this.forget();
+      await stale?.close().catch(() => undefined);
+      return this.callToolOnce(name, args, options);
+    }
+  }
+
+  private async callToolOnce(
+    name: string,
+    args: Record<string, unknown>,
+    options: { signal?: AbortSignal },
   ): Promise<McpToolResult> {
     const client = await this.ensureClient();
     const raw = await client.callTool({ name, arguments: args }, undefined, {

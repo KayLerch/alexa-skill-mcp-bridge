@@ -72,4 +72,32 @@ describe('BridgeMcpClient', () => {
     expect(JSON.stringify(result)).toMatch(/cancelled|guests/i);
     await mcp.close();
   });
+
+  it('opens a new session when the server answers 404 for the old one', async () => {
+    // A redeployed server has forgotten every session id; MCP says the client must start over.
+    let expireNextCall = false;
+    const expiring: typeof fetch = async (input, init) => {
+      if (expireNextCall && typeof init?.body === 'string' && init.body.includes('"tools/call"')) {
+        expireNextCall = false;
+        return new Response(JSON.stringify({ error: 'session not found' }), { status: 404 });
+      }
+      return fetch(input, init);
+    };
+    const mcp = new BridgeMcpClient({
+      url: server.url,
+      auth: { headers: {} },
+      callTimeoutMs: 10_000,
+      onElicitation: async () => ({ action: 'decline' }),
+      logger,
+      fetch: expiring,
+    });
+    await mcp.connect();
+    expireNextCall = true;
+
+    const result = await mcp.callTool('get_weather', { city: 'Berlin' });
+
+    expect(JSON.stringify(result)).toMatch(/berlin/i);
+    expect(methods.filter((m) => m === 'initialize')).toHaveLength(2);
+    await mcp.close();
+  });
 });
