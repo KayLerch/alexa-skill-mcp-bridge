@@ -68,6 +68,8 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       agentRuntimeArtifact: agentcore.AgentRuntimeArtifact.fromAsset(repoRoot, {
         file: 'packages/agent/Dockerfile',
         platform: Platform.LINUX_ARM64,
+        // The headless Chromium for the screen goes into the image only when it is on (D54).
+        buildArgs: { WITH_SCREEN: config.visual.enabled ? '1' : '0' },
       }),
       protocolConfiguration: agentcore.ProtocolType.HTTP,
       lifecycleConfiguration: {

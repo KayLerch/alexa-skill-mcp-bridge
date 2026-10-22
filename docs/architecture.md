@@ -14,7 +14,7 @@ Where each part of that lives, and what it is called in the code:
 
 - The Alexa Skill Lambda is `packages/skill-lambda`. It calls `InvokeAgentRuntime` with the runtime session id set to
   `hash(userId)` and an `AgentInvocation` payload, and renders the returned `TurnOutput`
-  (`status`, `speech`, `question?`, `endSession`, `visual: null`) as SSML.
+  (`status`, `speech`, `question?`, `endSession`, `visual`) as SSML. `visual` is the screen (D54) and is not shown yet.
 - The agent is `packages/agent`: `BridgeSession` holds the Strands Agent on Nova 2 Lite, `BridgeMcpClient` speaks
   Streamable HTTP to the MCP server, `QuestionQueue` holds parked elicitations and `ask_user` questions, and
   AgentCore Memory keeps exchanges and preferences.
@@ -45,6 +45,19 @@ Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user i
 `TurnRun.waitForOutcome(deadline)` is the one primitive: whichever comes first of the agent loop finishing, a question becoming current, or the deadline. It serves `turn`, `answer`, and `poll` alike.
 
 The deadline is `budgetMs - 500 ms` so the agent answers `pending` cleanly before the Lambda's abort at `budgetMs`. A run that passes its deadline keeps working; `/ping` reports `HealthyBusy` only then.
+
+## The screen
+
+With `visual.enabled` on and a frontend that sends `display` (`width`, `height`, `theme`), a turn can carry `visual`: the MCP server's own widget as a JPEG (D54). The agent never draws anything of its own, and it learns nothing about the device beyond those three fields.
+
+1. While the run works, every successful tool result whose `_meta.ui.resourceUri` (or the tool's own) names an MCP Apps widget is remembered with its arguments and result. A new run starts empty; forgetting the conversation (D48) forgets it too.
+2. After a `done` run, if the envelope has `display`, a widget was remembered, and at least 1 s of the deadline is left, the agent reads the `ui://` resource (once per URI for the container's life) and hands it to `WidgetRenderer`.
+3. The renderer is a headless Chromium started at warm-up. Its one page is a minimal MCP Apps host (`packages/agent/src/visual/host-page.ts`): the widget runs in a fresh sandboxed iframe at 768×480, gets `ui/initialize` answered with the theme and `displayMode: fullscreen`, then `tool-input` and `tool-result`. On `size-changed` (or after 800 ms, with a warning) the page is shot at `min(width, 1280) / 768` scale as a JPEG, quality 60, or 45 when that passes 90 KB; above that there is no image. The page reaches no network: Chromium's only proxy is a dead port with loopback included, WebRTC may not send UDP outside it, and request interception aborts every request but `data:` and `about:` on top. The widget's frame is removed after the shot.
+4. The render is cut off at the deadline. A widget that throws, a browser that will not start, a resource that will not load: the turn goes out with its speech and `visual: null`. A widget that hangs or crashes its page (the renderer heap is capped at 256 MB) costs one render: the browser is killed and the next render starts a new one.
+
+The browser is in the agent image only when `visual.enabled` is on at deploy: the stack builds the image with `WITH_SCREEN=1`. With the screen on and no browser in the image, the agent logs one warning and turns carry no visual.
+
+The renderer logs a timing and a byte count per image, never the image or the tool result.
 
 ## Voice rules
 
@@ -80,7 +93,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D53) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D54) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).

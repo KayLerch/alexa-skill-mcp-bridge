@@ -7,6 +7,7 @@ import {
 import {
   findConfigFile,
   turnOutputSchema,
+  type Display,
   type TurnInput,
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
@@ -21,6 +22,8 @@ export interface RemoteBridgeOptions {
   stillWorkingMessage: string;
   /** Stands in for the Alexa account-linked token when mcp.auth.type is alexaAccountLinking. */
   userToken?: string;
+  /** Sent with every turn, as for a device with a screen (D54). */
+  display?: Display;
 }
 
 /**
@@ -56,6 +59,7 @@ export function createRemoteBridge(options: RemoteBridgeOptions): Bridge {
                 budgetMs: options.budgetMs,
                 debug: options.debug,
                 ...(options.userToken ? { userToken: options.userToken } : {}),
+                ...(options.display ? { display: options.display } : {}),
               }),
             ),
           }),

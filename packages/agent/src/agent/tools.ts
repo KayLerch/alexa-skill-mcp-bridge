@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { errorFields, questionExpectsSchema, type Logger } from '@alexa-mcp-bridge/core';
 import { isUnauthorized } from '../mcp/auth.js';
 import type { BridgeMcpClient, McpToolDefinition } from '../mcp/client.js';
-import { toolResultText } from '../mcp/result.js';
+import { toolResultText, type McpToolResult } from '../mcp/result.js';
 import type { QuestionQueue } from '../elicitation/queue.js';
 import { loadPrompt } from './prompt.js';
 
@@ -76,11 +76,46 @@ export class ResultField {
   }
 }
 
+/** A tool call whose result has an MCP Apps widget to show (D54). */
+export interface WidgetCall {
+  resourceUri: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  result: McpToolResult;
+}
+
+/**
+ * The run's last successful tool call with a widget (D54), for the screen after the run.
+ * `begin()` runs at the start of every run; a later call without a widget leaves it in place,
+ * so the screen stays on the last thing the server drew. Held in memory only.
+ */
+export class WidgetRecorder {
+  private last?: WidgetCall;
+
+  begin(): void {
+    this.last = undefined;
+  }
+
+  record(call: WidgetCall): void {
+    this.last = call;
+  }
+
+  /** The conversation was forgotten (D48): no earlier account's result may reach the screen. */
+  clear(): void {
+    this.last = undefined;
+  }
+
+  get latest(): WidgetCall | undefined {
+    return this.last;
+  }
+}
+
 /** An MCP tool as a Strands tool. Prefers structuredContent, keeps text, never leaks raw errors. */
 export class BridgeMcpTool extends Tool {
   readonly name: string;
   readonly description: string;
   readonly toolSpec: { name: string; description: string; inputSchema: JSONSchema };
+  private readonly uiResourceUri?: string;
 
   constructor(
     definition: McpToolDefinition,
@@ -89,9 +124,11 @@ export class BridgeMcpTool extends Tool {
     private readonly onUnauthorized?: () => void,
     private readonly hidden?: HiddenArguments,
     private readonly resultField?: ResultField,
+    private readonly widgets?: WidgetRecorder,
   ) {
     super();
     this.name = definition.name;
+    this.uiResourceUri = definition.uiResourceUri;
     this.description = definition.description ?? '';
     this.toolSpec = {
       name: definition.name,
@@ -107,12 +144,19 @@ export class BridgeMcpTool extends Tool {
         ? (input as Record<string, unknown>)
         : {};
     try {
-      const result = await this.client.callTool(this.name, this.hidden?.fill(args) ?? args, {
+      const sent = this.hidden?.fill(args) ?? args;
+      const result = await this.client.callTool(this.name, sent, {
         signal: context.cancelSignal,
       });
+      // The result names its widget; a tool's own declaration is the fallback.
+      const resourceUri = result._meta?.ui?.resourceUri ?? this.uiResourceUri;
       if (!result.isError) {
         this.hidden?.remember(result.structuredContent);
         this.resultField?.record(result.structuredContent);
+        // MCP Apps widgets are ui:// resources; nothing else is read for the screen.
+        if (resourceUri?.startsWith('ui://')) {
+          this.widgets?.record({ resourceUri, toolName: this.name, input: sent, result });
+        }
       }
       // One block only. Nova collapses its context on a result that mixes json and text
       // (measured: 545 input tokens instead of 1712, empty answer; see plan D28).
@@ -121,12 +165,8 @@ export class BridgeMcpTool extends Tool {
         !result.isError && result.structuredContent
           ? [new JsonBlock({ json: result.structuredContent as JSONValue })]
           : [new TextBlock(text || 'The tool returned no content.')];
-      if (result._meta?.ui?.resourceUri) {
-        // Widgets are out of scope for v1; the hook stays so a visual frontend can pick this up.
-        this.logger.debug('tool result carries a ui resource', {
-          tool: this.name,
-          resourceUri: result._meta.ui.resourceUri,
-        });
+      if (resourceUri) {
+        this.logger.debug('tool result carries a ui resource', { tool: this.name, resourceUri });
       }
       return new ToolResultBlock({
         toolUseId,
@@ -162,9 +202,10 @@ export function mcpTools(
   onUnauthorized?: () => void,
   hidden?: HiddenArguments,
   resultField?: ResultField,
+  widgets?: WidgetRecorder,
 ): Tool[] {
   return definitions.map(
-    (d) => new BridgeMcpTool(d, client, logger, onUnauthorized, hidden, resultField),
+    (d) => new BridgeMcpTool(d, client, logger, onUnauthorized, hidden, resultField, widgets),
   );
 }
 

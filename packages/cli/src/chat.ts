@@ -13,6 +13,7 @@ import {
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
 import { createLocalBridge, type Bridge } from './bridge.js';
+import { parseDisplay, saveVisual } from './display.js';
 import { createRemoteBridge } from './remote.js';
 
 /**
@@ -28,16 +29,20 @@ const { values: args } = parseArgs({
     record: { type: 'boolean', default: false },
     budget: { type: 'string' },
     user: { type: 'string', default: 'local-user' },
+    display: { type: 'string' },
     help: { type: 'boolean', default: false },
   },
 });
 if (args.help) {
   stdout.write(
-    'npm run chat [-- --remote] [--debug] [--budget <ms>] [--user <name>]\n' +
+    'npm run chat [-- --remote] [--debug] [--budget <ms>] [--user <name>] [--display WxH[:light|dark]]\n' +
       '  --remote  talk to the deployed AgentCore runtime instead of running in-process\n' +
       '  --debug   show tool calls and timings\n' +
       '  --record  append what you say, and the tool chosen for it, to skill-package/training/<locale>.chat.jsonl for npm run generate\n' +
-      '  --budget  simulate the Alexa deadline (default: turn.budgetMs from bridge.config.ts)\n',
+      '  --budget  simulate the Alexa deadline (default: turn.budgetMs from bridge.config.ts)\n' +
+      '  --display act as a device with a screen of that size (e.g. 1280x800): each rendered screen is\n' +
+      '            saved as a JPEG and its path printed. In-process this turns visual.enabled on and needs\n' +
+      '            a Chromium at CHROMIUM_PATH; --remote renders only if the deployed config has it on\n',
   );
   process.exit(0);
 }
@@ -45,18 +50,30 @@ if (args.help) {
 const config = await loadConfigFile();
 const debug = args.debug || config.features.debug;
 const budgetMs = args.budget ? Number(args.budget) : config.turn.budgetMs;
+let display: ReturnType<typeof parseDisplay> | undefined;
+try {
+  display = args.display ? parseDisplay(args.display) : undefined;
+} catch (err) {
+  stderr.write(`${(err as Error).message}\n`);
+  process.exit(2);
+}
+/** The renderer's own timing of the latest screen, read from its log line (in-process only). */
+let lastRenderMs: number | undefined;
 // Humans read this terminal: one readable line per log event instead of JSON.
 const logger = createLogger(
   { service: 'chat' },
   {
-    level: debug ? 'debug' : 'warn',
+    level: debug ? 'debug' : 'info',
     write: (line) => {
       const event = JSON.parse(line) as {
         level: string;
         msg: string;
         errorMessage?: string;
         tool?: string;
+        elapsedMs?: number;
       };
+      if (event.msg === 'visual rendered') lastRenderMs = event.elapsedMs;
+      if (!debug && event.level === 'info') return;
       const detail = event.errorMessage
         ? `: ${event.errorMessage}`
         : event.tool
@@ -87,14 +104,21 @@ const bridge: Bridge = args.remote
       region: config.aws.region,
       stillWorkingMessage: config.skill.stillWorkingMessage,
       ...(userToken ? { userToken } : {}),
+      ...(display ? { display } : {}),
     })
   : createLocalBridge({
-      config: { ...config, features: { ...config.features, debug: collect } },
+      config: {
+        ...config,
+        features: { ...config.features, debug: collect },
+        // A display on the command line means: render the screen in this process.
+        visual: { enabled: config.visual.enabled || Boolean(display) },
+      },
       identity,
       logger,
       budgetMs,
       debug: collect,
       ...(userToken ? { userToken } : {}),
+      ...(display ? { display } : {}),
     });
 
 // Lines come through the async iterator so piped input (scripts, smoke tests) works as well
@@ -178,6 +202,12 @@ async function show(output: TurnOutput, elapsedMs?: number): Promise<void> {
     stderr.write(
       `  [debug] status=${output.status} model calls=${output.debug.modelCalls} tools=[${calls}] agent=${output.debug.elapsedMs}ms\n`,
     );
+  }
+  if (output.visual) {
+    const file = saveVisual(output.visual);
+    const rendered = lastRenderMs !== undefined ? `, rendered in ${lastRenderMs} ms` : '';
+    stdout.write(`  [screen ${output.visual.width}×${output.visual.height}${rendered}] ${file}\n`);
+    lastRenderMs = undefined;
   }
   if (output.status === 'question') {
     stderr.write(

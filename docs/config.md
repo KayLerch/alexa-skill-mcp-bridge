@@ -138,6 +138,37 @@ per-tool intents with a single catch-all intent that hands the whole spoken phra
 which decouples the interaction model from your tool schemas at the cost of that resolution. It is
 there for experiments; [decisions.md](decisions.md) D38 has the measurements.
 
+### visual
+
+| Field            | Default | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `visual.enabled` | `false` | Render the MCP server's own widget (the MCP Apps `ui://` resource a tool result names in `_meta.ui.resourceUri`, or the tool declares) to a JPEG for a device with a screen (D54). The agent starts a headless Chromium at warm-up and renders after a finished turn that called such a tool, when a second of the turn is left. Off: no browser starts and every turn has `visual: null`. The browser is built into the agent image only when this is on, so changing it needs `npm run deploy`. Costs image size and memory, see [cost.md](cost.md). |
+
+What a widget gets is what an Alexa+ device would give it, and no more: a sandboxed iframe of
+768×480 with no network (Chromium's only proxy is a dead port, loopback included, WebRTC may not
+send UDP outside it, and request interception aborts every request but `data:` and `about:`),
+`ui/initialize` answered with the device's theme and
+`displayMode: fullscreen`, then the tool's input and result. It should send
+`ui/notifications/size-changed` once it has drawn; the shot is taken then, or after 800 ms
+with a warning in the log. The image is at most 1280 px wide and 90 KB; a widget that throws
+gives no image, and the turn keeps its speech either way. A widget that hangs or runs its page
+out of memory (the renderer heap is capped at 256 MB) costs that one image: the browser restarts
+for the next render.
+
+With the screen on, the stack builds the agent image with `WITH_SCREEN=1` (Alpine's `chromium`
+and `font-noto`, about 330 MB more to pull); with it off the image has no browser. Turn it on and
+run `npm run deploy`; if the deployed image has no browser, the agent logs one warning
+("visual.enabled is on but the image has no browser") and answers without a visual.
+
+To see the screen without a device, run `npm run chat -- --display 1280x800` (optionally
+`:light`): every turn carries that display, and each rendered screen is saved as a JPEG whose
+path is printed with its render time. In-process this turns the screen on for the chat and
+needs a Chromium at `CHROMIUM_PATH`; with `--remote` the deployed config decides.
+
+The browser binary comes from `CHROMIUM_PATH` (default `/usr/bin/chromium-browser`, which the
+agent image installs). It is an environment variable of the container, not a config field;
+set it only to run the renderer outside the image, for example in the agent's tests.
+
 ### aws
 
 | Field              | Default     | Effect                                           |

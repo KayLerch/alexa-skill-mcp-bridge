@@ -27,6 +27,9 @@ const build = run(
     'linux/arm64',
     '-f',
     join('packages', 'agent', 'Dockerfile'),
+    // The headless Chromium for the screen only when visual.enabled is on (D54), as the stack does.
+    '--build-arg',
+    `WITH_SCREEN=${config.visual.enabled ? '1' : '0'}`,
     '-t',
     image,
     '.',

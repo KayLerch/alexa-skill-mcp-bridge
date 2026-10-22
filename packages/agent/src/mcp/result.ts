@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 /**
  * The parts of a tools/call result the bridge reads. Loose on purpose: servers add fields.
- * `_meta.ui.resourceUri` is kept so widgets can be surfaced later; v1 never renders it.
+ * `_meta.ui.resourceUri` names the result's MCP Apps widget, which the agent renders for a
+ * device with a screen (D54); the whole result is what the widget is handed.
  */
 export const mcpToolResultSchema = z.looseObject({
   content: z.array(z.looseObject({ type: z.string(), text: z.string().optional() })).default([]),

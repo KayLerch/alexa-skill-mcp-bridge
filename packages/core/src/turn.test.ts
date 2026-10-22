@@ -30,10 +30,21 @@ describe('turn contract', () => {
     expect(() => turnInputSchema.parse({ type: 'nope' })).toThrow();
   });
 
-  it('keeps visual pinned to null', () => {
+  it('carries no visual or one inline JPEG (D54)', () => {
     const base = { status: 'done', speech: 'hi', endSession: false };
     expect(turnOutputSchema.parse({ ...base, visual: null }).visual).toBeNull();
+    const visual = {
+      kind: 'image',
+      mimeType: 'image/jpeg',
+      dataUrl: 'data:image/jpeg;base64,AAAA',
+      width: 1280,
+      height: 800,
+    };
+    expect(turnOutputSchema.parse({ ...base, visual }).visual).toEqual(visual);
     expect(() => turnOutputSchema.parse({ ...base, visual: {} })).toThrow();
+    expect(() =>
+      turnOutputSchema.parse({ ...base, visual: { ...visual, mimeType: 'image/png' } }),
+    ).toThrow();
   });
 
   it('carries the account-link flag and the user token at the edges', () => {
@@ -98,6 +109,22 @@ describe('agent invocation envelope', () => {
       undefined,
     );
     expect(agentInvocationSchema.parse(base).timeZone).toBeUndefined();
+  });
+
+  it('carries the screen size and theme of a device with a display (D54)', () => {
+    expect(agentInvocationSchema.parse(base).display).toBeUndefined();
+    expect(
+      agentInvocationSchema.parse({ ...base, display: { width: 1280, height: 800 } }).display,
+    ).toEqual({ width: 1280, height: 800, theme: 'dark' });
+    expect(
+      agentInvocationSchema.parse({
+        ...base,
+        display: { width: 960, height: 480, theme: 'light' },
+      }).display?.theme,
+    ).toBe('light');
+    expect(() =>
+      agentInvocationSchema.parse({ ...base, display: { width: 0, height: 480 } }),
+    ).toThrow();
   });
 
   it('isValidTimeZone accepts IANA names only', () => {

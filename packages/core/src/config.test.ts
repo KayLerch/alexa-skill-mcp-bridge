@@ -27,6 +27,7 @@ describe('parseConfig', () => {
       catchAll: true,
     });
     expect(config.aws).toEqual({ region: 'us-east-1', logRetentionDays: 7 });
+    expect(config.visual).toEqual({ enabled: false });
   });
 
   it('fails on a missing mcp.url with the field path and the fix', () => {
