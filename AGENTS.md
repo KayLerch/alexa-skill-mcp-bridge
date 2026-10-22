@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D55 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D56 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
@@ -72,7 +72,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 
 ## Config rules
 
-- `bridge.config.ts` plus a git-ignored `.env` are the only developer input. Every consumer (generator, Lambda, agent, CDK) validates the merged result through `packages/core` at load time. Never read config fields from anywhere else.
+- `bridge.config.ts` plus a git-ignored `.env` (and, optionally, a profile folder from `BRIDGE_PROFILE_DIR`, D56) are the only developer input. Every consumer (generator, Lambda, agent, CDK) validates the merged result through `packages/core` at load time. Never read config fields from anywhere else.
 - `bridge.config.ts` is tracked and must stay committable as it ships. The developer-specific fields come from `.env` through `ENV_OVERRIDES` in `packages/core/src/config.ts` (D36). Adding one there means adding its line to `.env.example` and its row to `docs/config.md`.
 - Secrets never live in config or in the repo. Config holds a Secrets Manager secret name; the runtime fetches the value at startup. `MCP_SECRET_VALUE` in `.env` is the local-only escape.
 - Every field has a safe default except `mcp.url`, which defaults to the bundled example on port 3939. Adding a field means adding its default, its zod rule, its comment in `bridge.config.ts`, and its entry in `docs/config.md`.

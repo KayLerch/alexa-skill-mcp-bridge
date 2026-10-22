@@ -301,6 +301,7 @@ export class BridgeSession {
       memoryContext,
       maxSentences: config.speech.maxSentences,
       maxChoicesSpoken: config.speech.maxChoicesSpoken,
+      promptAddendum: config.agent.promptAddendum,
     };
     const systemPrompt = buildSystemPrompt(this.promptInputs);
     this.mcp = mcp;

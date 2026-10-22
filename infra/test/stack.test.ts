@@ -38,6 +38,16 @@ function imageBuildArgs(overrides: Record<string, unknown> = {}): Record<string,
 }
 
 describe('AlexaMcpBridgeStack', () => {
+  it('keeps the prompt addendum out of the Alexa Skill Lambda but in the agent runtime (D56)', () => {
+    const { template } = synth({ agent: { promptAddendum: 'Ask one question at a time.' } });
+    const lambdas = Object.values(template.findResources('AWS::Lambda::Function'));
+    const configs = lambdas.map((f) => f.Properties.Environment?.Variables?.BRIDGE_CONFIG);
+    expect(configs.filter(Boolean)).toHaveLength(1);
+    expect(configs[0] ?? configs[1]).not.toContain('promptAddendum');
+    const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
+    expect(JSON.stringify(runtimes)).toContain('Ask one question at a time.');
+  });
+
   it('builds the agent image without a browser unless visual.enabled is on (D54)', () => {
     expect(imageBuildArgs()).toEqual([{ WITH_SCREEN: '0' }]);
     expect(imageBuildArgs({ visual: { enabled: true } })).toEqual([{ WITH_SCREEN: '1' }]);

@@ -9,6 +9,7 @@ import {
 import { parseConfig, toolManifestSchema } from '@alexa-mcp-bridge/core';
 import { generate, examplePhrase } from './generate.js';
 import { scanServer, ScanError } from './scan.js';
+import { combineOverrides } from './utterances/overrides.js';
 
 let server: HotelsWeatherServerHandle;
 let dir: string;
@@ -128,6 +129,35 @@ describe('generate (template utterances)', () => {
     rmSync(paths().overridesDir, { recursive: true, force: true });
   });
 
+  it('merges a profile folder overrides after the repo ones (D56)', async () => {
+    const config = parseConfig({ mcp: { url: server.url } });
+    const profileOverrides = join(dir, 'profile/overrides');
+    mkdirSync(profileOverrides, { recursive: true });
+    writeFileSync(
+      join(profileOverrides, 'en-US.utterances.json'),
+      JSON.stringify({
+        intents: [
+          {
+            name: 'WhereToStayIntent',
+            tool: 'search_hotels',
+            samples: ['where should i stay in {destination}'],
+          },
+        ],
+      }),
+    );
+    const withProfile = await generate({
+      config,
+      paths: { ...paths(), profileOverridesDir: profileOverrides },
+      useModel: false,
+    });
+    const intents = (r: typeof withProfile) =>
+      r.models['en-US']?.interactionModel.languageModel.intents.map((i) => i.name) ?? [];
+    expect(intents(withProfile)).toContain('WhereToStayIntent');
+    const without = await generate({ config, paths: paths(), useModel: false });
+    expect(intents(without)).not.toContain('WhereToStayIntent');
+    rmSync(join(dir, 'profile'), { recursive: true, force: true });
+  });
+
   it('matches the snapshot for the hotels and weather server', async () => {
     const config = parseConfig({ mcp: { url: server.url } });
     const result = await generate({ config, paths: paths(), useModel: false });
@@ -157,5 +187,27 @@ describe('examplePhrase', () => {
       ['search hotels', 'search hotels guests {guests}'],
     );
     expect(phrase).toBe('search hotels guests two');
+  });
+});
+
+describe('combineOverrides', () => {
+  const empty = { utterances: {}, catchAll: [], slotSynonyms: {}, intents: [] };
+  it('puts profile samples first and lets a profile intent replace a repo one', () => {
+    const repo = {
+      ...empty,
+      utterances: { A: ['repo a'] },
+      catchAll: ['repo c'],
+      intents: [{ name: 'XIntent', tool: 't', samples: ['repo x'] }],
+    };
+    const profile = {
+      ...empty,
+      utterances: { A: ['profile a'] },
+      catchAll: ['profile c'],
+      intents: [{ name: 'XIntent', tool: 't', samples: ['profile x'] }],
+    };
+    const out = combineOverrides(repo, profile);
+    expect(out.utterances['A']).toEqual(['profile a', 'repo a']);
+    expect(out.catchAll).toEqual(['profile c', 'repo c']);
+    expect(out.intents).toEqual(profile.intents);
   });
 });

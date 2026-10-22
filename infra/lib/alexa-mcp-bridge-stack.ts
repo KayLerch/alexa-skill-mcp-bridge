@@ -30,6 +30,8 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
     super(scope, id, props);
     const { config, repoRoot } = props;
     const configJson = serializeConfig(config);
+    const { promptAddendum: _addendum, ...agentWithoutAddendum } = config.agent;
+    const lambdaConfigJson = serializeConfig({ ...config, agent: agentWithoutAddendum });
     const retention = retentionFor(config.aws.logRetentionDays);
 
     // Memory: short-term events always; long-term extraction strategies when memory.longTerm.
@@ -152,7 +154,9 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
       memorySize: 512,
       logGroup: skillLogs,
       environment: {
-        BRIDGE_CONFIG: configJson,
+        // The Alexa Skill Lambda has no use for the prompt addendum, and Lambda's environment
+        // is capped at 4 KB in total.
+        BRIDGE_CONFIG: lambdaConfigJson,
         AGENT_RUNTIME_ARN: runtime.agentRuntimeArn,
       },
       bundling: {

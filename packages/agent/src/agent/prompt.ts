@@ -54,6 +54,8 @@ export interface SystemPromptVars {
   /** config.speech, so the voice rules carry the same numbers the renderers use. */
   maxSentences: number;
   maxChoicesSpoken: number;
+  /** config.agent.promptAddendum (D56): the consumer's own guidance for this server. */
+  promptAddendum?: string | undefined;
 }
 
 /** The date in a time zone as YYYY-MM-DD; UTC when none is given. */
@@ -71,16 +73,18 @@ export function todayIn(now: Date, timeZone?: string): string {
  * because every model call that produces speech needs it, not only this one.
  */
 export function buildSystemPrompt(vars: SystemPromptVars): string {
-  const { maxSentences, maxChoicesSpoken, timeZone, ...persona } = vars;
+  const { maxSentences, maxChoicesSpoken, timeZone, promptAddendum, ...persona } = vars;
   const voice = renderPrompt('voice', {
     maxSentences: String(maxSentences),
     maxChoicesSpoken: String(maxChoicesSpoken),
   });
   const timeZoneRule = timeZone ? renderPrompt('time-zone', { timeZone }) : '';
+  const addendum = promptAddendum?.trim();
   return [
     renderPrompt('system', { ...persona, timeZoneRule }),
     voice,
     loadPrompt('tool-result').trim(),
+    ...(addendum ? [`## Server-specific guidance\n\n${addendum}`] : []),
   ].join('\n\n');
 }
 

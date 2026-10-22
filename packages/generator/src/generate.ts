@@ -10,7 +10,7 @@ import { buildManifest } from './manifest.js';
 import { spokenWords } from './names.js';
 import { scanServer, type ScanResult } from './scan.js';
 import { modelUtterances } from './utterances/model.js';
-import { mergeOverrides, readOverrides } from './utterances/overrides.js';
+import { combineOverrides, mergeOverrides, readOverrides } from './utterances/overrides.js';
 import { templateUtterances } from './utterances/template.js';
 import { importTraining, readTraining } from './training.js';
 import { writeGeneratedJson } from './write.js';
@@ -24,12 +24,15 @@ export interface GeneratePaths {
   manifest: string;
   interactionModelDir: string;
   overridesDir: string;
+  /** A profile folder's overrides, read after overridesDir so they win (D56). */
+  profileOverridesDir?: string | undefined;
   /** Where `npm run chat -- --record` writes what developers actually said. */
   trainingDir: string;
 }
 
-export function defaultPaths(repoRoot: string): GeneratePaths {
+export function defaultPaths(repoRoot: string, profileDir?: string): GeneratePaths {
   return {
+    profileOverridesDir: profileDir ? join(profileDir, 'overrides') : undefined,
     manifest: join(repoRoot, 'packages/skill-lambda/generated/tool-manifest.json'),
     interactionModelDir: join(repoRoot, 'skill-package/interactionModels/custom'),
     overridesDir: join(repoRoot, 'skill-package/overrides'),
@@ -70,7 +73,14 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
   let examplePhrases: string[] = [];
 
   for (const locale of config.skill.locales) {
-    const overrides = readOverrides(join(paths.overridesDir, `${locale}.utterances.json`));
+    const overridesFile = `${locale}.utterances.json`;
+    const repoOverrides = readOverrides(join(paths.overridesDir, overridesFile));
+    const overrides = paths.profileOverridesDir
+      ? combineOverrides(
+          repoOverrides,
+          readOverrides(join(paths.profileOverridesDir, overridesFile)),
+        )
+      : repoOverrides;
     const training = importTraining(
       readTraining(join(paths.trainingDir, `${locale}.chat.jsonl`)),
       draft.tools,
