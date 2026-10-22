@@ -7,7 +7,7 @@ import {
   type BridgeConfig,
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
-import { BridgeClient } from '../src/bridge.js';
+import { BridgeClient, UNLINKED_CANCEL_BUDGET_MS } from '../src/bridge.js';
 import { launchHandler } from '../src/handlers/launch.js';
 import { sessionEndedHandler, stopHandler } from '../src/handlers/standard.js';
 import { toolIntentHandler } from '../src/handlers/tool-intent.js';
@@ -100,6 +100,47 @@ describe('account linking in the Alexa Skill Lambda', () => {
       });
       expect(response.shouldEndSession).toBe(true);
       expect(response.reprompt).toBeUndefined();
+    }
+  });
+
+  it('waits on the unlinked cancel only for its own short budget, not the whole turn', async () => {
+    vi.useFakeTimers();
+    try {
+      const budgets: number[] = [];
+      let aborted = false;
+      const slow = new BridgeClient({
+        config: linking,
+        runtimeArn: 'arn:test',
+        logger: createLogger({}, { write: () => undefined }),
+        // A cold agent: answers the cancel only after 5 s, unless the bridge stops waiting first.
+        invoke: (envelope, _s, signal) =>
+          new Promise((resolve, reject) => {
+            budgets.push(envelope.budgetMs);
+            const timer = setTimeout(() => resolve(done('')), 5000);
+            signal.addEventListener('abort', () => {
+              aborted = true;
+              clearTimeout(timer);
+              reject(new Error('aborted'));
+            });
+          }),
+      });
+      let settled = false;
+      const response = Promise.resolve(
+        toolIntentHandler(slow, manifest).handle(searchHotels()),
+      ).then((r) => {
+        settled = true;
+        return r;
+      });
+      await vi.advanceTimersByTimeAsync(UNLINKED_CANCEL_BUDGET_MS - 1);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(2);
+      expect(settled).toBe(true);
+      expect(aborted).toBe(true);
+      expect(UNLINKED_CANCEL_BUDGET_MS).toBeLessThan(linking.turn.budgetMs);
+      expect(budgets).toEqual([UNLINKED_CANCEL_BUDGET_MS]);
+      expect((await response).card).toEqual({ type: 'LinkAccount' });
+    } finally {
+      vi.useRealTimers();
     }
   });
 

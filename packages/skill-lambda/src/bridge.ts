@@ -48,6 +48,13 @@ const TIME_ZONE_TIMEOUT_MS = 300;
 /** Below this the main call is not worth attempting; answer pending instead. */
 const MIN_BUDGET_MS = 800;
 
+/**
+ * The tokenless cancel on the no-token path waits at most this long (D48), so a user who has not
+ * linked hears the link prompt quickly. A warm agent answers a cancel in milliseconds; a cold one
+ * holds no conversation to forget.
+ */
+export const UNLINKED_CANCEL_BUDGET_MS = 800;
+
 export class BridgeClient {
   private readonly invoke: NonNullable<BridgeClientOptions['invoke']>;
 
@@ -126,7 +133,8 @@ export class BridgeClient {
       log.info('no account-linked token on the request; asking the user to link');
       // A cancel without a token tells the agent the link is gone, so it drops the conversation
       // before anyone links again (D48). Its answer never changes ours; send() never throws.
-      await this.send(ids, { type: 'cancel' }, config.turn.budgetMs, log);
+      // Its own short budget, not the turn's: the link prompt must not wait on a cold agent.
+      await this.send(ids, { type: 'cancel' }, UNLINKED_CANCEL_BUDGET_MS, log);
       // Stop still just ends the session.
       return turn.type === 'cancel'
         ? { status: 'done', speech: '', endSession: true, visual: null }
@@ -168,6 +176,8 @@ export class BridgeClient {
    * The device's IANA time zone from Alexa's UPS service, read once per Alexa session and cached
    * in the session attributes (D53). Bounded by TIME_ZONE_TIMEOUT_MS; a failure, a timeout or a
    * zone the Intl API rejects means no zone and is never an error. The lookup needs no permission.
+   * Only an answer is cached (a zone, or '' when the answer held no usable zone); after an error
+   * or a timeout the next turn of the session asks again.
    */
   private async deviceTimeZone(input: HandlerInput, log: Logger): Promise<string | undefined> {
     const cached = getTimeZone(input);
@@ -188,7 +198,6 @@ export class BridgeClient {
       return valid || undefined;
     } catch (err) {
       log.warn('device time zone unavailable; continuing without', errorFields(err));
-      setTimeZone(input, '');
       return undefined;
     } finally {
       if (timer) clearTimeout(timer);

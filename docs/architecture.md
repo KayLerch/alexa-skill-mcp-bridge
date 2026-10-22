@@ -93,7 +93,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D54) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D56) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).

@@ -94,6 +94,57 @@ describe('device time zone', () => {
     }
   });
 
+  it('asks again on the next turn after a timeout, and sends the zone then', async () => {
+    vi.useFakeTimers();
+    try {
+      const { bridge, envelopes } = setup();
+      const sessionAttributes: Record<string, unknown> = {};
+      let calls = 0;
+      const timeZone = vi.fn(() => {
+        calls += 1;
+        return calls === 1
+          ? new Promise<string>(() => undefined)
+          : Promise.resolve('America/New_York');
+      });
+      const input = handlerInput({ intent: 'X', timeZone, sessionAttributes });
+      const first = bridge.turn(input, turn);
+      await vi.advanceTimersByTimeAsync(301);
+      await first;
+      expect(envelopes[0]).not.toHaveProperty('timeZone');
+      expect(sessionAttributes).not.toHaveProperty('timeZone');
+      await bridge.turn(input, turn);
+      expect(timeZone).toHaveBeenCalledTimes(2);
+      expect(envelopes[1]?.timeZone).toBe('America/New_York');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('asks again on the next turn after an error', async () => {
+    const { bridge, envelopes } = setup();
+    const sessionAttributes: Record<string, unknown> = {};
+    const timeZone = vi
+      .fn<() => Promise<string>>()
+      .mockRejectedValueOnce(new Error('500 internal'))
+      .mockResolvedValueOnce('Europe/Berlin');
+    const input = handlerInput({ intent: 'X', timeZone, sessionAttributes });
+    await bridge.turn(input, turn);
+    await bridge.turn(input, turn);
+    expect(timeZone).toHaveBeenCalledTimes(2);
+    expect(envelopes.map((e) => e.timeZone)).toEqual([undefined, 'Europe/Berlin']);
+  });
+
+  it('caches "no zone" for the session when UPS answered without a usable one', async () => {
+    const { bridge, envelopes } = setup();
+    const sessionAttributes: Record<string, unknown> = {};
+    const timeZone = vi.fn(async () => 'Mars/Olympus');
+    const input = handlerInput({ intent: 'X', timeZone, sessionAttributes });
+    await bridge.turn(input, turn);
+    await bridge.turn(input, turn);
+    expect(timeZone).toHaveBeenCalledTimes(1);
+    expect(envelopes.every((e) => e.timeZone === undefined)).toBe(true);
+  });
+
   it('drops a zone Intl rejects', async () => {
     const { bridge, envelopes } = setup();
     await bridge.turn(handlerInput({ intent: 'X', timeZone: async () => 'Mars/Olympus' }), turn);

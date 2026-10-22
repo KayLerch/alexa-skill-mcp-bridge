@@ -53,6 +53,19 @@ describe('lastQuestion', () => {
     );
   });
 
+  it('keeps a question together with the options that follow it', () => {
+    expect(
+      lastQuestion(
+        'Right. Priya said so. Next, from the standup: Which vendor did Priya pick? A, Adyen; B, Stripe; or C, Square?',
+      ),
+    ).toBe(
+      'Next, from the standup: Which vendor did Priya pick? A, Adyen; B, Stripe; or C, Square?',
+    );
+    expect(lastQuestion('Which one? A, tea; or B, coffee? Say a letter.')).toBe(
+      'Which one? A, tea; or B, coffee?',
+    );
+  });
+
   it('is undefined when nothing asks', () => {
     expect(lastQuestion('That was the last one.')).toBeUndefined();
   });

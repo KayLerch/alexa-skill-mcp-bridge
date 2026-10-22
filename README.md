@@ -137,6 +137,8 @@ The first `--remote` turn provisions the runtime and may take a while; the ones 
 
 `npm run generate` builds the Alexa interaction model from your tools: one intent per tool with sample utterances for every combination of its arguments, a catch-all for phrasings it did not predict, and everything you said in `npm run chat -- --record`. If Alexa still mishears a request your server should handle, [docs/customizing.md](docs/customizing.md) shows how to add utterances, synonyms and intents without touching a generated file.
 
+With a profile folder (`BRIDGE_PROFILE_DIR`, [docs/config.md](docs/config.md#a-profile-folder)), `npm run generate` writes your server's names (invocation name, tools, phrasings) into the tracked generated files (`packages/skill-lambda/generated/`, `skill-package/interactionModels/`). Run it in a clone you never push from, or `git restore` those files before you commit to the bridge itself.
+
 ## Track C: the Alexa Skill, in the simulator or on a device
 
 Additional prerequisites:
@@ -260,7 +262,7 @@ The fields are described in Amazon's [account linking schema](https://developer.
 
 ## Out of scope for v1
 
-Interactive widgets (with `visual.enabled` the agent renders a server's MCP Apps widget to a still image, D54; nothing on it can be tapped), a web frontend (the CLI harness and the `Turn` contract are its foundation), other locales, MCP 2026-07-28 stateless elicitation, Alexa progressive responses.
+Interactive widgets (with `visual.enabled` the agent renders a server's MCP Apps widget to a still image, D54; nothing on it can be tapped), a web frontend (the CLI harness and the `Turn` contract are its foundation), other locales, MCP 2026-07-28 stateless elicitation. Progressive responses ("One moment." while the agent works, D52) were on this list and are built now.
 
 ## Security, privacy, and what to keep out of git
 
