@@ -8,7 +8,14 @@ import { readFileSync } from 'node:fs';
 const PROMPTS_DIR = new URL('../../prompts/', import.meta.url);
 
 export type PromptName =
-  'system' | 'voice' | 'tool-result' | 'elicitation' | 'tool-hint' | 'fallback' | 'ask-user';
+  | 'system'
+  | 'time-zone'
+  | 'voice'
+  | 'tool-result'
+  | 'elicitation'
+  | 'tool-hint'
+  | 'fallback'
+  | 'ask-user';
 
 const cache = new Map<PromptName, string>();
 
@@ -38,7 +45,10 @@ export interface SystemPromptVars {
   serverInstructions: string;
   toolList: string;
   locale: string;
+  /** The date in the user's zone (or UTC), YYYY-MM-DD. */
   today: string;
+  /** The user's IANA time zone (D53), when the frontend knows it. */
+  timeZone?: string | undefined;
   /** "Known about this user" block from long-term memory. Empty string when there is none. */
   memoryContext: string;
   /** config.speech, so the voice rules carry the same numbers the renderers use. */
@@ -46,17 +56,32 @@ export interface SystemPromptVars {
   maxChoicesSpoken: number;
 }
 
+/** The date in a time zone as YYYY-MM-DD; UTC when none is given. */
+export function todayIn(now: Date, timeZone?: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timeZone ?? 'UTC',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
 /**
  * Persona, then the voice rules, then how to read a tool result. `voice.md` is its own file
  * because every model call that produces speech needs it, not only this one.
  */
 export function buildSystemPrompt(vars: SystemPromptVars): string {
-  const { maxSentences, maxChoicesSpoken, ...persona } = vars;
+  const { maxSentences, maxChoicesSpoken, timeZone, ...persona } = vars;
   const voice = renderPrompt('voice', {
     maxSentences: String(maxSentences),
     maxChoicesSpoken: String(maxChoicesSpoken),
   });
-  return [renderPrompt('system', persona), voice, loadPrompt('tool-result').trim()].join('\n\n');
+  const timeZoneRule = timeZone ? renderPrompt('time-zone', { timeZone }) : '';
+  return [
+    renderPrompt('system', { ...persona, timeZoneRule }),
+    voice,
+    loadPrompt('tool-result').trim(),
+  ].join('\n\n');
 }
 
 /** One line per tool: name, then the description's first sentence. Keeps the prompt small. */

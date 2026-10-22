@@ -50,6 +50,8 @@ export interface FakeRequest {
   accessToken?: string;
   /** Test seam for ASK's directive service (Progressive Response). */
   enqueue?: (request: unknown) => Promise<void>;
+  /** Test seam for ASK's UPS service (the device's time zone). */
+  timeZone?: (deviceId: string) => Promise<string>;
 }
 
 export function handlerInput(fake: FakeRequest = {}): HandlerInput {
@@ -86,6 +88,7 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
           ...(fake.accessToken ? { accessToken: fake.accessToken } : {}),
         },
         apiEndpoint: 'https://api.amazonalexa.com',
+        device: { deviceId: 'amzn1.ask.device.D1' },
       },
     },
     request,
@@ -95,8 +98,13 @@ export function handlerInput(fake: FakeRequest = {}): HandlerInput {
     attributesManager: AttributesManagerFactory.init({ requestEnvelope }),
     responseBuilder: ResponseFactory.init(),
     context: {},
-    ...(fake.enqueue
-      ? { serviceClientFactory: { getDirectiveServiceClient: () => ({ enqueue: fake.enqueue }) } }
+    ...(fake.enqueue || fake.timeZone
+      ? {
+          serviceClientFactory: {
+            getDirectiveServiceClient: () => ({ enqueue: fake.enqueue }),
+            getUpsServiceClient: () => ({ getSystemTimeZone: fake.timeZone }),
+          },
+        }
       : {}),
   } as HandlerInput;
 }

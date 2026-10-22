@@ -1,7 +1,12 @@
 import type { Agent, Model } from '@strands-agents/sdk';
 import { errorFields, type BridgeConfig, type Logger } from '@alexa-mcp-bridge/core';
 import { buildAgent } from './agent/build-agent.js';
-import { buildSystemPrompt, formatToolList, type SystemPromptVars } from './agent/prompt.js';
+import {
+  buildSystemPrompt,
+  formatToolList,
+  todayIn,
+  type SystemPromptVars,
+} from './agent/prompt.js';
 import { HiddenArguments, ResultField, askUserTool, mcpTools } from './agent/tools.js';
 import { QuestionQueue } from './elicitation/queue.js';
 import { isUnauthorized, resolveMcpAuth, type SecretResolver } from './mcp/auth.js';
@@ -22,6 +27,8 @@ export type SessionState =
 export interface SessionIdentity {
   actorId: string;
   locale: string;
+  /** The user's IANA time zone, when the frontend sent a valid one (D53). */
+  timeZone?: string | undefined;
 }
 
 export interface BridgeSessionOptions {
@@ -171,6 +178,31 @@ export class BridgeSession {
     this.logger.info('account link lost; conversation history dropped');
   }
 
+  /**
+   * The frontend reports the user's zone on every invocation (D53). When it differs from the one
+   * the system prompt names (a traveller, a new Alexa session), rebuild the prompt so "today" and
+   * the zone to pass to tools follow the device. Before warm-up finishes there is nothing to do:
+   * connect() reads the zone from the identity.
+   */
+  updateTimeZone(timeZone: string | undefined): void {
+    if (!timeZone || !this.promptInputs || this.promptInputs.timeZone === timeZone) return;
+    this.promptInputs = {
+      ...this.promptInputs,
+      timeZone,
+      today: todayIn(this.now(), timeZone),
+    };
+    if (this.agent) {
+      this.agent.systemPrompt = buildSystemPrompt({
+        ...this.promptInputs,
+        ...(this.forgotten ? { memoryContext: '' } : {}),
+      });
+    }
+  }
+
+  private now(): Date {
+    return (this.options.now ?? (() => new Date()))();
+  }
+
   get serverName(): string | undefined {
     return this.mcp?.serverInfo?.name;
   }
@@ -216,13 +248,14 @@ export class BridgeSession {
           }),
       this.forgotten ? '' : memory.longTermContext(identity.actorId).catch(() => ''),
     ]);
-    const today = (this.options.now ?? (() => new Date()))().toISOString().slice(0, 10);
+    const today = todayIn(this.now(), identity.timeZone);
     this.promptInputs = {
       serverName: info.name,
       serverInstructions: info.instructions ?? '(the server gave no instructions)',
       toolList: formatToolList(definitions),
       locale: identity.locale,
       today,
+      timeZone: identity.timeZone,
       memoryContext,
       maxSentences: config.speech.maxSentences,
       maxChoicesSpoken: config.speech.maxChoicesSpoken,

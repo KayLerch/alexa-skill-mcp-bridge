@@ -7,6 +7,7 @@ import {
   SPOKEN,
   errorFields,
   hashId,
+  isValidTimeZone,
   linkAccountOutput,
   turnOutputSchema,
   type AgentInvocationInput,
@@ -15,7 +16,7 @@ import {
   type TurnInput,
   type TurnOutput,
 } from '@alexa-mcp-bridge/core';
-import { isAwaitingResult } from './session-attrs.js';
+import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
 
 /**
  * The Alexa Skill's client for the agent. Hashes Alexa ids, builds the envelope, calls
@@ -38,6 +39,9 @@ export interface BridgeClientOptions {
     signal: AbortSignal,
   ) => Promise<TurnOutput>;
 }
+
+/** The UPS lookup of the device's time zone may take this long; then the turn goes without (D53). */
+const TIME_ZONE_TIMEOUT_MS = 300;
 
 /** Below this the main call is not worth attempting; answer pending instead. */
 const MIN_BUDGET_MS = 800;
@@ -126,8 +130,14 @@ export class BridgeClient {
         ? { status: 'done', speech: '', endSession: true, visual: null }
         : linkAccountOutput();
     }
-    const call: Call = { ...ids, ...(userToken ? { userToken } : {}) };
-    let budgetMs = config.turn.budgetMs;
+    const lookupStarted = Date.now();
+    const timeZone = await this.deviceTimeZone(input, log);
+    const call: Call = {
+      ...ids,
+      ...(userToken ? { userToken } : {}),
+      ...(timeZone ? { timeZone } : {}),
+    };
+    let budgetMs = config.turn.budgetMs - (Date.now() - lookupStarted);
     let prefix = '';
 
     if (isAwaitingResult(input) && turn.type !== 'poll' && turn.type !== 'cancel') {
@@ -150,6 +160,37 @@ export class BridgeClient {
     return prefix ? { ...output, speech: `${prefix} ${output.speech}`.trim() } : output;
   }
 
+  /**
+   * The device's IANA time zone from Alexa's UPS service, read once per Alexa session and cached
+   * in the session attributes (D53). Bounded by TIME_ZONE_TIMEOUT_MS; a failure, a timeout or a
+   * zone the Intl API rejects means no zone and is never an error. The lookup needs no permission.
+   */
+  private async deviceTimeZone(input: HandlerInput, log: Logger): Promise<string | undefined> {
+    const cached = getTimeZone(input);
+    if (cached !== undefined) return cached || undefined;
+    const deviceId = input.requestEnvelope.context.System.device?.deviceId;
+    const ups = input.serviceClientFactory?.getUpsServiceClient();
+    if (!deviceId || !ups) return undefined;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      const zone = await Promise.race([
+        ups.getSystemTimeZone(deviceId),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error('timed out')), TIME_ZONE_TIMEOUT_MS);
+        }),
+      ]);
+      const valid = typeof zone === 'string' && isValidTimeZone(zone) ? zone : '';
+      setTimeZone(input, valid);
+      return valid || undefined;
+    } catch (err) {
+      log.warn('device time zone unavailable; continuing without', errorFields(err));
+      setTimeZone(input, '');
+      return undefined;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
   private async send(
     call: Call,
     turn: TurnInput,
@@ -165,6 +206,7 @@ export class BridgeClient {
       budgetMs,
       debug: config.features.debug,
       ...(call.userToken ? { userToken: call.userToken } : {}),
+      ...(call.timeZone ? { timeZone: call.timeZone } : {}),
     };
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), budgetMs);
@@ -192,9 +234,10 @@ interface Identity {
   locale: string;
 }
 
-/** What one agent call needs: the hashed identity and, with account linking, the user's token. */
+/** What one agent call needs: the hashed identity, the user's token with account linking, the device's zone. */
 interface Call extends Identity {
   userToken?: string;
+  timeZone?: string;
 }
 
 /** Raw Alexa ids are hashed here and never leave the Lambda. */
