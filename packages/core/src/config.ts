@@ -319,8 +319,9 @@ export function parseConfig(raw: unknown): BridgeConfig {
 export const CONFIG_FILE_NAME = 'bridge.config.ts';
 export const CONFIG_ENV_VAR = 'BRIDGE_CONFIG';
 /**
- * The agent runtime gets the prompt addendum in a variable of its own: AgentCore caps each
- * runtime environment variable at 2048 characters, and the addendum alone may be 2000 bytes.
+ * The agent runtime gets the prompt addendum in a variable of its own, as a JSON string:
+ * AgentCore caps each runtime environment variable at 2048 characters (the addendum alone may
+ * be 2000 bytes) and refuses control characters such as newlines.
  */
 export const PROMPT_ADDENDUM_ENV_VAR = 'BRIDGE_PROMPT_ADDENDUM';
 /** AgentCore Runtime's limit on one environment variable's value, in characters. */
@@ -551,8 +552,15 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BridgeC
   } catch {
     throw new ConfigError(`${CONFIG_ENV_VAR} is not valid JSON.`);
   }
-  const addendum = env[PROMPT_ADDENDUM_ENV_VAR];
-  if (addendum && parsed && typeof parsed === 'object') {
+  const encoded = env[PROMPT_ADDENDUM_ENV_VAR];
+  if (encoded && parsed && typeof parsed === 'object') {
+    // A JSON string, because AgentCore refuses control characters such as newlines in a value.
+    let addendum: unknown;
+    try {
+      addendum = JSON.parse(encoded);
+    } catch {
+      throw new ConfigError(`${PROMPT_ADDENDUM_ENV_VAR} is not a JSON string.`);
+    }
     const withAgent = parsed as { agent?: Record<string, unknown> };
     withAgent.agent = { ...withAgent.agent, promptAddendum: addendum };
   }

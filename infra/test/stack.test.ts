@@ -39,14 +39,18 @@ function imageBuildArgs(overrides: Record<string, unknown> = {}): Record<string,
 
 describe('AlexaMcpBridgeStack', () => {
   it('keeps the prompt addendum out of the Alexa Skill Lambda but in the agent runtime (D56)', () => {
-    const { template } = synth({ agent: { promptAddendum: 'Ask one question at a time.' } });
+    const { template } = synth({
+      agent: { promptAddendum: 'Ask one question at a time.\n- Speak say.' },
+    });
     const lambdas = Object.values(template.findResources('AWS::Lambda::Function'));
     const configs = lambdas.map((f) => f.Properties.Environment?.Variables?.BRIDGE_CONFIG);
     expect(configs.filter(Boolean)).toHaveLength(1);
     expect(configs[0] ?? configs[1]).not.toContain('promptAddendum');
     const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
     const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
-    expect(env.BRIDGE_PROMPT_ADDENDUM).toBe('Ask one question at a time.');
+    // JSON-encoded: AgentCore refuses control characters such as the newline in a value.
+    expect(env.BRIDGE_PROMPT_ADDENDUM).toBe('"Ask one question at a time.\\n- Speak say."');
+    expect(env.BRIDGE_PROMPT_ADDENDUM).not.toMatch(/[\u0000-\u001f\u007f]/);
     expect(env.BRIDGE_CONFIG).not.toContain('promptAddendum');
   });
 

@@ -66,12 +66,20 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
     });
     const runtimeEnv: Record<string, string> = {
       [CONFIG_ENV_VAR]: configJson,
-      ...(promptAddendum ? { [PROMPT_ADDENDUM_ENV_VAR]: promptAddendum } : {}),
+      // JSON-encoded: AgentCore refuses control characters (the addendum's newlines) in a value.
+      ...(promptAddendum ? { [PROMPT_ADDENDUM_ENV_VAR]: JSON.stringify(promptAddendum) } : {}),
       MEMORY_ID: memory.memoryId,
       LOG_LEVEL: config.features.debug ? 'debug' : 'info',
     };
     for (const [name, value] of Object.entries(runtimeEnv)) {
-      if (!cdk.Token.isUnresolved(value) && value.length > RUNTIME_ENV_VALUE_MAX) {
+      if (cdk.Token.isUnresolved(value)) continue;
+      // eslint-disable-next-line no-control-regex -- the characters AgentCore refuses
+      if (/[\u0000-\u001f\u007f]/.test(value)) {
+        throw new Error(
+          `${name} for the agent runtime holds a control character; AgentCore refuses them.`,
+        );
+      }
+      if (value.length > RUNTIME_ENV_VALUE_MAX) {
         throw new Error(
           `${name} for the agent runtime is ${value.length} characters; AgentCore allows ${RUNTIME_ENV_VALUE_MAX}. ` +
             'Shorten the longest config strings (skill.help, skill.greeting, the messages).',

@@ -78,9 +78,9 @@ describe('env round trip', () => {
     const config = parseConfig({ mcp: { url: 'http://localhost:3000/mcp' } });
     const loaded = loadConfigFromEnv({
       BRIDGE_CONFIG: serializeConfig(config),
-      BRIDGE_PROMPT_ADDENDUM: 'Ask one question at a time.',
+      BRIDGE_PROMPT_ADDENDUM: JSON.stringify('Ask one question at a time.\n- Speak say.'),
     });
-    expect(loaded.agent.promptAddendum).toBe('Ask one question at a time.');
+    expect(loaded.agent.promptAddendum).toBe('Ask one question at a time.\n- Speak say.');
   });
 });
 
