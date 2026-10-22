@@ -227,8 +227,13 @@ export function withSynonyms(
   });
 }
 
-/** Slot-free versions of the generated utterances, as phrases a person might actually say. */
-function catchAllTraining(utterances: string[]): string[] {
+/**
+ * Slot-free versions of the generated utterances, as phrases a person might actually say. Beside
+ * tool intents, a sample: phrases of three words or more, at most 100. As the only route to the
+ * agent (tool intents off, D69), all of them, short ones included ("quiz me", "skip"), because a
+ * phrase missing here falls to AMAZON.FallbackIntent and loses its words.
+ */
+function catchAllTraining(utterances: string[], all = false): string[] {
   const phrases = utterances
     .map((u) =>
       u
@@ -236,9 +241,21 @@ function catchAllTraining(utterances: string[]): string[] {
         .replace(/\s+/g, ' ')
         .trim(),
     )
-    .filter((u) => u.split(' ').length > 2);
-  return [...new Set(phrases)].sort().slice(0, 100);
+    .filter((u) => u && (all || u.split(' ').length > 2));
+  return [...new Set(phrases)].sort().slice(0, all ? CATCH_ALL_MAX_VALUES : 100);
 }
+
+/** Well under Alexa's limit on values per custom slot type. */
+const CATCH_ALL_MAX_VALUES = 1000;
+
+/** The bridge's own answer intents, by the short name `answers.intents` uses (D69). */
+export const ANSWER_INTENT_NAMES = {
+  date: 'DateAnswerIntent',
+  number: 'NumberAnswerIntent',
+  freeText: 'FreeTextAnswerIntent',
+  choice: 'ChoiceAnswerIntent',
+} as const;
+export type AnswerIntentKey = keyof typeof ANSWER_INTENT_NAMES;
 
 /** Repeat replays the last output and Next is a common "skip" (D59); both always ship. */
 export const STANDARD_INTENTS: AlexaIntent[] = [
@@ -276,6 +293,12 @@ export interface InteractionModelOptions {
   answerSamples?: Record<string, string[]>;
   /** answers.choices: canonical answer choice → spoken synonyms, for AnswerChoiceType (D67). */
   answerChoices?: Record<string, string[]>;
+  /**
+   * answers.intents: which of the bridge's own answer intents ship (D69). Unset: all of them. A
+   * date or number intent rewrites the words ("on friday" becomes an ISO date), which a server
+   * that grades spoken answers may not want; the catch-all then carries them as said.
+   */
+  answerIntents?: AnswerIntentKey[] | undefined;
   /** skill.fallbackSensitivity: the model's fallbackIntentSensitivity (D60). Unset: Alexa's default. */
   fallbackSensitivity?: 'LOW' | 'MEDIUM' | 'HIGH' | undefined;
 }
@@ -290,7 +313,11 @@ export function buildInteractionModel(
   const withToolIntents = options.toolIntents ?? true;
   // With tool intents off, the catch-all is the only way a request reaches the agent.
   const withCatchAll = (options.catchAll ?? true) || !withToolIntents;
-  const generatedUtterances = manifest.tools.flatMap((t) => utterancesByIntent[t.intent] ?? []);
+  const generatedUtterances = [
+    ...manifest.tools.flatMap((t) => utterancesByIntent[t.intent] ?? []),
+    // Without tool intents an alias has no intent of its own: its phrases train the catch-all.
+    ...(withToolIntents ? [] : (options.aliases ?? []).flatMap((a) => a.samples)),
+  ];
 
   const toolIntents: AlexaIntent[] = withToolIntents
     ? manifest.tools
@@ -312,7 +339,12 @@ export function buildInteractionModel(
   // Generated utterances double as training phrases for the catch-all slot: a closed list to
   // Alexa's eye, but it passes through phrases that are not in it, which is the whole point.
   const trainingPhrases = withCatchAll
-    ? [...new Set([...catchAllTraining(generatedUtterances), ...(options.catchAllPhrases ?? [])])]
+    ? [
+        ...new Set([
+          ...catchAllTraining(generatedUtterances, !withToolIntents),
+          ...(options.catchAllPhrases ?? []),
+        ]),
+      ]
     : [];
   const requestIntents: AlexaIntent[] = [
     FREE_TEXT_INTENT,
@@ -323,14 +355,17 @@ export function buildInteractionModel(
     ? customTypes
     : customTypes.filter((t) => t.name === 'YesNoType');
   const choices = answerChoiceType(customTypes, options.answerChoices);
-  const answerIntents = (choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS).map(
-    (intent) => {
+  const keep = options.answerIntents
+    ? new Set<string>(options.answerIntents.map((k) => ANSWER_INTENT_NAMES[k]))
+    : undefined;
+  const answerIntents = (choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS)
+    .filter((intent) => !keep || keep.has(intent.name))
+    .map((intent) => {
       const extra = options.answerSamples?.[intent.name];
       return extra?.length && intent.samples
         ? { ...intent, samples: [...new Set([...extra, ...intent.samples])] }
         : intent;
-    },
-  );
+    });
   const types: CustomSlotType[] = withSynonyms(
     [
       ...toolTypes,

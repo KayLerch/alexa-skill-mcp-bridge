@@ -167,6 +167,7 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
       config.skill.invocationName,
       {
         toolIntents: config.features.toolIntents,
+        answerIntents: config.answers.intents,
         catchAll: config.features.catchAll,
         catchAllPhrases: [...overrides.catchAll, ...training.catchAll],
         aliases,

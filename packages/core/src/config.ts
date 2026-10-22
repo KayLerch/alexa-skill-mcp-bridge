@@ -286,6 +286,15 @@ const bridgeConfigShape = z.object({
        * agent as "b". Read by the generator only; change it, then npm run generate.
        */
       choices: z.record(spokenWords, z.array(spokenWords)).default({}),
+      /**
+       * Which of the bridge's own answer intents ship (D69); unset ships all four. With tool
+       * intents off, ['choice'] leaves every other answer to the catch-all, word for word: a date
+       * or number intent would rewrite "on friday" as an ISO date. Read by the generator only.
+       */
+      intents: z
+        .array(z.enum(['date', 'number', 'freeText', 'choice']))
+        .min(1)
+        .optional(),
     })
     .prefault({}),
   aws: z

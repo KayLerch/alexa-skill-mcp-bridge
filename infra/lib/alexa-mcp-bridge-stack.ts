@@ -36,7 +36,8 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
     // The addendum travels on its own (PROMPT_ADDENDUM_ENV_VAR): the Lambda has no use for it,
     // and the runtime's variables are capped at RUNTIME_ENV_VALUE_MAX characters each.
     const { promptAddendum, ...agentWithoutAddendum } = config.agent;
-    // answers.choices shapes the interaction model only; the deployed code never reads it (D67).
+    // answers.choices and answers.intents shape the interaction model only; the deployed code never
+    // reads them (D67, D69).
     const configJson = serializeConfig({
       ...config,
       agent: agentWithoutAddendum,

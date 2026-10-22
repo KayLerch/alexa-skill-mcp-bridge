@@ -80,6 +80,37 @@ describe('buildInteractionModel', () => {
     expect(model.intents.map((i) => i.name)).toContain('SpokenRequestIntent');
   });
 
+  it('keeps only the answer intents named in answerIntents (D69)', () => {
+    const names = buildInteractionModel(manifest, utterances, types, 'bridge demo', {
+      toolIntents: false,
+      answerIntents: ['choice'],
+    }).interactionModel.languageModel.intents.map((i) => i.name);
+    expect(names).toContain('ChoiceAnswerIntent');
+    expect(names).not.toContain('DateAnswerIntent');
+    expect(names).not.toContain('NumberAnswerIntent');
+    expect(names).not.toContain('FreeTextAnswerIntent');
+  });
+
+  it('trains the catch-all on every phrase, short ones and aliases too, when tool intents are off (D69)', () => {
+    const many = {
+      FindParkIntent: [
+        'find park',
+        ...Array.from({ length: 150 }, (_, n) => `find a park number ${'x'.repeat(n + 1)}`),
+      ],
+    };
+    const tool = manifest.tools[0]!;
+    const model = buildInteractionModel(manifest, many, types, 'bridge demo', {
+      toolIntents: false,
+      aliases: [{ name: 'WhereToGoIntent', tool, samples: ['where to go'] }],
+    }).interactionModel.languageModel;
+    const values = model.types
+      .find((t) => t.name === CATCH_ALL_TYPE_NAME)!
+      .values.map((v) => v.name.value);
+    expect(values).toContain('find park');
+    expect(values).toContain('where to go');
+    expect(values.length).toBeGreaterThan(150);
+  });
+
   it('keeps the answer and standard intents in both modes', () => {
     for (const toolIntents of [true, false]) {
       const names = build(toolIntents).intents.map((i) => i.name);
