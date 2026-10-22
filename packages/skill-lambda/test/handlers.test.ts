@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger, type TurnInput, type TurnOutput } from '@alexa-mcp-bridge/core';
 import { BridgeClient } from '../src/bridge.js';
-import { answerHandler, answerHintFor, yesNoTurnHandler } from '../src/handlers/answers.js';
+import {
+  answerHandler,
+  answerHintFor,
+  openAnswerHandler,
+  yesNoTurnHandler,
+} from '../src/handlers/answers.js';
 import { launchHandler } from '../src/handlers/launch.js';
 import { fallbackHandler, stopHandler } from '../src/handlers/standard.js';
 import { toolIntentHandler } from '../src/handlers/tool-intent.js';
@@ -126,6 +131,89 @@ describe('answer intents', () => {
       type: 'turn',
       utterance: { intent: 'AMAZON.NoIntent', text: 'no' },
     });
+  });
+});
+
+describe('answers without a pending question', () => {
+  const open = { openTurn: true };
+
+  it.each([
+    ['NumberAnswerIntent', 'number', 'four', 'four'],
+    ['DateAnswerIntent', 'date', 'the fourteenth', 'the fourteenth'],
+    ['ChoiceAnswerIntent', 'choice', 'b', 'b'],
+    ['FreeTextAnswerIntent', 'answer', 'the suite', 'the suite'],
+  ])('%s becomes a turn with the spoken words', async (intent, slotName, spoken, text) => {
+    const { bridge, turns } = fakeBridge(() => done('Next.'));
+    const handler = openAnswerHandler(bridge);
+    const input = handlerInput({
+      intent,
+      slots: { [slotName]: slot(slotName, spoken) },
+      sessionAttributes: open,
+    });
+    expect(handler.canHandle(input)).toBe(true);
+    await handler.handle(input);
+    expect(turns[0]).toEqual({ type: 'turn', utterance: { text } });
+  });
+
+  it('keeps the session open', async () => {
+    const { bridge } = fakeBridge(() => done('Next.'));
+    const response = await openAnswerHandler(bridge).handle(
+      handlerInput({
+        intent: 'NumberAnswerIntent',
+        slots: { number: slot('number', '4') },
+        sessionAttributes: open,
+      }),
+    );
+    expect(response.shouldEndSession).toBe(false);
+  });
+
+  it('keeps the old refusal when no turn is open or a question is pending', () => {
+    const { bridge } = fakeBridge(() => done('x'));
+    const handler = openAnswerHandler(bridge);
+    expect(handler.canHandle(handlerInput({ intent: 'NumberAnswerIntent' }))).toBe(false);
+    expect(
+      handler.canHandle(
+        handlerInput({
+          intent: 'NumberAnswerIntent',
+          sessionAttributes: { ...open, ...pendingQuestion },
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      handler.canHandle(handlerInput({ intent: 'SearchHotelsIntent', sessionAttributes: open })),
+    ).toBe(false);
+  });
+
+  it('does not take yes and no (the yes/no handler does)', () => {
+    const { bridge } = fakeBridge(() => done('x'));
+    expect(
+      openAnswerHandler(bridge).canHandle(
+        handlerInput({ intent: 'AMAZON.YesIntent', sessionAttributes: open }),
+      ),
+    ).toBe(false);
+  });
+
+  it('render sets openTurn while the session stays open and clears it otherwise', async () => {
+    const attrs = (input: ReturnType<typeof handlerInput>) =>
+      input.attributesManager.getSessionAttributes() as Record<string, unknown>;
+    const { bridge } = fakeBridge(() => done('Next.'));
+    const stay = handlerInput({ intent: 'AMAZON.NoIntent' });
+    await yesNoTurnHandler(bridge).handle(stay);
+    expect(attrs(stay).openTurn).toBe(true);
+    const end = fakeBridge(() => done('Bye.', true));
+    const ended = handlerInput({ intent: 'AMAZON.NoIntent', sessionAttributes: open });
+    await yesNoTurnHandler(end.bridge).handle(ended);
+    expect(attrs(ended).openTurn).toBeUndefined();
+    const ask = fakeBridge(() => ({
+      status: 'question',
+      speech: 'How many?',
+      endSession: false,
+      visual: null,
+      question: { id: 'q9', expects: 'number', source: 'elicitation', message: 'How many?' },
+    }));
+    const parked = handlerInput({ intent: 'AMAZON.NoIntent', sessionAttributes: open });
+    await yesNoTurnHandler(ask.bridge).handle(parked);
+    expect(attrs(parked).openTurn).toBeUndefined();
   });
 });
 

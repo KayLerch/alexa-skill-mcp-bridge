@@ -2,7 +2,7 @@ import type { HandlerInput } from 'ask-sdk-core';
 import type { Response } from 'ask-sdk-model';
 import type { TurnOutput } from '@alexa-mcp-bridge/core';
 import { REPROMPT } from './greeting.js';
-import { setAwaitingResult, setPendingQuestion } from './session-attrs.js';
+import { setAwaitingResult, setOpenTurn, setPendingQuestion } from './session-attrs.js';
 
 /**
  * TurnOutput → Alexa response. Speech becomes SSML with light escaping, a reprompt keeps the
@@ -28,6 +28,8 @@ export function render(
 
   setPendingQuestion(input, output.status === 'question' ? output.question : undefined);
   setAwaitingResult(input, output.status === 'pending');
+  // Open for a spoken answer as an ordinary turn (D49) unless the session ends or a question is parked.
+  setOpenTurn(input, !endSession && output.status !== 'question');
 
   const builder = input.responseBuilder;
   if (speech) builder.speak(ssml(speech));

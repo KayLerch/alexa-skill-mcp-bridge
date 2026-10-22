@@ -61,7 +61,7 @@ MCP 2025-11-25 delivers elicitation as a server-to-client request on the still-o
 
 1. The agent calls a tool; the server sends `elicitation/create`. The MCP client's request handler hands the params to `QuestionQueue.elicit()`, which plans one spoken question per property (required first) and returns a promise. The tool call is now parked.
 2. `waitForOutcome` sees the question and the turn returns `status: 'question'`. The Lambda speaks it and stores `{id, expects, source, message}` in session attributes; the session stays open with a reprompt.
-3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which only fire while a question is pending. The Lambda sends `{type: 'answer', questionId, answer}`.
+3. The user answers. Alexa routes yes/no, dates, numbers, or a carrier-phrase free text to the answer intents, which fire while a question is pending; with none pending and the session open, a date, number, choice or free-text answer is an ordinary turn carrying the spoken words (D49). The Lambda sends `{type: 'answer', questionId, answer}`.
 4. The agent maps the answer deterministically (yes/no, `AMAZON.DATE`, `AMAZON.NUMBER`, enum with entity resolution, spoken number words). Free text against a typed property goes through one structured-output model call, then the same deterministic validation. An unusable answer re-asks.
 5. When every property has a value the elicitation resolves with `accept`, the tool continues, and the agent phrases the result. "No" to a non-yes/no question declines; stop, session end, a new topic, or the answer timeout cancel.
 6. `ask_user`, the agent's own tool for a missing argument, goes through the same queue, so the frontend sees one kind of question.
@@ -80,7 +80,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D48) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D49) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).

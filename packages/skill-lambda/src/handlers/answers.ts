@@ -4,7 +4,7 @@ import type { AnswerHint } from '@alexa-mcp-bridge/core';
 import type { BridgeClient } from '../bridge.js';
 import { slotValue } from '../manifest.js';
 import { render } from '../render.js';
-import { getPendingQuestion } from '../session-attrs.js';
+import { getPendingQuestion, hasOpenTurn } from '../session-attrs.js';
 
 const { getRequestType, getIntentName, getSlot } = askSdk;
 
@@ -85,6 +85,41 @@ export function yesNoTurnHandler(bridge: BridgeClient): RequestHandler {
       const output = await bridge.turn(input, {
         type: 'turn',
         utterance: { intent: getIntentName(input.requestEnvelope), text: yes ? 'yes' : 'no' },
+      });
+      return render(input, output);
+    },
+  };
+}
+
+const SPOKEN_SLOT: Record<string, { name: string; type: string }> = {
+  DateAnswerIntent: { name: 'date', type: 'AMAZON.DATE' },
+  NumberAnswerIntent: { name: 'number', type: 'AMAZON.NUMBER' },
+  ChoiceAnswerIntent: { name: 'choice', type: 'AnswerChoiceType' },
+  FreeTextAnswerIntent: { name: 'answer', type: 'AMAZON.SearchQuery' },
+};
+
+/**
+ * A quiz's question is the agent's own speech, not a parked elicitation (D49). An answer intent
+ * with no pending question while the session is open is an ordinary turn carrying what the user
+ * said, verbatim ("the fourteenth", not the resolved date).
+ */
+export function openAnswerHandler(bridge: BridgeClient): RequestHandler {
+  return {
+    canHandle: (input: HandlerInput) => {
+      if (getRequestType(input.requestEnvelope) !== 'IntentRequest') return false;
+      return (
+        getIntentName(input.requestEnvelope) in SPOKEN_SLOT &&
+        getPendingQuestion(input) === undefined &&
+        hasOpenTurn(input)
+      );
+    },
+    handle: async (input: HandlerInput) => {
+      const intent = getIntentName(input.requestEnvelope);
+      const mapping = SPOKEN_SLOT[intent] as { name: string; type: string };
+      const spoken = slotValue(getSlot(input.requestEnvelope, mapping.name), mapping.type)?.value;
+      const output = await bridge.turn(input, {
+        type: 'turn',
+        utterance: { ...(spoken ? { text: spoken } : {}) },
       });
       return render(input, output);
     },
