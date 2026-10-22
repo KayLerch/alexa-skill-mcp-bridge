@@ -6,6 +6,7 @@ import {
   type ManifestTool,
   type ToolManifest,
 } from '@alexa-mcp-bridge/core';
+import { slotValueId } from './slots.js';
 
 /**
  * The Alexa interaction model for one locale: generated tool intents, the answer intents the
@@ -139,12 +140,29 @@ export function choiceAnswerIntent(): AlexaIntent {
   };
 }
 
-/** Union of every enum value across tools, deduplicated by id. */
-export function answerChoiceType(types: CustomSlotType[]): CustomSlotType | undefined {
+/**
+ * Union of every enum value across tools, deduplicated by id, plus `answers.choices` (D67): each
+ * canonical choice is a value (its slugged id, its name as written) with the spoken synonyms that
+ * resolve to it, folded into a tool value of the same name when there is one.
+ */
+export function answerChoiceType(
+  types: CustomSlotType[],
+  choices: Record<string, string[]> = {},
+): CustomSlotType | undefined {
   const values = new Map<string, CustomSlotType['values'][number]>();
   for (const type of types) {
     if (type.name === 'YesNoType') continue;
     for (const v of type.values) if (!values.has(v.id ?? v.value)) values.set(v.id ?? v.value, v);
+  }
+  for (const [choice, synonyms] of Object.entries(choices)) {
+    const id = slotValueId(choice);
+    const key = [...values.keys()].find((k) => k === id || values.get(k)?.value === choice) ?? id;
+    const existing = values.get(key);
+    const merged = [...new Set([...(existing?.synonyms ?? []), ...synonyms])];
+    values.set(key, {
+      ...(existing ?? { value: choice, id }),
+      ...(merged.length ? { synonyms: merged } : {}),
+    });
   }
   return values.size ? { name: ANSWER_CHOICE_TYPE_NAME, values: [...values.values()] } : undefined;
 }
@@ -209,6 +227,8 @@ export interface InteractionModelOptions {
   slotSynonyms?: Record<string, Record<string, string[]>>;
   /** Built-in intents mapped in intents.builtIns; added when not standard already (D59). */
   builtIns?: string[];
+  /** answers.choices: canonical answer choice → spoken synonyms, for AnswerChoiceType (D67). */
+  answerChoices?: Record<string, string[]>;
   /** skill.fallbackSensitivity: the model's fallbackIntentSensitivity (D60). Unset: Alexa's default. */
   fallbackSensitivity?: 'LOW' | 'MEDIUM' | 'HIGH' | undefined;
 }
@@ -255,7 +275,7 @@ export function buildInteractionModel(
   const toolTypes = withToolIntents
     ? customTypes
     : customTypes.filter((t) => t.name === 'YesNoType');
-  const choices = answerChoiceType(customTypes);
+  const choices = answerChoiceType(customTypes, options.answerChoices);
   const answerIntents = choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS;
   const types: CustomSlotType[] = withSynonyms(
     [

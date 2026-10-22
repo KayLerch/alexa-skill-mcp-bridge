@@ -76,6 +76,19 @@ export const MAPPABLE_BUILT_IN_INTENTS = [
 ] as const;
 export type MappableBuiltInIntent = (typeof MAPPABLE_BUILT_IN_INTENTS)[number];
 
+/**
+ * A value Alexa accepts in a custom slot type and a sample utterance: lowercase words of letters
+ * with apostrophes, joined by single spaces or hyphens. No digits, no other punctuation.
+ */
+export const SPOKEN_WORDS = /^[a-z']+(?:[ -][a-z']+)*$/;
+const spokenWords = z
+  .string()
+  .max(140)
+  .regex(SPOKEN_WORDS, 'lowercase words: letters, apostrophes, spaces and hyphens, no digits');
+
+/** The default `visual.idleTimeoutMs`: how long the screen asks to stay up without activity. */
+export const SCREEN_IDLE_TIMEOUT_MS = 60_000;
+
 const bridgeConfigShape = z.object({
   mcp: z.object({
     url: z.url({
@@ -258,6 +271,21 @@ const bridgeConfigShape = z.object({
        * with a screen (D54). Starts a headless Chromium in the agent container at warm-up.
        */
       enabled: z.boolean().default(false),
+      /**
+       * How long the screen should stay up without activity, in milliseconds: the APL
+       * document's settings.idleTimeout (D68). A recommendation; the device may bound it.
+       */
+      idleTimeoutMs: z.number().int().min(10_000).default(SCREEN_IDLE_TIMEOUT_MS),
+    })
+    .prefault({}),
+  answers: z
+    .object({
+      /**
+       * Extra values for the answer-choice slot type (D67): a canonical value and the spoken
+       * synonyms that resolve to it, e.g. { b: ['bee', 'option b'] }. "bee" then reaches the
+       * agent as "b". Read by the generator only; change it, then npm run generate.
+       */
+      choices: z.record(spokenWords, z.array(spokenWords)).default({}),
     })
     .prefault({}),
   aws: z
@@ -269,6 +297,20 @@ const bridgeConfigShape = z.object({
 });
 
 export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) => {
+  // One spoken phrase resolves to one choice: Alexa would pick either, silently.
+  const owner = new Map<string, string>();
+  for (const [choice, synonyms] of Object.entries(config.answers.choices)) {
+    for (const synonym of synonyms) {
+      const message =
+        synonym in config.answers.choices && synonym !== choice
+          ? `"${synonym}" is itself a choice`
+          : owner.has(synonym) && owner.get(synonym) !== choice
+            ? `"${synonym}" is already a synonym of "${owner.get(synonym)}"`
+            : undefined;
+      if (message) ctx.addIssue({ code: 'custom', path: ['answers', 'choices', choice], message });
+      if (!owner.has(synonym)) owner.set(synonym, choice);
+    }
+  }
   // A goodbye intent cannot hand the turn to the model: the session ends right after it.
   for (const intent of SESSION_ENDING_INTENTS) {
     const action = config.intents.builtIns[intent];

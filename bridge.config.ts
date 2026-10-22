@@ -164,6 +164,14 @@ export default defineConfig({
     enabled: false,
   },
 
+  answers: {
+    // Extra one-word answers for questions the server asks in its own speech (D67): a canonical
+    // value and the spoken synonyms that resolve to it. "bee" then reaches the server as "b".
+    // Lowercase words only, no digits. Read by npm run generate only.
+    // choices: { a: ['ay', 'option a'], b: ['bee', 'be', 'option b'], c: ['see', 'sea', 'option c'] },
+    choices: {},
+  },
+
   aws: {
     // Only us-east-1 has been verified. BRIDGE_AWS_REGION in .env overrides it.
     region: 'us-east-1',

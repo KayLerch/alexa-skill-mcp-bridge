@@ -113,3 +113,45 @@ describe('buildInteractionModel', () => {
     expect(model.modelConfiguration).toEqual({ fallbackIntentSensitivity: { level: 'LOW' } });
   });
 });
+
+describe('answer choices (answers.choices, D67)', () => {
+  const choiceType = (options: Parameters<typeof buildInteractionModel>[4], t = types) =>
+    buildInteractionModel(
+      manifest,
+      utterances,
+      t,
+      'bridge demo',
+      options,
+    ).interactionModel.languageModel.types.find((type) => type.name === 'AnswerChoiceType');
+
+  it('adds each canonical choice with its synonyms, the canonical value as id and name', () => {
+    const type = choiceType({ answerChoices: { b: ['bee', 'be', 'option b'], "c'est": [] } });
+    expect(type?.values).toContainEqual({
+      id: 'b',
+      name: { value: 'b', synonyms: ['bee', 'be', 'option b'] },
+    });
+    expect(type?.values).toContainEqual({ id: 'c_est', name: { value: "c'est" } });
+    expect(type?.values.map((v) => v.name.value)).toContain('fishing');
+  });
+
+  it('folds synonyms into a tool enum value that is already there', () => {
+    const type = choiceType({ answerChoices: { fishing: ['angling'] } });
+    expect(type?.values.filter((v) => v.name.value === 'fishing')).toEqual([
+      { name: { value: 'fishing', synonyms: ['angling'] } },
+    ]);
+  });
+
+  it('gives a server without enums the choice intent once choices are configured', () => {
+    const noEnums = types.filter((t) => t.name === 'YesNoType');
+    const without = buildInteractionModel(manifest, utterances, noEnums, 'bridge demo')
+      .interactionModel.languageModel;
+    expect(without.intents.map((i) => i.name)).not.toContain('ChoiceAnswerIntent');
+    const model = buildInteractionModel(manifest, utterances, noEnums, 'bridge demo', {
+      answerChoices: { a: ['ay'] },
+    }).interactionModel.languageModel;
+    expect(model.intents.map((i) => i.name)).toContain('ChoiceAnswerIntent');
+    expect(model.types.find((t) => t.name === 'AnswerChoiceType')?.values).toEqual([
+      { id: 'a', name: { value: 'a', synonyms: ['ay'] } },
+    ]);
+  });
+});

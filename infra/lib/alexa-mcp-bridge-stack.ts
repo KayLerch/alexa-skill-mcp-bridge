@@ -36,7 +36,12 @@ export class AlexaMcpBridgeStack extends cdk.Stack {
     // The addendum travels on its own (PROMPT_ADDENDUM_ENV_VAR): the Lambda has no use for it,
     // and the runtime's variables are capped at RUNTIME_ENV_VALUE_MAX characters each.
     const { promptAddendum, ...agentWithoutAddendum } = config.agent;
-    const configJson = serializeConfig({ ...config, agent: agentWithoutAddendum });
+    // answers.choices shapes the interaction model only; the deployed code never reads it (D67).
+    const configJson = serializeConfig({
+      ...config,
+      agent: agentWithoutAddendum,
+      answers: { choices: {} },
+    });
     const retention = retentionFor(config.aws.logRetentionDays);
 
     // Memory: short-term events always; long-term extraction strategies when memory.longTerm.

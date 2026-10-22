@@ -66,6 +66,17 @@ describe('AlexaMcpBridgeStack', () => {
     }
   });
 
+  it('keeps answers.choices, which only the generator reads, out of the deployed config (D67)', () => {
+    const { template } = synth({ answers: { choices: { b: ['bee', 'option b'] } } });
+    const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    expect(env.BRIDGE_CONFIG).not.toContain('option b');
+    const lambdas = Object.values(template.findResources('AWS::Lambda::Function'));
+    for (const f of lambdas) {
+      expect(f.Properties.Environment?.Variables?.BRIDGE_CONFIG ?? '').not.toContain('option b');
+    }
+  });
+
   it('names the variable and its size when a runtime variable is still too long', () => {
     expect(() => synth({ skill: { help: 'h'.repeat(2100) } })).toThrowError(
       /BRIDGE_CONFIG .* 2048/,

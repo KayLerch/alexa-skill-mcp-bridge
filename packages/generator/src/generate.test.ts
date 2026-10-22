@@ -158,6 +158,21 @@ describe('generate (template utterances)', () => {
     rmSync(join(dir, 'profile'), { recursive: true, force: true });
   });
 
+  it('adds answers.choices to the answer choice type (D67)', async () => {
+    const config = parseConfig({
+      mcp: { url: server.url },
+      answers: { choices: { b: ['bee', 'option b'] } },
+    });
+    const result = await generate({ config, paths: paths(), useModel: false });
+    const type = result.models['en-US']?.interactionModel.languageModel.types.find(
+      (t) => t.name === 'AnswerChoiceType',
+    );
+    expect(type?.values).toContainEqual({
+      id: 'b',
+      name: { value: 'b', synonyms: ['bee', 'option b'] },
+    });
+  });
+
   it('matches the snapshot for the hotels and weather server', async () => {
     const config = parseConfig({ mcp: { url: server.url } });
     const result = await generate({ config, paths: paths(), useModel: false });
