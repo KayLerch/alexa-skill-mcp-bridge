@@ -158,6 +158,39 @@ describe('generate (template utterances)', () => {
     rmSync(join(dir, 'profile'), { recursive: true, force: true });
   });
 
+  it("takes overrides for the bridge's own answer intents and checks their slots", async () => {
+    // The hotels server has no enums: the choice intent exists only through answers.choices.
+    const config = parseConfig({ mcp: { url: server.url }, answers: { choices: { a: [] } } });
+    mkdirSync(paths().overridesDir, { recursive: true });
+    writeFileSync(
+      join(paths().overridesDir, 'en-US.utterances.json'),
+      JSON.stringify({
+        ChoiceAnswerIntent: ['my pick is {choice}', 'my pick is {answer}'],
+        NumberAnswerIntent: ['party of {number}'],
+      }),
+    );
+    const result = await generate({ config, paths: paths(), useModel: false });
+    const samples = (name: string) =>
+      result.models['en-US']?.interactionModel.languageModel.intents.find((i) => i.name === name)
+        ?.samples ?? [];
+    expect(samples('ChoiceAnswerIntent')[0]).toBe('my pick is {choice}');
+    expect(samples('NumberAnswerIntent')[0]).toBe('party of {number}');
+    expect(result.notes).toEqual([
+      expect.stringMatching(/override for ChoiceAnswerIntent rejected: "my pick is \{answer\}"/),
+    ]);
+    const plain = await generate({
+      config: parseConfig({ mcp: { url: server.url } }),
+      paths: paths(),
+      useModel: false,
+    });
+    expect(plain.notes).toContainEqual(
+      expect.stringMatching(
+        /override for ChoiceAnswerIntent ignored: the model has no answer choices/,
+      ),
+    );
+    rmSync(paths().overridesDir, { recursive: true, force: true });
+  });
+
   it('adds answers.choices to the answer choice type (D67)', async () => {
     const config = parseConfig({
       mcp: { url: server.url },

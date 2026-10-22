@@ -3,6 +3,7 @@ import {
   GENERATED_NOTICE,
   type CustomSlotType,
   type GeneratedMarker,
+  type ManifestSlot,
   type ManifestTool,
   type ToolManifest,
 } from '@alexa-mcp-bridge/core';
@@ -122,9 +123,11 @@ export function catchAllIntent(): AlexaIntent {
 }
 
 /**
- * "stargazing", "january", "yosemite": one word in reply to a question with choices. Without this
- * intent a bare enum value lands in AMAZON.FallbackIntent, which carries no text, and the Lambda
- * can only repeat the question. The answer handler only accepts it while a question is pending.
+ * "stargazing", "january", "yosemite", "b": a choice in reply to a question, alone or inside a
+ * sentence ("i think it's b", "option b"). Without this intent a bare enum value lands in
+ * AMAZON.FallbackIntent, which carries no text, and the Lambda can only repeat the question.
+ * The carriers repeat FreeTextAnswerIntent's on purpose: a different slot makes them different
+ * samples to Alexa, and the custom slot wins when the words are one of its values.
  */
 export function choiceAnswerIntent(): AlexaIntent {
   return {
@@ -132,12 +135,51 @@ export function choiceAnswerIntent(): AlexaIntent {
     slots: [{ name: 'choice', type: ANSWER_CHOICE_TYPE_NAME }],
     samples: [
       '{choice}',
+      'i think it is {choice}',
+      "i think it's {choice}",
+      "it's {choice}",
+      'it is {choice}',
+      'option {choice}',
+      'answer {choice}',
+      'letter {choice}',
+      'the answer is {choice}',
+      'go with {choice}',
+      "i'll go with {choice}",
+      'i choose {choice}',
+      'i pick {choice}',
       '{choice} please',
       "i'd say {choice}",
       "let's say {choice}",
       'make it {choice}',
     ],
   };
+}
+
+/**
+ * The slots of one of the bridge's own answer intents, in the manifest's shape, so an overrides
+ * file can add samples to it and have them checked like a tool's. Undefined for any other intent.
+ */
+export function answerIntentSlots(intent: string): ManifestSlot[] | undefined {
+  const found = [...ANSWER_INTENTS, choiceAnswerIntent()].find(
+    (i) => i.name === intent && i.slots?.length,
+  );
+  return found?.slots?.map((s) => ({
+    argument: s.name,
+    slot: s.name,
+    slotType: s.type,
+    required: false,
+  }));
+}
+
+/** Alexa refuses one sample string in two intents: the first intent that has it keeps it. */
+function uniqueSamples(intents: AlexaIntent[]): AlexaIntent[] {
+  const seen = new Set<string>();
+  return intents.map((intent) => {
+    if (!intent.samples) return intent;
+    const samples = intent.samples.filter((u) => !seen.has(u));
+    for (const u of samples) seen.add(u);
+    return { ...intent, samples };
+  });
 }
 
 /**
@@ -227,6 +269,11 @@ export interface InteractionModelOptions {
   slotSynonyms?: Record<string, Record<string, string[]>>;
   /** Built-in intents mapped in intents.builtIns; added when not standard already (D59). */
   builtIns?: string[];
+  /**
+   * Intent name → extra samples for the bridge's own answer intents, from overrides, already
+   * checked against answerIntentSlots. They come first.
+   */
+  answerSamples?: Record<string, string[]>;
   /** answers.choices: canonical answer choice → spoken synonyms, for AnswerChoiceType (D67). */
   answerChoices?: Record<string, string[]>;
   /** skill.fallbackSensitivity: the model's fallbackIntentSensitivity (D60). Unset: Alexa's default. */
@@ -276,7 +323,14 @@ export function buildInteractionModel(
     ? customTypes
     : customTypes.filter((t) => t.name === 'YesNoType');
   const choices = answerChoiceType(customTypes, options.answerChoices);
-  const answerIntents = choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS;
+  const answerIntents = (choices ? [...ANSWER_INTENTS, choiceAnswerIntent()] : ANSWER_INTENTS).map(
+    (intent) => {
+      const extra = options.answerSamples?.[intent.name];
+      return extra?.length && intent.samples
+        ? { ...intent, samples: [...new Set([...extra, ...intent.samples])] }
+        : intent;
+    },
+  );
   const types: CustomSlotType[] = withSynonyms(
     [
       ...toolTypes,
@@ -293,14 +347,15 @@ export function buildInteractionModel(
     interactionModel: {
       languageModel: {
         invocationName,
-        intents: [
+        // Tool intents first: they keep a sample an answer intent would repeat.
+        intents: uniqueSamples([
           ...toolIntents,
           ...aliasIntents,
           ...answerIntents,
           ...requestIntents,
           ...STANDARD_INTENTS,
           ...extraBuiltIns(options.builtIns ?? []),
-        ],
+        ]),
         types: types.map((t) => ({
           name: t.name,
           values: t.values.map((v) => ({

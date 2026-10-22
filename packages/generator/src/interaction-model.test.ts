@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { CustomSlotType, ToolManifest } from '@alexa-mcp-bridge/core';
-import { CATCH_ALL_TYPE_NAME, buildInteractionModel } from './interaction-model.js';
+import {
+  CATCH_ALL_TYPE_NAME,
+  answerIntentSlots,
+  buildInteractionModel,
+} from './interaction-model.js';
 
 const manifest: ToolManifest = {
   _generated: { by: 'test', notice: 'test' },
@@ -153,5 +157,94 @@ describe('answer choices (answers.choices, D67)', () => {
     expect(model.types.find((t) => t.name === 'AnswerChoiceType')?.values).toEqual([
       { id: 'a', name: { value: 'a', synonyms: ['ay'] } },
     ]);
+  });
+});
+
+describe('answer intent samples', () => {
+  it('lets a choice be said inside a sentence', () => {
+    const choice = build(true).intents.find((i) => i.name === 'ChoiceAnswerIntent');
+    expect(choice?.samples).toEqual([
+      '{choice}',
+      'i think it is {choice}',
+      "i think it's {choice}",
+      "it's {choice}",
+      'it is {choice}',
+      'option {choice}',
+      'answer {choice}',
+      'letter {choice}',
+      'the answer is {choice}',
+      'go with {choice}',
+      "i'll go with {choice}",
+      'i choose {choice}',
+      'i pick {choice}',
+      '{choice} please',
+      "i'd say {choice}",
+      "let's say {choice}",
+      'make it {choice}',
+    ]);
+  });
+
+  // A quiz server whose answer argument is free text: its generated intent can say what the
+  // bridge's FreeTextAnswerIntent says, and Alexa refuses one sample string in two intents.
+  const quiz: ToolManifest = {
+    ...manifest,
+    tools: [
+      ...manifest.tools,
+      {
+        name: 'submit_answer',
+        intent: 'SubmitAnswerIntent',
+        slots: [
+          { argument: 'answer', slot: 'answer', slotType: 'AMAZON.SearchQuery', required: true },
+        ],
+        elicitedArguments: [],
+        inputSchema: {},
+      },
+    ],
+  };
+  const quizUtterances = {
+    ...utterances,
+    SubmitAnswerIntent: ['submit answer {answer}', 'the answer is {answer}', "it's {answer}"],
+  };
+
+  it('never puts one sample string in two intents; the tool intent keeps it', () => {
+    const model = buildInteractionModel(quiz, quizUtterances, types, 'bridge demo', {
+      answerChoices: { b: ['bee'] },
+    }).interactionModel.languageModel;
+    const all = model.intents.flatMap((i) => i.samples ?? []);
+    expect(new Set(all).size).toBe(all.length);
+    const samples = (name: string) => model.intents.find((i) => i.name === name)?.samples ?? [];
+    expect(samples('SubmitAnswerIntent')).toContain('the answer is {answer}');
+    expect(samples('FreeTextAnswerIntent')).not.toContain('the answer is {answer}');
+    expect(samples('FreeTextAnswerIntent')).toContain('my answer is {answer}');
+    // Same carrier, different slot: allowed, and the choice keeps its own.
+    expect(samples('ChoiceAnswerIntent')).toContain('the answer is {choice}');
+  });
+
+  it('puts extra samples for the answer intents first', () => {
+    const model = buildInteractionModel(manifest, utterances, types, 'bridge demo', {
+      answerSamples: {
+        ChoiceAnswerIntent: ['my pick is {choice}', 'i think it is {choice}'],
+        FreeTextAnswerIntent: ['my guess is {answer}'],
+      },
+    }).interactionModel.languageModel;
+    const samples = (name: string) => model.intents.find((i) => i.name === name)?.samples ?? [];
+    expect(samples('ChoiceAnswerIntent').slice(0, 3)).toEqual([
+      'my pick is {choice}',
+      'i think it is {choice}',
+      '{choice}',
+    ]);
+    expect(
+      samples('ChoiceAnswerIntent').filter((u) => u === 'i think it is {choice}'),
+    ).toHaveLength(1);
+    expect(samples('FreeTextAnswerIntent')[0]).toBe('my guess is {answer}');
+  });
+
+  it('names the slots of the answer intents an overrides file may extend', () => {
+    expect(answerIntentSlots('ChoiceAnswerIntent')).toEqual([
+      { argument: 'choice', slot: 'choice', slotType: 'AnswerChoiceType', required: false },
+    ]);
+    expect(answerIntentSlots('DateAnswerIntent')?.[0]?.slotType).toBe('AMAZON.DATE');
+    expect(answerIntentSlots('FindParkIntent')).toBeUndefined();
+    expect(answerIntentSlots('AMAZON.YesIntent')).toBeUndefined();
   });
 });

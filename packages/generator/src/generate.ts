@@ -5,7 +5,11 @@ import {
   type ManifestTool,
   type ToolManifest,
 } from '@alexa-mcp-bridge/core';
-import { buildInteractionModel, type InteractionModel } from './interaction-model.js';
+import {
+  answerIntentSlots,
+  buildInteractionModel,
+  type InteractionModel,
+} from './interaction-model.js';
 import { buildManifest } from './manifest.js';
 import { spokenWords } from './names.js';
 import { scanServer, type ScanResult } from './scan.js';
@@ -116,7 +120,18 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         notes.push(`${locale} override for ${tool.intent} rejected: "${r}"`);
       utterancesByIntent[tool.intent] = merged.utterances;
     }
+    // The bridge's own answer intents take extra samples too, checked against their slots.
+    const answerSamples: Record<string, string[]> = {};
     for (const [intent, extra] of Object.entries(overrides.utterances)) {
+      const slots = answerIntentSlots(intent);
+      if (!slots) continue;
+      const merged = mergeOverrides([], extra, slots);
+      for (const r of merged.rejected)
+        notes.push(`${locale} override for ${intent} rejected: "${r}"`);
+      answerSamples[intent] = merged.utterances;
+    }
+    for (const [intent, extra] of Object.entries(overrides.utterances)) {
+      if (answerIntentSlots(intent)) continue;
       if (!utterancesByIntent[intent] && !draft.tools.some((t) => t.intent === intent)) {
         notes.push(
           `${locale} override for unknown intent ${intent} ignored (${extra.length} utterances)`,
@@ -158,9 +173,17 @@ export async function generate(options: GenerateOptions): Promise<GenerateResult
         slotSynonyms: overrides.slotSynonyms,
         builtIns: Object.keys(config.intents.builtIns),
         fallbackSensitivity: config.skill.fallbackSensitivity,
+        answerSamples,
         answerChoices: config.answers.choices,
       },
     );
+    const built = new Set(model.interactionModel.languageModel.intents.map((i) => i.name));
+    for (const intent of Object.keys(answerSamples).filter((name) => !built.has(name))) {
+      notes.push(
+        `${locale} override for ${intent} ignored: the model has no answer choices ` +
+          '(no tool enum, no answers.choices)',
+      );
+    }
     models[locale] = model;
     const file = join(paths.interactionModelDir, `${locale}.json`);
     writeGeneratedJson(file, model as unknown as Record<string, unknown>);
