@@ -1,6 +1,7 @@
 import type { HandlerInput } from 'ask-sdk-core';
 import type { Response } from 'ask-sdk-model';
 import type { TurnOutput } from '@alexa-mcp-bridge/core';
+import { MAX_RESPONSE_BYTES, screenDirective, supportsApl } from './apl/screen.js';
 import { REPROMPT } from './greeting.js';
 import { setAwaitingResult, setOpenTurn, setPendingQuestion } from './session-attrs.js';
 
@@ -8,7 +9,7 @@ import { setAwaitingResult, setOpenTurn, setPendingQuestion } from './session-at
  * TurnOutput → Alexa response. Speech becomes SSML with light escaping, a reprompt keeps the
  * microphone open whenever the session stays open, and session attributes track a pending
  * question or an outstanding result for the next request. An output that asks the user to link
- * their account adds the LinkAccount card.
+ * their account adds the LinkAccount card. A visual on an APL device adds one RenderDocument (D55).
  */
 export interface RenderOptions {
   /** Spoken before the agent's speech (a fetched result, a greeting). */
@@ -37,7 +38,17 @@ export function render(
     builder.reprompt(ssml(output.reprompt ?? (output.status === 'question' ? speech : REPROMPT)));
   // The card in the Alexa app is where the user links their account (D48).
   if (output.linkAccount) builder.withLinkAccountCard();
-  return builder.withShouldEndSession(endSession).getResponse();
+  const response = builder.withShouldEndSession(endSession).getResponse();
+  if (output.visual && supportsApl(input)) {
+    const directive = screenDirective(output.visual);
+    // Alexa refuses a response over 120 KB; the picture goes, the speech stays (D55).
+    const sessionAttributes = input.attributesManager.getSessionAttributes();
+    const size = Buffer.byteLength(
+      JSON.stringify({ response: { ...response, directives: [directive] }, sessionAttributes }),
+    );
+    if (size <= MAX_RESPONSE_BYTES) response.directives = [directive];
+  }
+  return response;
 }
 
 export function ssml(text: string): string {

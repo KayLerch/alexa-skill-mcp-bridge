@@ -195,6 +195,16 @@ One turn is the eight numbered steps in the diagram near the top of this page. T
 
 Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the Alexa Skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field. Details in [docs/architecture.md](docs/architecture.md).
 
+## Screens
+
+On an Alexa+ device with a screen, the bridge shows the MCP Apps widget your server delivers, as a still image (D54, D55). What you need:
+
+- An MCP server whose tools or results carry an MCP Apps widget (`_meta.ui.resourceUri` pointing at a `ui://` resource).
+- `visual.enabled` set to `true` in `bridge.config.ts`, then a redeploy: the agent image carries a headless Chromium only when the screen is on at deploy time.
+- `npm run skill:deploy` once, so the Alexa Skill declares the APL interface (`skill-package/skill.json`).
+
+The agent renders the widget to a JPEG, and the Alexa Skill shows it full screen, best-fit on black. The image cannot be tapped. A speaker gets speech only, and a picture that would push the response past Alexa's 120 KB cap is dropped; the speech always stays. To try it without a device: `npm run chat -- --display 1280x800` saves each rendered screen as a JPEG.
+
 ## Requirements your server must meet
 
 - **Streamable HTTP.** The bridge declares the `elicitation` capability at `initialize` and speaks whatever

@@ -12,7 +12,7 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D54 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D55 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
@@ -96,7 +96,7 @@ They carry a `_generated` marker (`by` and `notice` only: no source URL, no time
 - No DynamoDB in v1. State lives in Alexa session attributes, AgentCore Memory, and the microVM.
 - `packages/core` has no AWS dependencies. Frontends contain no MCP or model logic. The agent knows nothing about Alexa.
 - Nothing runs always-on. Every default that costs money is documented where the cost occurs. There is no budget alarm (D35).
-- `TurnOutput.visual` is only ever the MCP server's own widget (`_meta.ui.resourceUri`), rendered by the agent to an inline JPEG for an envelope that carries `display` (D54); the bridge never draws a screen of its own, and a render that fails or runs out of time drops the visual, never the speech. The widget reaches no network (a dead proxy, loopback included, no WebRTC UDP, request interception on top). Chromium is in the image only when `visual.enabled` is on at deploy (`WITH_SCREEN`). The image bytes and the tool result text are never logged.
+- `TurnOutput.visual` is only ever the MCP server's own widget (`_meta.ui.resourceUri`), rendered by the agent to an inline JPEG for an envelope that carries `display` (D54); the bridge never draws a screen of its own, and a render that fails or runs out of time drops the visual, never the speech. The widget reaches no network (a dead proxy, loopback included, no WebRTC UDP, request interception on top). Chromium is in the image only when `visual.enabled` is on at deploy (`WITH_SCREEN`). The Alexa Skill sends `display` and adds the APL `RenderDocument` only for a device with the APL interface, and drops it above 115 KB (D55). The image bytes and the tool result text are never logged.
 - Raw Alexa user and session IDs are hashed with `core.hashId()` before they reach AWS or any log.
 
 ## Naming (from the owner)
