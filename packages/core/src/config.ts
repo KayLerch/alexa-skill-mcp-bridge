@@ -180,9 +180,10 @@ const bridgeConfigShape = z.object({
       budgetMs: z.number().int().min(1000).max(7500).default(6500),
       /**
        * After this long without an answer the Alexa Skill says "One moment." (Progressive
-       * Response), once per request (D52). 0 turns it off. Keep it well under budgetMs.
+       * Response), once per request (D52). 0 turns it off. Below budgetMs, or it never fires.
+       * The default sits above a normal turn (1.5 to 3 s), so only a slow one hears it (D71).
        */
-      progressiveAfterMs: z.number().int().min(0).max(7000).default(1500),
+      progressiveAfterMs: z.number().int().min(0).max(7000).default(3000),
     })
     .prefault({}),
   tools: z
@@ -331,6 +332,17 @@ export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) =>
           'takes a tool ({ "tool": "...", "arguments": {...} }), not a text: the session ends right after it.',
       });
     }
+  }
+  // The Lambda stops waiting at the budget, and the progressive response with it.
+  if (
+    config.turn.progressiveAfterMs > 0 &&
+    config.turn.progressiveAfterMs >= config.turn.budgetMs
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['turn', 'progressiveAfterMs'],
+      message: `must be below turn.budgetMs (${config.turn.budgetMs}), or 0 to turn it off: the Alexa Skill stops waiting at the budget.`,
+    });
   }
   // The Gateway authenticates the agent with SigV4 and has no way to pass the user's token on.
   if (config.features.gateway && config.mcp.auth.type === 'alexaAccountLinking') {
