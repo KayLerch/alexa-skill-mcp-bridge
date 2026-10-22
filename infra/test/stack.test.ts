@@ -45,7 +45,27 @@ describe('AlexaMcpBridgeStack', () => {
     expect(configs.filter(Boolean)).toHaveLength(1);
     expect(configs[0] ?? configs[1]).not.toContain('promptAddendum');
     const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
-    expect(JSON.stringify(runtimes)).toContain('Ask one question at a time.');
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    expect(env.BRIDGE_PROMPT_ADDENDUM).toBe('Ask one question at a time.');
+    expect(env.BRIDGE_CONFIG).not.toContain('promptAddendum');
+  });
+
+  it("fits every runtime variable under AgentCore's 2048-character cap, with a full addendum", () => {
+    const { template } = synth({
+      agent: { promptAddendum: 'x'.repeat(2000) },
+      skill: { help: 'h'.repeat(400), examplePhrases: ['quiz me', 'quiz me on yesterday'] },
+    });
+    const runtimes = Object.values(template.findResources('AWS::BedrockAgentCore::Runtime'));
+    const env = runtimes[0]?.Properties.EnvironmentVariables as Record<string, string>;
+    for (const value of Object.values(env)) {
+      if (typeof value === 'string') expect(value.length).toBeLessThanOrEqual(2048);
+    }
+  });
+
+  it('names the variable and its size when a runtime variable is still too long', () => {
+    expect(() => synth({ skill: { help: 'h'.repeat(2100) } })).toThrowError(
+      /BRIDGE_CONFIG .* 2048/,
+    );
   });
 
   it('allow-lists the token header on the runtime only with account linking (D63)', () => {

@@ -73,6 +73,15 @@ describe('env round trip', () => {
   it('explains a missing env var', () => {
     expect(() => loadConfigFromEnv({})).toThrowError(/BRIDGE_CONFIG is not set/);
   });
+
+  it('takes the prompt addendum from its own env var (AgentCore caps a variable at 2048 characters)', () => {
+    const config = parseConfig({ mcp: { url: 'http://localhost:3000/mcp' } });
+    const loaded = loadConfigFromEnv({
+      BRIDGE_CONFIG: serializeConfig(config),
+      BRIDGE_PROMPT_ADDENDUM: 'Ask one question at a time.',
+    });
+    expect(loaded.agent.promptAddendum).toBe('Ask one question at a time.');
+  });
 });
 
 describe('applyEnvOverrides', () => {

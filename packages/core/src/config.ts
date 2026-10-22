@@ -141,8 +141,8 @@ const bridgeConfigShape = z.object({
       /**
        * Extra guidance for the MCP server this bridge talks to, appended to the system prompt
        * under "Server-specific guidance". Normally filled from <BRIDGE_PROFILE_DIR>/prompt-addendum.md
-       * at load time (D56); it travels inside BRIDGE_CONFIG, so the deployed agent has it too.
-       * Capped at 2000 UTF-8 bytes because BRIDGE_CONFIG is an environment variable.
+       * at load time (D56); the deployed agent gets it as BRIDGE_PROMPT_ADDENDUM, its own variable.
+       * Capped at 2000 UTF-8 bytes because AgentCore caps a runtime variable at 2048 characters.
        */
       promptAddendum: z
         .string()
@@ -318,6 +318,13 @@ export function parseConfig(raw: unknown): BridgeConfig {
 
 export const CONFIG_FILE_NAME = 'bridge.config.ts';
 export const CONFIG_ENV_VAR = 'BRIDGE_CONFIG';
+/**
+ * The agent runtime gets the prompt addendum in a variable of its own: AgentCore caps each
+ * runtime environment variable at 2048 characters, and the addendum alone may be 2000 bytes.
+ */
+export const PROMPT_ADDENDUM_ENV_VAR = 'BRIDGE_PROMPT_ADDENDUM';
+/** AgentCore Runtime's limit on one environment variable's value, in characters. */
+export const RUNTIME_ENV_VALUE_MAX = 2048;
 export const ENV_FILE_NAME = '.env';
 
 /**
@@ -527,7 +534,10 @@ export async function loadConfigFile(path?: string): Promise<BridgeConfig> {
   }
 }
 
-/** Load config from the BRIDGE_CONFIG env var. Used by the Lambda and the container. */
+/**
+ * Load config from the BRIDGE_CONFIG env var, plus the prompt addendum from
+ * BRIDGE_PROMPT_ADDENDUM when set. Used by the Lambda and the container.
+ */
 export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
   const raw = env[CONFIG_ENV_VAR];
   if (!raw) {
@@ -540,6 +550,11 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): BridgeC
     parsed = JSON.parse(raw);
   } catch {
     throw new ConfigError(`${CONFIG_ENV_VAR} is not valid JSON.`);
+  }
+  const addendum = env[PROMPT_ADDENDUM_ENV_VAR];
+  if (addendum && parsed && typeof parsed === 'object') {
+    const withAgent = parsed as { agent?: Record<string, unknown> };
+    withAgent.agent = { ...withAgent.agent, promptAddendum: addendum };
   }
   return parseConfig(parsed);
 }
