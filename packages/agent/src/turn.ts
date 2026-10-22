@@ -273,10 +273,12 @@ async function directCall(
   const speech = outcome.kind === 'ok' ? cleanSpeech(outcome.speech ?? '') : '';
   if (outcome.kind !== 'ok' || !speech) return done('');
   const reprompt = lastQuestion(speech);
+  const fallback = outcome.endsSession ? '' : cleanSpeech(outcome.fallback ?? '');
   const output: TurnOutput = {
     status: 'done',
     speech,
     ...(!outcome.endsSession && reprompt ? { reprompt } : {}),
+    ...(fallback ? { fallback } : {}),
     endSession: outcome.endsSession,
     visual: null,
   };

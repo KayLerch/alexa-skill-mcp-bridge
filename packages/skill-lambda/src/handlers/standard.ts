@@ -130,6 +130,7 @@ export function stopHandler(bridge: BridgeClient, config: BridgeConfig): Request
 
 /**
  * Fallback: with a question pending, ask it again. With the session open for an answer (D60),
+ * the server's own hint when the last output carried one (speech.fallbackField, D70), else
  * skill.fallbackWhileOpen and the last question again, never a generic "what would you like".
  * Otherwise the agent asks what was meant.
  */
@@ -144,8 +145,9 @@ export function fallbackHandler(bridge: BridgeClient, config: BridgeConfig): Req
       }
       // A result still being worked on is fetched by the agent turn below (poll first).
       if (hasOpenTurn(input) && !isAwaitingResult(input)) {
-        const reprompt = getLastOutput(input)?.reprompt ?? REPROMPT;
-        const speech = `${config.skill.fallbackWhileOpen} ${reprompt}`;
+        const last = getLastOutput(input);
+        const reprompt = last?.reprompt ?? REPROMPT;
+        const speech = last?.fallback ?? `${config.skill.fallbackWhileOpen} ${reprompt}`;
         return render(input, { ...done(speech, false), reprompt }, { remember: false });
       }
       const output = await bridge.turn(input, {

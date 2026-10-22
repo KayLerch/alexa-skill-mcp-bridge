@@ -218,6 +218,13 @@ const bridgeConfigShape = z.object({
        * end with a question.
        */
       endSessionField: z.string().min(1).optional(),
+      /**
+       * A string field of a tool result's structuredContent that the Alexa Skill speaks, exactly,
+       * when Alexa misses the user's reply while the session is open for one (D70): a hint the
+       * server wrote for its own question ('Say A, B or C, or "skip".'). Read from the run's last
+       * successful result; unset or absent: skill.fallbackWhileOpen and the last question (D60).
+       */
+      fallbackField: z.string().min(1).optional(),
     })
     .prefault({}),
   intents: z

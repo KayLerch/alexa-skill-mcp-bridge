@@ -133,6 +133,9 @@ miles"`, `"the second one"`): they teach the catch-all what answers sound like, 
 - `skill.fallbackSensitivity` sets how readily Alexa gives up on the nearest intent. Whatever still
   lands in Fallback while the session is open is asked again: `skill.fallbackWhileOpen` ("Sorry, I
   didn't catch that.") and the last question, never a generic "What would you like to do?" (D60).
+  A server that knows what its question accepts can say it instead: with `speech.fallbackField`
+  (for example `hint`), the field of the question's tool result ('Say A, B or C, or "skip".') is
+  spoken exactly as written, with the question as reprompt (D70).
 
 ## Built-in intents: repeat, next, stop
 

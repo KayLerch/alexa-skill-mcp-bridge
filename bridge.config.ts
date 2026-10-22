@@ -114,6 +114,10 @@ export default defineConfig({
     // Set: the session stays open after every turn unless the last result says so. Unset: it ends
     // when the spoken answer does not end with a question.
     // endSessionField: 'end_session',
+    // A string field of a tool result's structuredContent that the Alexa Skill speaks, exactly,
+    // when Alexa misses the reply to the question it came with (D70), for example
+    // 'Say A, B or C, or "skip".'. Unset or absent: fallbackWhileOpen and the last question.
+    // fallbackField: 'hint',
   },
 
   intents: {

@@ -50,7 +50,11 @@ export function render(
   const reprompt = output.reprompt ?? (output.status === 'question' ? speech : REPROMPT);
   // "Still working on it" is not worth repeating; the last real answer is.
   if (!endSession && speech && output.status !== 'pending' && options.remember !== false) {
-    setLastOutput(input, { speech, reprompt });
+    setLastOutput(input, {
+      speech,
+      reprompt,
+      ...(output.fallback ? { fallback: output.fallback } : {}),
+    });
   }
 
   const builder = input.responseBuilder;

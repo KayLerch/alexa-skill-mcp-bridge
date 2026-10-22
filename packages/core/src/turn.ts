@@ -119,6 +119,11 @@ export const turnOutputSchema = z.object({
   debug: turnDebugSchema.optional(),
   /** The MCP server needs the user's linked account: the frontend shows how to link it (D48). */
   linkAccount: z.boolean().optional(),
+  /**
+   * The server's own line for a reply the frontend could not make out (speech.fallbackField, D70).
+   * Only on an output that keeps the session open.
+   */
+  fallback: z.string().optional(),
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
 

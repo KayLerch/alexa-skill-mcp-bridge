@@ -28,6 +28,9 @@ const URI = 'ui://parks/start-0123456789ab.html';
 const SUGGEST =
   'Welcome back. Glacier is open in June. Say "plan a visit to Glacier", or name a park. What would you like?';
 
+const QUESTION = 'Right. Which park has the tallest trees?';
+const HINT = 'Name a park, for example "Yosemite", or say "skip".';
+
 let http: Server;
 let url = '';
 const calls: { name: string; args: unknown }[] = [];
@@ -83,6 +86,10 @@ beforeAll(async () => {
           structuredContent: { say: `Planned ${park}.`, end_session: false },
         }),
       );
+      server.registerTool('quiz_question', { description: 'Ask a park question.' }, async () => ({
+        content: [{ type: 'text', text: 'question' }],
+        structuredContent: { say: QUESTION, hint: HINT },
+      }));
       server.registerTool('end_trip', { description: 'End.' }, async () => ({
         content: [{ type: 'text', text: 'end' }],
         structuredContent: { say: 'Trip saved.', end_session: true },
@@ -273,5 +280,44 @@ describe('speech.endSessionField (D58)', () => {
     const out = await send({ type: 'turn', utterance: { text: 'where is zion' } });
     expect(out.endSession).toBe(true);
     await session.close();
+  });
+});
+
+describe('speech.fallbackField (D70)', () => {
+  const ask: ScriptStep = { toolUse: { name: 'quiz_question', input: {} } };
+  const hinted = { speech: { resultField: 'say', fallbackField: 'hint' } };
+
+  it("carries the last result's hint in the turn output", async () => {
+    const { session, send } = harness([ask, { text: 'ignored' }], hinted);
+    const out = await send({ type: 'turn', utterance: { text: 'next question' } });
+    expect(out).toMatchObject({
+      speech: QUESTION,
+      reprompt: 'Which park has the tallest trees?',
+      fallback: HINT,
+      endSession: false,
+    });
+    await session.close();
+  });
+
+  it('carries it on a direct call too', async () => {
+    const { session, send } = harness([], hinted);
+    const out = await send({ type: 'tool', tool: 'quiz_question' });
+    expect(out).toMatchObject({ speech: QUESTION, fallback: HINT });
+    await session.close();
+  });
+
+  it('has none when the last result has no hint, or without the setting', async () => {
+    const plan: ScriptStep = { toolUse: { name: 'plan_trip', input: { park: 'Zion' } } };
+    const hintless = harness([ask, plan, { text: 'ignored' }], hinted);
+    const out = await hintless.send({ type: 'turn', utterance: { text: 'plan zion' } });
+    expect(out.speech).toBe('Planned Zion.');
+    expect(out.fallback).toBeUndefined();
+    await hintless.session.close();
+
+    const unset = harness([ask, { text: 'ignored' }], { speech: { resultField: 'say' } });
+    const plain = await unset.send({ type: 'turn', utterance: { text: 'next question' } });
+    expect(plain.speech).toBe(QUESTION);
+    expect(plain.fallback).toBeUndefined();
+    await unset.session.close();
   });
 });

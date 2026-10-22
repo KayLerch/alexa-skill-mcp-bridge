@@ -58,37 +58,45 @@ function isMissing(value: unknown): boolean {
 
 /**
  * The fields of the run's latest successful tool result the bridge reads itself: the string to
- * speak verbatim (speech.resultField, D51) and the flag that ends the session
- * (speech.endSessionField, D58). `begin()` runs at the start of every run so nothing leaks across
- * turns.
+ * speak verbatim (speech.resultField, D51), the flag that ends the session
+ * (speech.endSessionField, D58) and the hint for a missed reply (speech.fallbackField, D70).
+ * `begin()` runs at the start of every run so nothing leaks across turns.
  */
 export class ResultField {
   private latest?: string;
   private ends = false;
+  private hint?: string;
 
   constructor(
     private readonly name?: string,
     private readonly endSessionName?: string,
+    private readonly fallbackName?: string,
   ) {}
 
   begin(): void {
     this.latest = undefined;
     this.ends = false;
+    this.hint = undefined;
   }
 
-  /** Each successful result replaces both values; one without a usable field clears it. */
+  /** Each successful result replaces every value; one without a usable field clears it. */
   record(structured: unknown): void {
     const record =
       structured && typeof structured === 'object' && !Array.isArray(structured)
         ? (structured as Record<string, unknown>)
         : {};
-    const value = this.name ? record[this.name] : undefined;
-    this.latest = typeof value === 'string' && value.trim() ? value : undefined;
+    this.latest = this.name ? text(record[this.name]) : undefined;
     this.ends = this.endSessionName ? record[this.endSessionName] === true : false;
+    this.hint = this.fallbackName ? text(record[this.fallbackName]) : undefined;
   }
 
   get value(): string | undefined {
     return this.latest;
+  }
+
+  /** The latest result's hint for a missed reply, when speech.fallbackField is set. */
+  get fallback(): string | undefined {
+    return this.hint;
   }
 
   /** True when speech.endSessionField is set: the result, not the trailing "?", ends the session. */
@@ -100,6 +108,11 @@ export class ResultField {
   get endsSession(): boolean {
     return this.ends;
   }
+}
+
+/** A non-empty string, or undefined. */
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 /** A tool call whose result has an MCP Apps widget to show (D54). */
