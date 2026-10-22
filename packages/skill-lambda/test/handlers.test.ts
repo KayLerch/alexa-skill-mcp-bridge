@@ -359,20 +359,20 @@ describe('runtime session', () => {
   });
 });
 
-describe('poll-first (D16)', () => {
-  it('speaks an outstanding result ahead of the new turn and shortens the budget', async () => {
+describe('poll-first (D16, D72)', () => {
+  it('returns only the outstanding result: the new words never reach the agent', async () => {
     const budgets: number[] = [];
+    const turns: TurnInput[] = [];
     const bridge = new BridgeClient({
       config,
       runtimeArn: 'arn',
       logger,
       invoke: async (envelope) => {
         budgets.push(envelope.budgetMs);
-        if (envelope.turn.type === 'poll') {
-          await new Promise((r) => setTimeout(r, 50));
-          return done('Berlin is cloudy.');
-        }
-        return done('Hamburg has rain.');
+        turns.push(envelope.turn);
+        return envelope.turn.type === 'poll'
+          ? done('Berlin is cloudy.')
+          : done('Hamburg has rain.');
       },
     });
     const input = handlerInput({
@@ -383,9 +383,68 @@ describe('poll-first (D16)', () => {
       type: 'turn',
       utterance: { text: 'weather in Hamburg' },
     });
-    expect(output.speech).toBe('Berlin is cloudy. Hamburg has rain.');
-    expect(budgets[0]).toBe(config.turn.budgetMs);
-    expect(budgets[1]).toBeLessThan(config.turn.budgetMs);
+    expect(output.speech).toBe('Berlin is cloudy.');
+    expect(turns).toEqual([{ type: 'poll' }]);
+    expect(budgets).toEqual([config.turn.budgetMs]);
+  });
+
+  it('runs the new words when nothing was outstanding after all', async () => {
+    const turns: TurnInput[] = [];
+    const bridge = new BridgeClient({
+      config,
+      runtimeArn: 'arn',
+      logger,
+      invoke: async (envelope) => {
+        turns.push(envelope.turn);
+        return envelope.turn.type === 'poll' ? done('') : done('Hamburg has rain.');
+      },
+    });
+    const output = await bridge.turn(
+      handlerInput({ intent: 'GetWeatherIntent', sessionAttributes: { awaitingResult: true } }),
+      { type: 'turn', utterance: { text: 'weather in Hamburg' } },
+    );
+    expect(output.speech).toBe('Hamburg has rain.');
+    expect(turns.map((t) => t.type)).toEqual(['poll', 'turn']);
+  });
+
+  it('a stop with a mapped tool still goes straight to the tool, without a poll', async () => {
+    const mapped = {
+      ...config,
+      intents: { builtIns: { 'AMAZON.StopIntent': { tool: 'end_trip' } } },
+    };
+    const turns: TurnInput[] = [];
+    const bridge = new BridgeClient({
+      config: mapped,
+      runtimeArn: 'arn',
+      logger,
+      invoke: async (envelope) => {
+        turns.push(envelope.turn);
+        return done('Trip saved. Goodbye.', true);
+      },
+    });
+    await stopHandler(bridge, mapped).handle(
+      handlerInput({ intent: 'AMAZON.StopIntent', sessionAttributes: { awaitingResult: true } }),
+    );
+    expect(turns.map((t) => t.type)).toEqual(['tool']);
+  });
+
+  it('says "still working" again, with its reprompt, when the result is still not ready', async () => {
+    const slow = new BridgeClient({
+      config: { ...config, turn: { budgetMs: 100, progressiveAfterMs: 0 } },
+      runtimeArn: 'arn',
+      logger,
+      invoke: neverAnswers,
+    });
+    const output = await slow.turn(
+      handlerInput({ intent: 'GetWeatherIntent', sessionAttributes: { awaitingResult: true } }),
+      { type: 'turn', utterance: { text: 'x' } },
+    );
+    expect(output).toMatchObject({
+      status: 'pending',
+      speech: 'Still working on it. Say "continue" in a moment.',
+      reprompt: 'Say "continue" to hear it.',
+      endSession: false,
+    });
   });
 
   it('returns pending when the poll is still pending', async () => {

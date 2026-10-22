@@ -195,10 +195,7 @@ describe('account linking in the Alexa Skill Lambda', () => {
       accessToken: TOKEN,
     });
     await toolIntentHandler(bridge, manifest).handle(input);
-    expect(envelopes.map((e) => [e.turn.type, e.userToken])).toEqual([
-      ['poll', TOKEN],
-      ['turn', TOKEN],
-    ]);
+    expect(envelopes.map((e) => [e.turn.type, e.userToken])).toEqual([['poll', TOKEN]]);
   });
 
   it('shows the card when the agent reports that the server refused the token', async () => {

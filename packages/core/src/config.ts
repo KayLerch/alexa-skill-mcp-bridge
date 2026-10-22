@@ -114,9 +114,13 @@ const bridgeConfigShape = z.object({
       coldStartMessage: z
         .string()
         .default("I'm still starting up. Give me a moment and open me again."),
-      stillWorkingMessage: z
-        .string()
-        .default("I'm still working on that. Ask me again in a moment."),
+      /**
+       * Spoken when a turn runs past the budget. Whatever the user says next fetches that result
+       * and only that (D72), so the line tells them what to say.
+       */
+      stillWorkingMessage: z.string().default('Still working on it. Say "continue" in a moment.'),
+      /** The reprompt after stillWorkingMessage. */
+      stillWorkingReprompt: z.string().default('Say "continue" to hear it.'),
       /**
        * A tool the agent calls directly on launch, without the model (D57). Its
        * speech.resultField is spoken, its widget shown, and the session ends only when

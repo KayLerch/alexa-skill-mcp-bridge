@@ -45,7 +45,10 @@ export default defineConfig({
     // Spoken on launch. Unset: derived from the server name and two example phrases.
     // greeting: 'Welcome. Ask me about hotels or the weather.',
     coldStartMessage: "I'm still starting up. Give me a moment and open me again.",
-    stillWorkingMessage: "I'm still working on that. Ask me again in a moment.",
+    // Spoken when a turn runs past the budget, and its reprompt. Whatever the user says next
+    // fetches that result and only that (D72), so the line tells them what to say.
+    stillWorkingMessage: 'Still working on it. Say "continue" in a moment.',
+    stillWorkingReprompt: 'Say "continue" to hear it.',
     // A tool the agent calls on launch without the model (D57), for a server that writes its own
     // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
     // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.

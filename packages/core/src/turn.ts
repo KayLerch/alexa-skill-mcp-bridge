@@ -127,6 +127,23 @@ export const turnOutputSchema = z.object({
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
 
+/**
+ * The answer while a run works past the budget: skill.stillWorkingMessage and its reprompt. The
+ * session stays open, and the next request fetches the result (D72).
+ */
+export function stillWorkingOutput(skill: {
+  stillWorkingMessage: string;
+  stillWorkingReprompt: string;
+}): TurnOutput {
+  return {
+    status: 'pending',
+    speech: skill.stillWorkingMessage,
+    reprompt: skill.stillWorkingReprompt,
+    endSession: false,
+    visual: null,
+  };
+}
+
 /** The answer when the request has no usable account-linked token. Ends the session. */
 export function linkAccountOutput(): TurnOutput {
   return {

@@ -1,6 +1,7 @@
 import {
   SPOKEN,
   linkAccountOutput,
+  stillWorkingOutput,
   type AgentInvocation,
   type AnswerHint,
   type Logger,
@@ -416,6 +417,5 @@ function question(q: Question): TurnOutput {
 }
 
 function pending(session: BridgeSession): TurnOutput {
-  const speech = session.config.skill.stillWorkingMessage;
-  return { status: 'pending', speech, reprompt: speech, endSession: false, visual: null };
+  return stillWorkingOutput(session.config.skill);
 }

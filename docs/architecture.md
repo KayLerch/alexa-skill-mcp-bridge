@@ -35,7 +35,7 @@ Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user i
 | `turn`   | `warming`                      | Wait for warm-up, bounded by the budget; `pending` if it does not finish                                                                                                                                                                                                                |
 | `turn`   | `ready`                        | Start a `TurnRun`; `waitForOutcome(deadline)` returns finished, question, or deadline                                                                                                                                                                                                   |
 | `turn`   | `awaiting-answer`              | The user changed topic: cancel the question, let the tool call unwind (2 s cap), discard, run the new turn                                                                                                                                                                              |
-| `turn`   | `overrun`                      | `pending` without starting another run; the Lambda polls first                                                                                                                                                                                                                          |
+| `turn`   | `overrun`                      | `pending` without starting another run; the Lambda polls first and answers with the result alone (D72)                                                                                                                                                                                  |
 | `answer` | `awaiting-answer`, matching id | Map the answer; more properties left: ask the next one; else resolve the elicitation and wait on the same run                                                                                                                                                                           |
 | `answer` | stale or unknown id            | Treated as a `turn` with the answer as text; what the user said is never dropped                                                                                                                                                                                                        |
 | `poll`   | `overrun`                      | The result if ready, else `pending`                                                                                                                                                                                                                                                     |
@@ -96,7 +96,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D68) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D72) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).

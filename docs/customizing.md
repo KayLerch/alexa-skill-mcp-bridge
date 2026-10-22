@@ -141,7 +141,7 @@ miles"`, `"the second one"`): they teach the catch-all what answers sound like, 
 
 The generated model always has `AMAZON.RepeatIntent` and `AMAZON.NextIntent` beside help, stop,
 cancel and fallback. "Repeat" replays the last thing the user heard, from the session, with no
-agent call. The others go to the agent as the word itself unless you map them in
+agent call (after "still working" it fetches the result instead, D72). The others go to the agent as the word itself unless you map them in
 `intents.builtIns` ([config](config.md#intents)):
 
 ```json

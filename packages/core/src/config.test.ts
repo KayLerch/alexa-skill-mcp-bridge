@@ -17,6 +17,10 @@ describe('parseConfig', () => {
     expect(config.agent.reasoningEffort).toBe('off');
     expect(config.runtime).toEqual({ idleTimeoutMinutes: 20, maxLifetimeHours: 8 });
     expect(config.turn).toEqual({ budgetMs: 6500, progressiveAfterMs: 3000 });
+    expect(config.skill.stillWorkingMessage).toBe(
+      'Still working on it. Say "continue" in a moment.',
+    );
+    expect(config.skill.stillWorkingReprompt).toBe('Say "continue" to hear it.');
     expect(config.elicitation.answerTimeoutSeconds).toBe(120);
     expect(config.speech).toEqual({ maxSentences: 3, maxChoicesSpoken: 3 });
     expect(config.memory).toEqual({ shortTerm: true, longTerm: true, hydrateLastEvents: 20 });

@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-bedrock-agentcore';
 import {
   findConfigFile,
+  stillWorkingOutput,
   turnOutputSchema,
   type Display,
   type TurnInput,
@@ -21,6 +22,7 @@ export interface RemoteBridgeOptions {
   region: string;
   runtimeArn?: string;
   stillWorkingMessage: string;
+  stillWorkingReprompt: string;
   /** Stands in for the Alexa account-linked token when mcp.auth.type is alexaAccountLinking. */
   userToken?: string;
   /** Sent with every turn, as for a device with a screen (D54). */
@@ -76,13 +78,7 @@ export function createRemoteBridge(options: RemoteBridgeOptions): Bridge {
         return turnOutputSchema.parse(JSON.parse(body ?? '{}'));
       } catch (err) {
         if (aborter.signal.aborted) {
-          return {
-            status: 'pending',
-            speech: options.stillWorkingMessage,
-            reprompt: options.stillWorkingMessage,
-            endSession: false,
-            visual: null,
-          };
+          return stillWorkingOutput(options);
         }
         throw err;
       } finally {

@@ -103,6 +103,7 @@ const bridge: Bridge = args.remote
       debug: collect,
       region: config.aws.region,
       stillWorkingMessage: config.skill.stillWorkingMessage,
+      stillWorkingReprompt: config.skill.stillWorkingReprompt,
       ...(userToken ? { userToken } : {}),
       ...(display ? { display } : {}),
     })

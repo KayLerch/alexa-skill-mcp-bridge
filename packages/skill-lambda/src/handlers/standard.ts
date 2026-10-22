@@ -20,6 +20,7 @@ import {
   getPendingQuestion,
   hasOpenTurn,
   isAwaitingResult,
+  setAwaitingResult,
 } from '../session-attrs.js';
 
 const { getRequestType, getIntentName } = askSdk;
@@ -33,23 +34,40 @@ export function helpHandler(config: BridgeConfig, manifest: ToolManifest): Reque
     canHandle: (input) => isIntent(input, 'AMAZON.HelpIntent'),
     handle: async (input) => {
       const pending = getPendingQuestion(input);
+      const awaiting = isAwaitingResult(input);
       const speech = pending
         ? `${helpText(config, manifest)} Right now I am waiting for an answer: ${pending.message}`
         : helpText(config, manifest);
       // The help text is not what "repeat" should replay.
-      return render(input, done(speech, false), { speech, endSession: false, remember: false });
+      const response = render(input, done(speech, false), {
+        speech,
+        endSession: false,
+        remember: false,
+      });
+      // Help does not fetch an outstanding result, and does not lose it either (D72).
+      if (awaiting) setAwaitingResult(input, true);
+      return response;
     },
   };
 }
 
 /**
  * "Repeat" (D59): what the user heard last, from the session attributes, without asking the
- * agent. Everything else in the session stays as it was.
+ * agent. Everything else in the session stays as it was. After "still working" the user has not
+ * heard the answer yet, so "repeat" fetches it like any other request (D72).
  */
-export function repeatHandler(): RequestHandler {
+export function repeatHandler(bridge: BridgeClient): RequestHandler {
   return {
     canHandle: (input) => isIntent(input, 'AMAZON.RepeatIntent'),
     handle: async (input) => {
+      if (isAwaitingResult(input)) {
+        const output = await bridge.turn(input, { type: 'poll' });
+        if (output.status !== 'done' || output.speech || output.linkAccount) {
+          return render(input, output);
+        }
+        // Nothing was waiting after all: replay as usual.
+        setAwaitingResult(input, false);
+      }
       const last = getLastOutput(input);
       return input.responseBuilder
         .speak(ssml(last?.speech ?? REPROMPT))
