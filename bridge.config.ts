@@ -71,6 +71,9 @@ export default defineConfig({
   turn: {
     // The agent call's share of Alexa's 8-second limit. The Lambda aborts at this point.
     budgetMs: 6500,
+    // After this long without an answer the Alexa Skill says "One moment." (Progressive Response),
+    // once per request. 0 turns it off.
+    progressiveAfterMs: 1500,
   },
 
   tools: {

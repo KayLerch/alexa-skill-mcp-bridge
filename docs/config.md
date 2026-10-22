@@ -112,13 +112,14 @@ is still a paragraph.
 
 ### turn, elicitation, memory
 
-| Field                              | Default | Effect                                                                                                        |
-| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| `turn.budgetMs`                    | `6500`  | The agent call's share of Alexa's 8 s. The agent answers `pending` 500 ms before it; the Lambda aborts at it. |
-| `elicitation.answerTimeoutSeconds` | `120`   | A question waiting for a spoken answer is cancelled after this long.                                          |
-| `memory.shortTerm`                 | `true`  | Store every exchange in AgentCore Memory and rehydrate on cold start.                                         |
-| `memory.longTerm`                  | `true`  | User-preference and summary extraction. Costs one model call per session (see [cost.md](cost.md)).            |
-| `memory.hydrateLastEvents`         | `20`    | Exchanges rehydrated into the agent's history on cold start.                                                  |
+| Field                              | Default | Effect                                                                                                                                               |
+| ---------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turn.budgetMs`                    | `6500`  | The agent call's share of Alexa's 8 s. The agent answers `pending` 500 ms before it; the Lambda aborts at it.                                        |
+| `turn.progressiveAfterMs`          | `1500`  | After this long without an answer the Alexa Skill says "One moment." through Alexa's Progressive Response (D52), once per request. `0` turns it off. |
+| `elicitation.answerTimeoutSeconds` | `120`   | A question waiting for a spoken answer is cancelled after this long.                                                                                 |
+| `memory.shortTerm`                 | `true`  | Store every exchange in AgentCore Memory and rehydrate on cold start.                                                                                |
+| `memory.longTerm`                  | `true`  | User-preference and summary extraction. Costs one model call per session (see [cost.md](cost.md)).                                                   |
+| `memory.hydrateLastEvents`         | `20`    | Exchanges rehydrated into the agent's history on cold start.                                                                                         |
 
 ### features
 

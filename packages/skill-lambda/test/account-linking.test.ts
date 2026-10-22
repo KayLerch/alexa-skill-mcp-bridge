@@ -83,7 +83,7 @@ describe('account linking in the Alexa Skill Lambda', () => {
       throw new Error('agent runtime returned 500');
     });
     const hanging = new BridgeClient({
-      config: { ...linking, turn: { budgetMs: 1000 } },
+      config: { ...linking, turn: { budgetMs: 1000, progressiveAfterMs: 0 } },
       runtimeArn: 'arn:test',
       logger: createLogger({}, { write: () => undefined }),
       invoke: (_e, _s, signal) =>
@@ -168,7 +168,7 @@ describe('account linking in the Alexa Skill Lambda', () => {
       if (call === 2) throw new Error('agent runtime returned 500');
       return done(`ok ${envelope.turn.type}`);
     });
-    const fast = { ...linking, turn: { budgetMs: 1000 } };
+    const fast = { ...linking, turn: { budgetMs: 1000, progressiveAfterMs: 0 } };
     const slowBridge = new BridgeClient({
       config: fast,
       runtimeArn: 'arn:test',

@@ -67,6 +67,46 @@ export class BridgeClient {
   }
 
   async turn(input: HandlerInput, turn: TurnInput): Promise<TurnOutput> {
+    const timer = this.startProgressive(input, turn);
+    try {
+      return await this.run(input, turn);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Progressive Response (D52): one "One moment." if the agent has not answered by
+   * turn.progressiveAfterMs. Fire and forget; a failure never touches the answer. Not for
+   * cancel turns; the no-token path returns before it matters (the timer is cleared with it).
+   */
+  private startProgressive(
+    input: HandlerInput,
+    turn: TurnInput,
+  ): ReturnType<typeof setTimeout> | undefined {
+    const { config, logger } = this.options;
+    const after = config.turn.progressiveAfterMs;
+    if (after <= 0 || turn.type === 'cancel') return undefined;
+    const linking = config.mcp.auth.type === 'alexaAccountLinking';
+    if (linking && !linkedToken(input)) return undefined;
+    return setTimeout(() => {
+      try {
+        const service = input.serviceClientFactory?.getDirectiveServiceClient();
+        if (!service) return;
+        const requestId = input.requestEnvelope.request.requestId;
+        service
+          .enqueue({
+            header: { requestId },
+            directive: { type: 'VoicePlayer.Speak', speech: SPOKEN.oneMoment },
+          })
+          .catch((err: unknown) => logger.warn('progressive response failed', errorFields(err)));
+      } catch (err) {
+        logger.warn('progressive response failed', errorFields(err));
+      }
+    }, after);
+  }
+
+  private async run(input: HandlerInput, turn: TurnInput): Promise<TurnOutput> {
     const { config, logger } = this.options;
     const ids = identity(input);
     const log = logger.child({
