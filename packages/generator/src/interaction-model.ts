@@ -1,6 +1,7 @@
 import {
   GENERATED_BY,
   GENERATED_NOTICE,
+  spelledLetterIntentName,
   type CustomSlotType,
   type GeneratedMarker,
   type ManifestSlot,
@@ -372,6 +373,13 @@ export function buildInteractionModel(
         ? { ...intent, samples: [...new Set([...extra, ...intent.samples])] }
         : intent;
     });
+  // One slot-free intent per single-letter choice, for the spelled form a lone letter arrives in (D74).
+  const spelledLetterIntents: AlexaIntent[] =
+    choices && (!keep || keep.has('ChoiceAnswerIntent'))
+      ? Object.keys(options.answerChoices ?? {})
+          .filter((choice) => /^[a-z]$/.test(choice))
+          .map((letter) => ({ name: spelledLetterIntentName(letter), samples: [`${letter}.`] }))
+      : [];
   const types: CustomSlotType[] = withSynonyms(
     [
       ...toolTypes,
@@ -393,6 +401,7 @@ export function buildInteractionModel(
           ...toolIntents,
           ...aliasIntents,
           ...answerIntents,
+          ...spelledLetterIntents,
           ...requestIntents,
           ...STANDARD_INTENTS,
           ...extraBuiltIns(options.builtIns ?? []),
