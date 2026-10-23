@@ -171,6 +171,17 @@ describe('answers without a pending question', () => {
     expect(turns[0]).toEqual({ type: 'turn', utterance: { text } });
   });
 
+  // A lone spoken "A" reaches the skill as "A.", which only a slot-free intent catches (D74).
+  it('turns a spelled-letter intent into that letter', async () => {
+    const { bridge, turns } = fakeBridge(() => done('Next.'));
+    const handler = openAnswerHandler(bridge);
+    const input = handlerInput({ intent: 'SpelledLetterAIntent', sessionAttributes: open });
+    expect(handler.canHandle(input)).toBe(true);
+    await handler.handle(input);
+    expect(turns[0]).toEqual({ type: 'turn', utterance: { text: 'a' } });
+    expect(answerHintFor(input, 'SpelledLetterAIntent')).toEqual({ text: 'a' });
+  });
+
   it('keeps the session open', async () => {
     const { bridge } = fakeBridge(() => done('Next.'));
     const response = await openAnswerHandler(bridge).handle(

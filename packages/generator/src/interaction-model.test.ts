@@ -113,6 +113,22 @@ describe('buildInteractionModel', () => {
     expect(values.length).toBeGreaterThan(150);
   });
 
+  it('adds a slot-free intent per single-letter choice for the spelled form "a." (D74)', () => {
+    const names = (answerIntents?: ('choice' | 'number')[]) =>
+      buildInteractionModel(manifest, utterances, types, 'bridge demo', {
+        toolIntents: false,
+        answerChoices: { a: ['ay'], b: [], blue: [] },
+        ...(answerIntents ? { answerIntents } : {}),
+      }).interactionModel.languageModel.intents;
+    const spelled = names().filter((i) => i.name.startsWith('SpelledLetter'));
+    expect(spelled).toEqual([
+      { name: 'SpelledLetterAIntent', samples: ['a.'] },
+      { name: 'SpelledLetterBIntent', samples: ['b.'] },
+    ]);
+    // Without the choice intent there are no choices to answer with.
+    expect(names(['number']).some((i) => i.name.startsWith('SpelledLetter'))).toBe(false);
+  });
+
   it('keeps the answer and standard intents in both modes', () => {
     for (const toolIntents of [true, false]) {
       const names = build(toolIntents).intents.map((i) => i.name);

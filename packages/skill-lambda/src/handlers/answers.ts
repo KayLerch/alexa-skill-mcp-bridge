@@ -1,6 +1,6 @@
 import type { HandlerInput, RequestHandler } from 'ask-sdk-core';
 import askSdk from 'ask-sdk-core';
-import type { AnswerHint } from '@alexa-mcp-bridge/core';
+import { spelledLetterOf, type AnswerHint } from '@alexa-mcp-bridge/core';
 import type { BridgeClient } from '../bridge.js';
 import { slotValue } from '../manifest.js';
 import { render } from '../render.js';
@@ -25,8 +25,9 @@ export function answerHandler(bridge: BridgeClient): RequestHandler {
   return {
     canHandle: (input: HandlerInput) => {
       if (getRequestType(input.requestEnvelope) !== 'IntentRequest') return false;
+      const name = getIntentName(input.requestEnvelope);
       return (
-        ANSWER_INTENTS.has(getIntentName(input.requestEnvelope)) &&
+        (ANSWER_INTENTS.has(name) || spelledLetterOf(name) !== undefined) &&
         getPendingQuestion(input) !== undefined
       );
     },
@@ -44,6 +45,8 @@ export function answerHandler(bridge: BridgeClient): RequestHandler {
 }
 
 export function answerHintFor(input: HandlerInput, intentName: string): AnswerHint {
+  const letter = spelledLetterOf(intentName);
+  if (letter) return { text: letter };
   switch (intentName) {
     case 'AMAZON.YesIntent':
       return { yesNo: true };
@@ -113,17 +116,21 @@ export function openAnswerHandler(bridge: BridgeClient): RequestHandler {
   return {
     canHandle: (input: HandlerInput) => {
       if (getRequestType(input.requestEnvelope) !== 'IntentRequest') return false;
+      const name = getIntentName(input.requestEnvelope);
       return (
-        getIntentName(input.requestEnvelope) in SPOKEN_SLOT &&
+        (name in SPOKEN_SLOT || spelledLetterOf(name) !== undefined) &&
         getPendingQuestion(input) === undefined &&
         hasOpenTurn(input)
       );
     },
     handle: async (input: HandlerInput) => {
       const intent = getIntentName(input.requestEnvelope);
-      const mapping = SPOKEN_SLOT[intent] as { name: string; type: string };
-      const value = slotValue(getSlot(input.requestEnvelope, mapping.name), mapping.type);
-      const text = value?.resolvedValue ?? value?.value;
+      const mapping = SPOKEN_SLOT[intent];
+      const value = mapping
+        ? slotValue(getSlot(input.requestEnvelope, mapping.name), mapping.type)
+        : undefined;
+      // A spelled-letter intent carries no slot: its name is the answer (D74).
+      const text = spelledLetterOf(intent) ?? value?.resolvedValue ?? value?.value;
       const output = await bridge.turn(input, {
         type: 'turn',
         utterance: { ...(text ? { text } : {}) },

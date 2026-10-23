@@ -154,3 +154,17 @@ export function linkAccountOutput(): TurnOutput {
     linkAccount: true,
   };
 }
+
+/**
+ * A lone spoken letter reaches a skill as "A.", which Alexa matches to no slot ("a." as a custom slot value or a
+ * catch-all phrase still lands in AMAZON.FallbackIntent; measured 23 Oct 2026). A slot-free intent with the sample
+ * "a." catches it, so every single-letter answer choice gets one (D74).
+ */
+export function spelledLetterIntentName(letter: string): string {
+  return `SpelledLetter${letter.toUpperCase()}Intent`;
+}
+
+/** The letter a spelled-letter intent stands for, lowercase; undefined for any other intent. */
+export function spelledLetterOf(intentName: string): string | undefined {
+  return /^SpelledLetter([A-Z])Intent$/.exec(intentName)?.[1]?.toLowerCase();
+}
