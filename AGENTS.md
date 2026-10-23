@@ -12,13 +12,13 @@ A bridge that lets a developer test an MCP server on a physical Alexa+ device as
 
 1. [README.md](README.md): what the bridge is, the three tracks, and the security section listing what must never reach a commit.
 2. [docs/architecture.md](docs/architecture.md): the turn story, elicitation parking, the state machine table, and what has been verified against live AWS.
-3. [docs/decisions.md](docs/decisions.md): every decision D1 to D72 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
+3. [docs/decisions.md](docs/decisions.md): every decision D1 to D74 with its rationale and the condition that would reverse it, plus the dated verification log. Read the relevant row before changing something that looks arbitrary; it usually is not.
 
 The code is the source of truth. Where a document disagrees with the code, the code wins and the document is the bug. [docs/history/](docs/history/) holds the original brief and execution plan, frozen and unmaintained: provenance, never instruction.
 
 ## Repo state
 
-Complete and green as of 2026-09-05: every package below exists, and `npm run build`, `npm test`, `npm run lint`, `npm run synth`, and `npm run check:leaks -- --all` pass. Not done, none of it blocking local work: the deploy-dependent spikes (S2, S3, S6), a device test, and the 20-run latency measurement. The verification log in [docs/decisions.md](docs/decisions.md) says what is confirmed and what is still an assumption.
+Complete and green as of 2026-10-23: every package below exists, and `npm run build`, `npm test`, `npm run lint`, `npm run synth`, and `npm run check:leaks -- --all` pass. Deployed and answered end to end on a physical Alexa+ device. Still open, none of it blocking local work: the deploy-dependent spikes (S2, S3, S6) and the 20-run latency measurement. The verification log in [docs/decisions.md](docs/decisions.md) says what is confirmed and what is still an assumption.
 
 ## Layout
 
@@ -39,8 +39,8 @@ examples/national-parks-mcp-server  THE default example: find_park and plan_park
 examples/hotels-weather-mcp-server   The other example: search_hotels (elicits guests) and get_weather.
 spikes                       Day-one verification probes. Outside the npm workspaces. Re-runnable.
 docs                         architecture, config, cost, decisions, onboarding, troubleshooting, history/ (frozen brief and plan),
-                             img/ (README diagrams: build.mjs emits the wide banner light, dark and auto, plus the
-                             tall turn diagram; auto carries both palettes as CSS variables and is the click-to-enlarge target).
+                             img/ (the README and architecture banner: build.mjs emits it light, dark and auto;
+                             auto carries both palettes as CSS variables and is the click-to-enlarge target).
 .claude/commands             Thin entry points (/onboard). One line each; the procedure lives in docs/.
 scripts                      deploy, skill-deploy, destroy, doctor, check-leaks, check-model-access, agent-dev. Run by Node 22 directly.
 ask-resources.json           ASK CLI project file at the root; `ask deploy` runs from here and reads skill-package/.
@@ -83,7 +83,7 @@ ask-resources.json           ASK CLI project file at the root; `ask deploy` runs
 
 - `packages/skill-lambda/generated/tool-manifest.json`
 - `skill-package/interactionModels/custom/*.json`
-- `docs/img/*.svg` (the README diagrams; `node docs/img/build.mjs` rebuilds all four from one source)
+- `docs/img/*.svg` (the banner used by README.md and docs/architecture.md; `node docs/img/build.mjs` rebuilds all three from one source)
 
 They carry a `_generated` marker (`by` and `notice` only: no source URL, no timestamp, so they stay deterministic and leak nothing, D37) and a `.gitattributes` entry. Regenerate with `npm run generate`. Everything a developer adds goes beside them and survives regeneration: `skill-package/overrides/<locale>.utterances.json` (extra samples, `catchAll` phrases, `slotSynonyms`, alias `intents`, D46) and `skill-package/training/<locale>.chat.jsonl` (written by `npm run chat -- --record`). `docs/customizing.md` is the developer-facing version. The diagrams are the exception to the `_generated` marker: an SVG carries an XML comment instead. Change a documented fact that a diagram states and `docs/img/build.mjs` is part of that change. Handlers are never generated; generated artifacts are data only, and an alias intent routes through the manifest with no code.
 
@@ -145,7 +145,7 @@ Documentation here is one surface, not a pile of pages: `README.md`, `docs/*.md`
 
 When you change a documented fact, do all three:
 
-1. **Sweep the other pages.** Grep the repo for the old value before you call the change done: a default, a port, a command, a field or env var name, a file path, a count ("D1 to D37"), a sentence the code speaks. Two pages that disagree are worse than one page that says nothing.
+1. **Sweep the other pages.** Grep the repo for the old value before you call the change done: a default, a port, a command, a field or env var name, a file path, a count ("D1 to D74"), a sentence the code speaks. Two pages that disagree are worse than one page that says nothing.
 2. **Check it against the code.** Every documented default, flag, env var, npm script, printed message and path must exist as written. Read the code; do not trust the sentence that was there before you.
 3. **Reconcile out loud.** If the code disagrees with the docs, the code wins and the doc is the bug — unless the code is what is wrong, in which case say so in your reply instead of quietly changing behavior to match a sentence. When it cannot be settled in the same change (it needs a deploy, a device, or the owner's call), flag it in your reply and leave a row in `docs/decisions.md` rather than an unmarked stale line.
 

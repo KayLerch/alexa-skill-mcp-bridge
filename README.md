@@ -21,7 +21,7 @@ An add-on is how an MCP server is meant to reach Alexa+, and that tooling is not
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/bridge.dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="docs/img/bridge.light.svg">
-    <img src="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.auto.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
+    <img src="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.auto.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, AgentCore Memory and a widget renderer on headless Chromium. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device, as speech and, where the server offers a widget, as an image shown on the screen. A numbered legend below the diagram explains all eight steps, and two callouts under it cover a slow turn, where the Alexa Skill says &quot;One moment.&quot; while the agent keeps working, and a screen, where the agent renders your server's widget to an image the Alexa Skill shows full screen.">
   </picture>
 </p>
 
@@ -32,6 +32,23 @@ You put your MCP server URL into one config file. A generator turns your server'
 **This bridge reproduces the mechanics of an Alexa+ MCP client, not Alexa's own model judgment.** Tool choice, argument filling, and phrasing come from Nova 2 Lite with the prompts in this repo; Alexa+ will pick and phrase differently. What you can verify here: that your MCP server speaks Streamable HTTP at a version Alexa+ accepts, that its tool descriptions lead a model to the right call, that elicitation survives the gap between two Alexa turns, where the tool call stays open while the user is asked and answers, and how your results sound.
 
 **Tear down:** `npm run destroy` removes everything the cloud track created. See [docs/cost.md](docs/cost.md).
+
+## What the bridge gives you
+
+Each row is an Alexa Skill mechanism on the left and the MCP side it is wired to on the right.
+
+| Alexa Skill side                                                                                                                                                                                                                                                       | MCP side                                                                                                                               |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| **The interaction model is generated.** One intent per tool, slots typed from the tool's JSON Schema, sample utterances written by Nova, and a catch-all intent so a phrasing nobody anticipated still reaches the agent as text instead of dying in Alexa's fallback. | `tools/list`, re-read with `npm run generate`. [docs/customizing.md](docs/customizing.md)                                              |
+| **A tool can ask the user something.** The question is spoken, one field at a time, and the answer on a later Alexa turn resumes the very same call. Your server sees an ordinary round trip and never learns a person was in the middle of it.                        | `elicitation/create` on the open `tools/call`, parked in the microVM. [docs/architecture.md](docs/architecture.md#elicitation-parking) |
+| **A slow tool does not lose the turn.** After three seconds the Alexa Skill says "One moment.", the run carries on, and the result reaches the user on the next exchange.                                                                                              | Any tool that outruns Alexa's few seconds. [Slow turns](#what-happens-on-a-turn)                                                       |
+| **A screen shows your widget.** Rendered headless to a still image and sent as one APL screen, full screen on black. Speakers get the speech alone.                                                                                                                    | The MCP Apps widget a result names in `_meta.ui.resourceUri`. [Screens](#screens)                                                      |
+| **Each user signs in as themselves.** Alexa account linking gives every user their own OAuth token, and the agent sends it on as `Authorization: Bearer`, so your server sees the person rather than the bridge.                                                       | `mcp.auth.type: 'alexaAccountLinking'`. [Per-user sign-in](#per-user-sign-in)                                                          |
+| **The answer is written for the ear.** A few sentences, only a few choices read aloud, no markdown and no raw JSON, then rendered as SSML. A server that writes its own spoken line can have it said word for word.                                                    | Tool results, or `speech.resultField` of `structuredContent`. [docs/config.md](docs/config.md)                                         |
+| **It opens and closes on your terms.** `skill.launch` calls a tool directly at launch with no model call, so the first thing a user hears, and sees, is your server's own opening; a result field can end the session.                                                 | Any tool, called by name. [docs/config.md](docs/config.md)                                                                             |
+| **The conversation carries over.** Recent exchanges and preferences come back per user, and the MCP session stays warm between turns, so tool state survives the gap.                                                                                                  | One MCP session per user in AgentCore Memory and the microVM. [docs/architecture.md](docs/architecture.md#memory)                      |
+
+[docs/architecture.md](docs/architecture.md) is the whole turn story; [docs/decisions.md](docs/decisions.md) says why each of these was built the way it was.
 
 ## Pick a track
 
@@ -195,7 +212,11 @@ When you are done: `npm run destroy`. The Alexa Skill stays in your Amazon devel
 
 One turn is the eight numbered steps in the diagram near the top of this page. The whole round trip has to finish inside the few seconds Alexa allows, which is what shapes every choice in the turn path.
 
-Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the Alexa Skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field. Details in [docs/architecture.md](docs/architecture.md).
+Elicitation: when your tool asks the user a question, the agent parks the open `tools/call` stream inside the microVM, the Alexa Skill speaks the question, and the answer on the next turn resumes the same tool call. Multi-field forms become one spoken question per field.
+
+**Slow turns.** A tool that takes longer than a few seconds does not have to lose the turn. After `turn.progressiveAfterMs` (3 s by default) the Alexa Skill says "One moment." while the agent keeps working, and if the agent is still going at `turn.budgetMs` the run carries on in the warm microVM; the next thing the user says is answered with that result instead of being run as a new request (D52, D72). Set it to `0` to switch the interjection off.
+
+Details for both in [docs/architecture.md](docs/architecture.md).
 
 ## Screens
 
@@ -261,6 +282,15 @@ The fields are described in Amazon's [account linking schema](https://developer.
 - [docs/decisions.md](docs/decisions.md): every decision with its rationale and what would reverse it, plus the dated verification log.
 - [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md): layout, style, naming, and the rules for generated files. `AGENTS.md` is the instruction file for whichever coding agent you use; `CLAUDE.md` is a symlink to it.
 - [docs/history/](docs/history/): the original brief and execution plan, frozen. Provenance, not instruction.
+
+## Contributors
+
+Pull requests that landed, with thanks:
+
+- [@Osiyomeoh](https://github.com/Osiyomeoh): never speak a model's inline reasoning; one runtime session per user **and** runtime version, so a deploy reaches users at their next turn; a generator fix so no slot name is bound to two types.
+- [@Raul99Alejandro](https://github.com/Raul99Alejandro): open a new MCP session when the server answers 404, which is what the MCP spec asks of a client after the server restarts.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) has the loop; [AGENTS.md](AGENTS.md) has the house rules.
 
 ## Out of scope for v1
 

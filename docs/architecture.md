@@ -6,7 +6,7 @@ The bridge lets a developer test an MCP server on a physical Alexa+ device as if
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="img/bridge.dark.svg">
     <source media="(prefers-color-scheme: light)" srcset="img/bridge.light.svg">
-    <img src="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.auto.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram explains all eight steps.">
+    <img src="https://raw.githubusercontent.com/KayLerch/alexa-skill-mcp-bridge/main/docs/img/bridge.auto.svg" alt="The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP, AgentCore Memory and a widget renderer on headless Chromium. Numbered arrows 1 to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the device, as speech and, where the server offers a widget, as an image shown on the screen. A numbered legend below the diagram explains all eight steps, and two callouts under it cover a slow turn, where the Alexa Skill says &quot;One moment.&quot; while the agent keeps working, and a screen, where the agent renders your server's widget to an image the Alexa Skill shows full screen.">
   </picture>
 </p>
 
@@ -46,6 +46,16 @@ Identity: raw Alexa ids are hashed with SHA-256 in the Lambda. The hashed user i
 `TurnRun.waitForOutcome(deadline)` is the one primitive: whichever comes first of the agent loop finishing, a question becoming current, or the deadline. It serves `turn`, `answer`, and `poll` alike.
 
 The deadline is `budgetMs - 500 ms` so the agent answers `pending` cleanly before the Lambda's abort at `budgetMs`. A run that passes its deadline keeps working; `/ping` reports `HealthyBusy` only then.
+
+## Slow turns
+
+Alexa allows about 8 s. The agent gets `turn.budgetMs` of it (6500 ms) and the Lambda aborts there, so a tool that runs longer needs two things: something to say while it works, and somewhere for the result to go.
+
+1. **"One moment."** After `turn.progressiveAfterMs` (3000 ms, D52 as amended by D71) the Lambda enqueues one `VoicePlayer.Speak` through the ASK directive service, a Progressive Response. Once per request, fire and forget: a failure is logged and never touches the answer. Skipped on a `cancel` turn, and with account linking configured it waits until a linked token is there. `0` turns it off, and the config refuses a value at or above `budgetMs`.
+2. **The run keeps going.** At the deadline (`budgetMs - 500 ms`) the agent answers `pending` and the `TurnRun` carries on inside the warm microVM. `/ping` reports `HealthyBusy` only while a run is past its deadline.
+3. **The result reaches the user next.** With a result outstanding, the Lambda polls first and answers with that result alone; the words the user just said are not run as a turn (D72). A `poll` turn gets the result if it is ready and `pending` otherwise.
+
+So a long tool call costs the user one "One moment." and one extra exchange, rather than an error.
 
 ## The screen
 
@@ -96,7 +106,7 @@ Hazards on the path (see [troubleshooting.md](troubleshooting.md)): the MCP SDK'
 
 ## Decisions
 
-[decisions.md](decisions.md) lists every decision (D1 to D72) with its rationale and the condition that would reverse it. The ones that shape the code most:
+[decisions.md](decisions.md) lists every decision (D1 to D74) with its rationale and the condition that would reverse it. The ones that shape the code most:
 
 - Raw MCP SDK `Client` instead of Strands' `McpClient` (D21): Strands drops `structuredContent` and pins tool calls to a 60 s timeout.
 - One content block per tool result (D28): Nova collapses its context on a result that mixes `json` and `text` (545 input tokens instead of 1712, empty answer).

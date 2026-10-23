@@ -1,9 +1,9 @@
 /**
  * Builds the README diagrams. Run with: node docs/img/build.mjs
  *
- * Four files come out of here and none of them should be edited by hand: a tall version used in
- * "What happens on a turn", a wide banner used at the top, each in a light and a dark palette.
- * One source keeps the four consistent, which matters because they state the same facts.
+ * Three files come out of here and none of them should be edited by hand: the wide banner in a
+ * light, a dark and a self-adapting palette. One source keeps them consistent, and one diagram
+ * means a fact is stated once.
  *
  * Two rules the labels follow: no name that exists only inside this repo, and no number a config
  * change could invalidate. Both belong in the docs, where they can be kept current.
@@ -68,7 +68,13 @@ const AUTO = {
     '  </style>',
 };
 
-const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+// Also escapes the double quote: esc() feeds the aria-label attribute as well as text nodes.
+const esc = (s) =>
+  String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 const text = (x, y, s, o = {}) =>
   `  <text x="${x}" y="${y}"${o.anchor ? ` text-anchor="${o.anchor}"` : ''} font-size="${o.size ?? 13}"` +
   `${o.weight ? ` font-weight="${o.weight}"` : ''}${o.spacing ? ` letter-spacing="${o.spacing}"` : ''}` +
@@ -91,154 +97,27 @@ function open(w, h, p, aria, style) {
 }
 const close = () => ['  </g>', '</svg>', ''];
 
-// ---------------------------------------------------------------- tall version
-
-const ARIA_TALL =
-  'One Alexa turn, top to bottom: the Alexa+ device sends voice to the Alexa Skill, which matches it to an intent and ' +
-  'slots and calls the thin Alexa Skill Lambda. Inside AWS us-east-1 the Lambda invokes AgentCore Runtime, one microVM ' +
-  'per user holding a Strands agent on Nova 2 Lite, an MCP client over Streamable HTTP and AgentCore Memory. It calls ' +
-  'your MCP server, which sits outside AWS. Every step has a return arrow beside it, and the answer travels the whole ' +
-  'way back as speech the device says.';
-
-function tall(p) {
-  const W = 920,
-    H = 1056,
-    CX = 180,
-    CW = 560,
-    DOWN = 440,
-    UP = 480;
-  const s = open(W, H, p, ARIA_TALL, p.style);
-
-  const card = (y, h, eyebrow, accent, title, sub) => {
-    s.push(box(CX, y, CW, h, p));
-    s.push(
-      text(CX + 24, y + 32, eyebrow, { size: 11, weight: '600', spacing: 1.3, fill: p[accent] }),
-    );
-    s.push(text(CX + 24, y + 60, title, { size: 19, weight: '600', fill: p.title }));
-    s.push(text(CX + 24, y + 83, sub, { size: 13, fill: p.sub }));
-  };
-  const arrows = (y0, y1, request, response) => {
-    s.push(
-      `  <line x1="${DOWN}" y1="${y0 + 6}" x2="${DOWN}" y2="${y1 - 10}" stroke="${p.arrow}" stroke-width="1.6" marker-end="url(#f)"/>`,
-    );
-    s.push(
-      `  <line x1="${UP}" y1="${y1 - 6}" x2="${UP}" y2="${y0 + 10}" stroke="${p.back}" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#b)"/>`,
-    );
-    const mid = (y0 + y1) / 2;
-    for (const [lines, x, anchor] of [
-      [request, DOWN - 24, 'end'],
-      [response, UP + 24, 'start'],
-    ]) {
-      let ty = mid - (lines.length - 1) * 7 + 4;
-      for (const line of lines) {
-        s.push(text(x, Math.round(ty), line, { anchor, size: 11.5, fill: p.label }));
-        ty += 15;
-      }
-    }
-  };
-
-  s.push(
-    box(112, 372, 696, 448, p, { r: 18, fill: 'none', stroke: p.boundary, sw: 1.4, dash: '7 5' }),
-  );
-  s.push(
-    text(132, 397, 'AWS · us-east-1 · one CDK stack', {
-      size: 11.5,
-      weight: '600',
-      spacing: 1.1,
-      fill: p.boundarytext,
-    }),
-  );
-
-  card(
-    32,
-    100,
-    'ALEXA+ DEVICE',
-    'alexa',
-    'The user speaks',
-    'A device, or the test simulator in the developer console',
-  );
-  arrows(132, 212, ['voice'], ['the device speaks']);
-  card(
-    212,
-    100,
-    'ALEXA+',
-    'alexa',
-    'Alexa Skill',
-    'Matches utterances against the interaction model generated from your tools',
-  );
-  arrows(312, 408, ['intent + slots'], ['SSML']);
-  card(
-    408,
-    100,
-    'AWS LAMBDA',
-    'aws',
-    'Alexa Skill Lambda',
-    'Thin: forwards the request, speaks the answer back',
-  );
-  arrows(508, 588, ['InvokeAgentRuntime'], ['the spoken answer,', 'or a question to ask']);
-  card(
-    588,
-    200,
-    'AMAZON BEDROCK',
-    'aws',
-    'AgentCore Runtime',
-    'One microVM per user, kept warm between turns',
-  );
-
-  const rows = [
-    ['Strands agent', 'Amazon Nova 2 Lite', 'picks the tool, fills args'],
-    ['MCP client', 'Streamable HTTP', 'elicitation at initialize'],
-    ['AgentCore Memory', 'history, preferences', 'keyed by hashed user id'],
-  ];
-  rows.forEach(([head, l2, l3], i) => {
-    const x = 200 + i * 179,
-      w = 162;
-    s.push(box(x, 680, w, 80, p, { r: 10, fill: p.chip, stroke: p.chipstroke }));
-    s.push(
-      text(x + w / 2, 704, head, { anchor: 'middle', size: 12.5, weight: '600', fill: p.title }),
-    );
-    s.push(text(x + w / 2, 724, l2, { anchor: 'middle', size: 11.5, fill: p.sub }));
-    s.push(text(x + w / 2, 741, l3, { anchor: 'middle', size: 11.5, fill: p.sub }));
-  });
-
-  arrows(788, 892, ['tools/call'], ['result, or a question']);
-  card(
-    892,
-    100,
-    'OUTSIDE AWS',
-    'mcp',
-    'Your MCP server',
-    'Anywhere reachable over HTTPS. Nothing in it changes for the bridge',
-  );
-  s.push(
-    text(
-      W / 2,
-      1024,
-      'Elicitation: MCP wants the answer inside the same tools/call, but an Alexa turn ends in seconds. The call stays parked in the microVM across turns.',
-      { anchor: 'middle', size: 11.5, fill: p.sub },
-    ),
-  );
-  return [...s, ...close()].join('\n');
-}
-
 // ---------------------------------------------------------------- wide version
 
 const ARIA_WIDE =
   'The bridge at a glance, left to right: an Alexa+ device, the Alexa Skill, a thin Alexa Skill Lambda and AgentCore ' +
   'Runtime inside AWS us-east-1, and your MCP server outside it. The runtime holds a Strands agent on Nova 2 Lite, an ' +
-  'MCP client over Streamable HTTP and AgentCore Memory. Numbered arrows 1 to 4 carry the request rightwards to your ' +
-  'server, and arrows 5 to 8 carry the answer back leftwards to the device. A numbered legend below the diagram ' +
-  'explains all eight steps.';
+  'MCP client over Streamable HTTP, AgentCore Memory and a widget renderer on headless Chromium. Numbered arrows 1 ' +
+  'to 4 carry the request rightwards to your server, and arrows 5 to 8 carry the answer back leftwards to the ' +
+  'device, as speech and, where the server offers a widget, as an image shown on the screen. A numbered legend ' +
+  'below the diagram explains all eight steps, and two callouts under it cover a slow ' +
+  'turn, where the Alexa Skill says "One moment." while the agent keeps working, and a screen, where the agent ' +
+  "renders your server's widget to an image the Alexa Skill shows full screen.";
 
 function wide(p) {
   const W = 1120,
-    H = 424;
+    H = 472;
   const s = open(W, H, p, ARIA_WIDE, p.style);
   const FWD = 120,
     BACK = 166;
 
   s.push(
-    box(410, 28, 483, 228, p, { r: 16, fill: 'none', stroke: p.boundary, sw: 1.4, dash: '7 5' }),
+    box(410, 28, 483, 238, p, { r: 16, fill: 'none', stroke: p.boundary, sw: 1.4, dash: '7 5' }),
   );
   s.push(
     text(426, 50, 'AWS · us-east-1', {
@@ -283,9 +162,9 @@ function wide(p) {
 
   node(24, 138, 'ALEXA+ DEVICE', 'alexa', 'The user speaks', 'or types in the simulator');
   node(227, 138, 'ALEXA+', 'alexa', 'Alexa Skill', 'intent + slots');
-  node(430, 158, 'AWS LAMBDA', 'aws', 'Alexa Skill Lambda', 'thin, speaks the answer');
+  node(430, 158, 'AWS LAMBDA', 'aws', 'Alexa Skill Lambda', 'thin: speech and screen');
 
-  s.push(box(653, 40, 220, 204, p));
+  s.push(box(653, 40, 220, 214, p));
   s.push(
     text(763, 68, 'AMAZON BEDROCK', {
       anchor: 'middle',
@@ -304,13 +183,16 @@ function wide(p) {
     }),
   );
   s.push(text(763, 108, 'one microVM per user', { anchor: 'middle', size: 10.5, fill: p.sub }));
-  [['Strands agent · Nova 2 Lite'], ['MCP client · Streamable HTTP'], ['AgentCore Memory']].forEach(
-    ([label], i) => {
-      const y = 122 + i * 36;
-      s.push(box(667, y, 192, 30, p, { r: 8, fill: p.chip, stroke: p.chipstroke }));
-      s.push(text(763, y + 19.5, label, { anchor: 'middle', size: 10, fill: p.title }));
-    },
-  );
+  [
+    ['Strands agent · Nova 2 Lite'],
+    ['MCP client · Streamable HTTP'],
+    ['AgentCore Memory'],
+    ['Widget renderer · Chromium'],
+  ].forEach(([label], i) => {
+    const y = 118 + i * 32;
+    s.push(box(667, y, 192, 28, p, { r: 8, fill: p.chip, stroke: p.chipstroke }));
+    s.push(text(763, y + 18.5, label, { anchor: 'middle', size: 10, fill: p.title }));
+  });
 
   node(938, 158, 'OUTSIDE AWS', 'mcp', 'Your MCP server', 'no changes needed');
 
@@ -339,10 +221,18 @@ function wide(p) {
       true,
       'The agent picks a tool, fills its arguments, and calls your server over Streamable HTTP.',
     ],
-    [5, false, 'Your server returns a result, or asks a question back through elicitation.'],
-    [6, false, 'The agent turns that into one short spoken answer, or into the question to ask.'],
-    [7, false, 'The Lambda renders it as SSML and hands it back to Alexa+.'],
-    [8, false, 'The device speaks. A parked question resumes the same call on the next turn.'],
+    [
+      5,
+      false,
+      'Your server returns a result, with a widget if it offers one, or asks a question back.',
+    ],
+    [
+      6,
+      false,
+      'The agent writes one short spoken answer or the next question, and renders that widget.',
+    ],
+    [7, false, 'The Lambda sends the speech as SSML and the image as one APL screen.'],
+    [8, false, 'The device speaks and shows it. A parked question resumes the same call.'],
   ];
   legend.forEach(([n, forward, line], i) => {
     const x = i < 4 ? 24 : 572;
@@ -353,12 +243,30 @@ function wide(p) {
     );
     s.push(text(x + 24, y, line, { size: 11, fill: p.sub }));
   });
+
+  // Neither is a step in the round trip, so they get their own band rather than a number.
+  s.push(`  <line x1="24" y1="406" x2="${W - 24}" y2="406" stroke="${p.rule}" stroke-width="1"/>`);
+  [
+    [
+      'aws',
+      'Slow turn',
+      'the Alexa Skill says "One moment." while the agent keeps working, then speaks the result.',
+    ],
+    [
+      'mcp',
+      'Screen',
+      "the agent renders your server's widget to an image, and the Alexa Skill shows it full screen.",
+    ],
+  ].forEach(([accent, label, line], i) => {
+    const y = 434 + i * 24;
+    s.push(`  <rect x="24" y="${y - 12}" width="11" height="11" rx="3" fill="${p[accent]}"/>`);
+    s.push(text(43, y, label, { size: 11, weight: '600', fill: p.title }));
+    s.push(text(126, y, line, { size: 11, fill: p.sub }));
+  });
   return [...s, ...close()].join('\n');
 }
 
 for (const [name, svg] of [
-  ['turn.light.svg', tall(LIGHT)],
-  ['turn.dark.svg', tall(DARK)],
   ['bridge.light.svg', wide(LIGHT)],
   ['bridge.dark.svg', wide(DARK)],
   ['bridge.auto.svg', wide(AUTO)],
