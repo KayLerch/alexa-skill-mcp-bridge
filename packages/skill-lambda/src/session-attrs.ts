@@ -23,6 +23,8 @@ interface Attributes {
   /** What the user heard last and its reprompt, for "repeat" and a missed answer (D59, D60). */
   lastSpeech?: string;
   lastReprompt?: string;
+  /** The server's hint for a missed reply that came with the last output (D70). */
+  lastFallback?: string;
 }
 
 function read(input: HandlerInput): Attributes {
@@ -88,17 +90,26 @@ export function setTimeZone(input: HandlerInput, timeZone: string): void {
 export interface LastOutput {
   speech: string;
   reprompt: string;
+  fallback?: string;
 }
 
 /** The last spoken output of an open session, or undefined before the first one. */
 export function getLastOutput(input: HandlerInput): LastOutput | undefined {
-  const { lastSpeech, lastReprompt } = read(input);
-  return lastSpeech ? { speech: lastSpeech, reprompt: lastReprompt ?? lastSpeech } : undefined;
+  const { lastSpeech, lastReprompt, lastFallback } = read(input);
+  if (!lastSpeech) return undefined;
+  return {
+    speech: lastSpeech,
+    reprompt: lastReprompt ?? lastSpeech,
+    ...(lastFallback ? { fallback: lastFallback } : {}),
+  };
 }
 
+/** A new output replaces all three; one without a hint drops the earlier hint. */
 export function setLastOutput(input: HandlerInput, output: LastOutput): void {
   const attrs = read(input);
   attrs.lastSpeech = output.speech;
   attrs.lastReprompt = output.reprompt;
+  if (output.fallback) attrs.lastFallback = output.fallback;
+  else delete attrs.lastFallback;
   write(input, attrs);
 }

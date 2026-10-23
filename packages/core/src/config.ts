@@ -114,9 +114,13 @@ const bridgeConfigShape = z.object({
       coldStartMessage: z
         .string()
         .default("I'm still starting up. Give me a moment and open me again."),
-      stillWorkingMessage: z
-        .string()
-        .default("I'm still working on that. Ask me again in a moment."),
+      /**
+       * Spoken when a turn runs past the budget. Whatever the user says next fetches that result
+       * and only that (D72), so the line tells them what to say.
+       */
+      stillWorkingMessage: z.string().default('Still working on it. Say "continue" in a moment.'),
+      /** The reprompt after stillWorkingMessage. */
+      stillWorkingReprompt: z.string().default('Say "continue" to hear it.'),
       /**
        * A tool the agent calls directly on launch, without the model (D57). Its
        * speech.resultField is spoken, its widget shown, and the session ends only when
@@ -180,9 +184,10 @@ const bridgeConfigShape = z.object({
       budgetMs: z.number().int().min(1000).max(7500).default(6500),
       /**
        * After this long without an answer the Alexa Skill says "One moment." (Progressive
-       * Response), once per request (D52). 0 turns it off. Keep it well under budgetMs.
+       * Response), once per request (D52). 0 turns it off. Below budgetMs, or it never fires.
+       * The default sits above a normal turn (1.5 to 3 s), so only a slow one hears it (D71).
        */
-      progressiveAfterMs: z.number().int().min(0).max(7000).default(1500),
+      progressiveAfterMs: z.number().int().min(0).max(7000).default(3000),
     })
     .prefault({}),
   tools: z
@@ -217,6 +222,13 @@ const bridgeConfigShape = z.object({
        * end with a question.
        */
       endSessionField: z.string().min(1).optional(),
+      /**
+       * A string field of a tool result's structuredContent that the Alexa Skill speaks, exactly,
+       * when Alexa misses the user's reply while the session is open for one (D70): a hint the
+       * server wrote for its own question ('Say A, B or C, or "skip".'). Read from the run's last
+       * successful result; unset or absent: skill.fallbackWhileOpen and the last question (D60).
+       */
+      fallbackField: z.string().min(1).optional(),
     })
     .prefault({}),
   intents: z
@@ -331,6 +343,17 @@ export const bridgeConfigSchema = bridgeConfigShape.superRefine((config, ctx) =>
           'takes a tool ({ "tool": "...", "arguments": {...} }), not a text: the session ends right after it.',
       });
     }
+  }
+  // The Lambda stops waiting at the budget, and the progressive response with it.
+  if (
+    config.turn.progressiveAfterMs > 0 &&
+    config.turn.progressiveAfterMs >= config.turn.budgetMs
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['turn', 'progressiveAfterMs'],
+      message: `must be below turn.budgetMs (${config.turn.budgetMs}), or 0 to turn it off: the Alexa Skill stops waiting at the budget.`,
+    });
   }
   // The Gateway authenticates the agent with SigV4 and has no way to pass the user's token on.
   if (config.features.gateway && config.mcp.auth.type === 'alexaAccountLinking') {

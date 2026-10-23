@@ -31,7 +31,7 @@ const builder = askSdk.SkillBuilders.custom()
     freeTextHandler(bridge),
     yesNoTurnHandler(bridge),
     helpHandler(config, manifest),
-    repeatHandler(),
+    repeatHandler(bridge),
     builtInHandler(bridge, config),
     stopHandler(bridge, config),
     fallbackHandler(bridge, config),

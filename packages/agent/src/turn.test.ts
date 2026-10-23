@@ -205,14 +205,21 @@ describe('overrun and poll', () => {
           { toolUse: { name: 'get_weather', input: { city: 'Berlin' } } },
           { text: 'Berlin is partly cloudy.' },
         ],
-        { mcp: { url: slow.url }, skill: { stillWorkingMessage: 'Still working.' } },
+        {
+          mcp: { url: slow.url },
+          skill: { stillWorkingMessage: 'Still working.', stillWorkingReprompt: 'Say continue.' },
+        },
       );
       await slowSession.ready({ actorId: 'a', locale: 'en-US' }, 5000);
       const first = await slowSend(
         { type: 'turn', utterance: { text: 'weather in Berlin' } },
         1200,
       );
-      expect(first).toMatchObject({ status: 'pending', speech: 'Still working.' });
+      expect(first).toMatchObject({
+        status: 'pending',
+        speech: 'Still working.',
+        reprompt: 'Say continue.',
+      });
       expect(slowSession.state).toBe('overrun');
       expect(slowSession.ping()).toBe('HealthyBusy');
 

@@ -16,7 +16,11 @@ describe('parseConfig', () => {
     expect(config.agent.modelId).toBe('us.amazon.nova-2-lite-v1:0');
     expect(config.agent.reasoningEffort).toBe('off');
     expect(config.runtime).toEqual({ idleTimeoutMinutes: 20, maxLifetimeHours: 8 });
-    expect(config.turn.budgetMs).toBe(6500);
+    expect(config.turn).toEqual({ budgetMs: 6500, progressiveAfterMs: 3000 });
+    expect(config.skill.stillWorkingMessage).toBe(
+      'Still working on it. Say "continue" in a moment.',
+    );
+    expect(config.skill.stillWorkingReprompt).toBe('Say "continue" to hear it.');
     expect(config.elicitation.answerTimeoutSeconds).toBe(120);
     expect(config.speech).toEqual({ maxSentences: 3, maxChoicesSpoken: 3 });
     expect(config.memory).toEqual({ shortTerm: true, longTerm: true, hydrateLastEvents: 20 });
@@ -55,6 +59,23 @@ describe('parseConfig', () => {
         features: { gateway: true },
       }),
     ).toThrowError(/features\.gateway: .*alexaAccountLinking/);
+  });
+
+  it('wants the progressive response before the turn budget runs out, or off', () => {
+    const url = { url: 'http://x/mcp' };
+    expect(() => parseConfig({ mcp: url, turn: { budgetMs: 3000 } })).toThrowError(
+      /turn\.progressiveAfterMs: .*below turn\.budgetMs/,
+    );
+    expect(() =>
+      parseConfig({ mcp: url, turn: { budgetMs: 2500, progressiveAfterMs: 2500 } }),
+    ).toThrowError(/turn\.progressiveAfterMs/);
+    expect(parseConfig({ mcp: url, turn: { budgetMs: 2500, progressiveAfterMs: 0 } }).turn).toEqual(
+      { budgetMs: 2500, progressiveAfterMs: 0 },
+    );
+    expect(
+      parseConfig({ mcp: url, turn: { budgetMs: 2500, progressiveAfterMs: 2000 } }).turn
+        .progressiveAfterMs,
+    ).toBe(2000);
   });
 
   it('validates the Alexa Skill id shape', () => {

@@ -7,9 +7,16 @@ The launch hit a cold runtime: provisioning the microVM plus MCP `initialize` to
 - Check the runtime logs (`/aws/bedrock-agentcore/...` in CloudWatch) for `warm-up failed`. The usual cause is an unreachable `mcp.url` from AWS (a tunnel that expired, a server on localhost).
 - Run `npm run chat -- --remote` and send a few turns; the second one should be fast.
 
-## "I'm still working on that" loops
+## "Still working on it" loops
 
-A turn runs past the budget on every request. Look at the `run finished` log line for `elapsedMs`. Causes, in order of likelihood: a slow MCP tool, reasoning effort above `off`, a very long tool result (the model reads all of it), or a system prompt bloated by long server `instructions`. Use `npm run chat -- --debug` to see per-call timings.
+After "Still working on it. Say "continue" in a moment." the next request of any kind fetches the
+result the agent is still working on, and the user hears that result alone: the words they said
+are not run as a new turn, because after "still working" they are most often "continue" or the
+same answer again, which would otherwise reach the server twice (D72). Stop, cancel and "go home"
+still cancel, and help answers without touching the result. If the result is still not ready
+within the budget, the user hears the line again.
+
+If that happens on every request, a turn runs past the budget every time. Look at the `run finished` log line for `elapsedMs`. Causes, in order of likelihood: a slow MCP tool, reasoning effort above `off`, a very long tool result (the model reads all of it), or a system prompt bloated by long server `instructions`. Use `npm run chat -- --debug` to see per-call timings.
 
 ## The question never gets an answer, or the tool call fails after a minute
 

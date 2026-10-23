@@ -9,8 +9,9 @@ import {
   repeatHandler,
   stopHandler,
 } from '../src/handlers/standard.js';
+import { openAnswerHandler } from '../src/handlers/answers.js';
 import { greeting, helpText } from '../src/greeting.js';
-import { config as baseConfig, handlerInput, manifest } from './helpers.js';
+import { config as baseConfig, handlerInput, manifest, slot } from './helpers.js';
 import { LINE, done, fakeBridge, launchConfig, repromptOf, ssmlOf, withConfig } from './voice.js';
 
 /**
@@ -26,7 +27,7 @@ describe('repeat (D59)', () => {
     await launchHandler(bridge, launchConfig, manifest).handle(input);
     const attributes = input.attributesManager.getSessionAttributes();
     const repeat = handlerInput({ intent: 'AMAZON.RepeatIntent', sessionAttributes: attributes });
-    const response = await repeatHandler().handle(repeat);
+    const response = await repeatHandler(bridge).handle(repeat);
     expect(turns).toHaveLength(1);
     expect(ssmlOf(response)).toContain('Welcome back.');
     expect(repromptOf(response)).toBe('<speak>What would you like?</speak>');
@@ -217,16 +218,17 @@ describe('a missed answer while the session is open (D60)', () => {
     expect(withConfig({}).skill.fallbackWhileOpen).toBe("Sorry, I didn't catch that.");
   });
 
-  it('with a result still being worked on, the agent turn fetches it first', async () => {
+  it('with a result still being worked on, the agent turn fetches it and only it', async () => {
     const config = withConfig({});
     const { bridge, turns } = fakeBridge(config, () => done('Here it is. Next?'));
-    await fallbackHandler(bridge, config).handle(
+    const response = await fallbackHandler(bridge, config).handle(
       handlerInput({
         intent: 'AMAZON.FallbackIntent',
         sessionAttributes: { openTurn: true, awaitingResult: true, lastSpeech: 'One moment.' },
       }),
     );
-    expect(turns.map((t) => t.type)).toEqual(['poll', 'turn']);
+    expect(turns.map((t) => t.type)).toEqual(['poll']);
+    expect(ssmlOf(response)).toBe('<speak>Here it is. Next?</speak>');
   });
 
   it('without an open turn the agent still asks what was meant', async () => {
@@ -234,6 +236,138 @@ describe('a missed answer while the session is open (D60)', () => {
     const { bridge, turns } = fakeBridge(config, () => done('What would you like to do?'));
     await fallbackHandler(bridge, config).handle(handlerInput({ intent: 'AMAZON.FallbackIntent' }));
     expect(turns).toEqual([{ type: 'turn', utterance: { intent: 'AMAZON.FallbackIntent' } }]);
+  });
+});
+
+describe('a server-written hint for a missed reply (D70)', () => {
+  const HINT = 'Name a park, for example "Yosemite", or say "skip".';
+  const QUESTION = 'Which park has the tallest trees?';
+
+  it('is stored with the last output and spoken alone when Alexa misses the reply', async () => {
+    const config = withConfig({ speech: { fallbackField: 'hint' } });
+    const { bridge, turns } = fakeBridge(config, () =>
+      done(`Right. ${QUESTION}`, { reprompt: QUESTION, fallback: HINT }),
+    );
+    const asked = handlerInput({ intent: 'AMAZON.NextIntent' });
+    await builtInHandler(bridge, config).handle(asked);
+    const attributes = asked.attributesManager.getSessionAttributes();
+    expect(attributes).toMatchObject({
+      openTurn: true,
+      lastSpeech: `Right. ${QUESTION}`,
+      lastReprompt: QUESTION,
+      lastFallback: HINT,
+    });
+
+    const missed = handlerInput({ intent: 'AMAZON.FallbackIntent', sessionAttributes: attributes });
+    const response = await fallbackHandler(bridge, config).handle(missed);
+    expect(turns).toHaveLength(1);
+    expect(ssmlOf(response)).toBe(
+      '<speak>Name a park, for example &quot;Yosemite&quot;, or say &quot;skip&quot;.</speak>',
+    );
+    expect(repromptOf(response)).toBe(`<speak>${QUESTION}</speak>`);
+    expect(response.shouldEndSession).toBe(false);
+
+    // "Repeat" still replays the question, not the hint.
+    const again = missed.attributesManager.getSessionAttributes();
+    expect(again).toMatchObject({ lastSpeech: `Right. ${QUESTION}`, lastFallback: HINT });
+    const repeated = await repeatHandler(bridge).handle(
+      handlerInput({ intent: 'AMAZON.RepeatIntent', sessionAttributes: again }),
+    );
+    expect(ssmlOf(repeated)).toBe(`<speak>Right. ${QUESTION}</speak>`);
+  });
+
+  it('is dropped by the next output without one: then the usual re-ask', async () => {
+    const config = withConfig({ speech: { fallbackField: 'hint' } });
+    const { bridge } = fakeBridge(config, () => done(`Next. ${QUESTION}`, { reprompt: QUESTION }));
+    const input = handlerInput({
+      intent: 'AMAZON.NextIntent',
+      sessionAttributes: {
+        openTurn: true,
+        lastSpeech: 'Old?',
+        lastReprompt: 'Old?',
+        lastFallback: HINT,
+      },
+    });
+    await builtInHandler(bridge, config).handle(input);
+    const attributes = input.attributesManager.getSessionAttributes();
+    expect(attributes.lastFallback).toBeUndefined();
+    const response = await fallbackHandler(bridge, config).handle(
+      handlerInput({ intent: 'AMAZON.FallbackIntent', sessionAttributes: attributes }),
+    );
+    expect(ssmlOf(response)).toBe(`<speak>Sorry, I didn't catch that. ${QUESTION}</speak>`);
+  });
+
+  it('a pending question still wins over the hint', async () => {
+    const config = withConfig({ speech: { fallbackField: 'hint' } });
+    const { bridge } = fakeBridge(config, () => done('x'));
+    const response = await fallbackHandler(bridge, config).handle(
+      handlerInput({
+        intent: 'AMAZON.FallbackIntent',
+        sessionAttributes: {
+          lastFallback: HINT,
+          pendingQuestion: {
+            id: 'q1',
+            expects: 'number',
+            source: 'elicitation',
+            message: 'How many people?',
+          },
+        },
+      }),
+    );
+    expect(ssmlOf(response)).toBe(`<speak>${SPOKEN.questionRepeat} How many people?</speak>`);
+  });
+});
+
+describe('"still working", then whatever the user says next (D72)', () => {
+  const RESULT = 'Correct! Question 3: which park has the tallest trees?';
+  const outstanding = { openTurn: true, awaitingResult: true, lastSpeech: 'Question 2?' };
+
+  it('a repeated answer is not sent to the agent: the pending result is spoken', async () => {
+    const config = withConfig({});
+    const { bridge, turns } = fakeBridge(config, (turn) =>
+      turn.type === 'poll'
+        ? done(RESULT, { reprompt: 'Which park has the tallest trees?' })
+        : done('Wrong turn.'),
+    );
+    const input = handlerInput({
+      intent: 'FreeTextAnswerIntent',
+      slots: { answer: slot('answer', 'yellowstone') },
+      sessionAttributes: outstanding,
+    });
+    const response = await openAnswerHandler(bridge).handle(input);
+    expect(turns).toEqual([{ type: 'poll' }]);
+    expect(ssmlOf(response)).toBe(`<speak>${RESULT}</speak>`);
+    expect(input.attributesManager.getSessionAttributes()).toMatchObject({
+      lastSpeech: RESULT,
+      openTurn: true,
+    });
+    expect(input.attributesManager.getSessionAttributes().awaitingResult).toBeUndefined();
+  });
+
+  it('"repeat" fetches the outstanding result instead of replaying the last answer', async () => {
+    const config = withConfig({});
+    const { bridge, turns } = fakeBridge(config, () => done(RESULT));
+    const response = await repeatHandler(bridge).handle(
+      handlerInput({ intent: 'AMAZON.RepeatIntent', sessionAttributes: outstanding }),
+    );
+    expect(turns).toEqual([{ type: 'poll' }]);
+    expect(ssmlOf(response)).toBe(`<speak>${RESULT}</speak>`);
+  });
+
+  it('help answers without the agent and leaves the result outstanding', async () => {
+    const config = withConfig({});
+    const input = handlerInput({ intent: 'AMAZON.HelpIntent', sessionAttributes: outstanding });
+    await helpHandler(config, manifest).handle(input);
+    expect(input.attributesManager.getSessionAttributes()).toMatchObject({ awaitingResult: true });
+  });
+
+  it('cancel still cancels', async () => {
+    const config = withConfig({});
+    const { bridge, turns } = fakeBridge(config, () => done(''));
+    await stopHandler(bridge, config).handle(
+      handlerInput({ intent: 'AMAZON.CancelIntent', sessionAttributes: outstanding }),
+    );
+    expect(turns).toEqual([{ type: 'cancel' }]);
   });
 });
 

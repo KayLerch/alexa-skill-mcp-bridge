@@ -20,6 +20,7 @@ import {
   getPendingQuestion,
   hasOpenTurn,
   isAwaitingResult,
+  setAwaitingResult,
 } from '../session-attrs.js';
 
 const { getRequestType, getIntentName } = askSdk;
@@ -33,23 +34,40 @@ export function helpHandler(config: BridgeConfig, manifest: ToolManifest): Reque
     canHandle: (input) => isIntent(input, 'AMAZON.HelpIntent'),
     handle: async (input) => {
       const pending = getPendingQuestion(input);
+      const awaiting = isAwaitingResult(input);
       const speech = pending
         ? `${helpText(config, manifest)} Right now I am waiting for an answer: ${pending.message}`
         : helpText(config, manifest);
       // The help text is not what "repeat" should replay.
-      return render(input, done(speech, false), { speech, endSession: false, remember: false });
+      const response = render(input, done(speech, false), {
+        speech,
+        endSession: false,
+        remember: false,
+      });
+      // Help does not fetch an outstanding result, and does not lose it either (D72).
+      if (awaiting) setAwaitingResult(input, true);
+      return response;
     },
   };
 }
 
 /**
  * "Repeat" (D59): what the user heard last, from the session attributes, without asking the
- * agent. Everything else in the session stays as it was.
+ * agent. Everything else in the session stays as it was. After "still working" the user has not
+ * heard the answer yet, so "repeat" fetches it like any other request (D72).
  */
-export function repeatHandler(): RequestHandler {
+export function repeatHandler(bridge: BridgeClient): RequestHandler {
   return {
     canHandle: (input) => isIntent(input, 'AMAZON.RepeatIntent'),
     handle: async (input) => {
+      if (isAwaitingResult(input)) {
+        const output = await bridge.turn(input, { type: 'poll' });
+        if (output.status !== 'done' || output.speech || output.linkAccount) {
+          return render(input, output);
+        }
+        // Nothing was waiting after all: replay as usual.
+        setAwaitingResult(input, false);
+      }
       const last = getLastOutput(input);
       return input.responseBuilder
         .speak(ssml(last?.speech ?? REPROMPT))
@@ -130,6 +148,7 @@ export function stopHandler(bridge: BridgeClient, config: BridgeConfig): Request
 
 /**
  * Fallback: with a question pending, ask it again. With the session open for an answer (D60),
+ * the server's own hint when the last output carried one (speech.fallbackField, D70), else
  * skill.fallbackWhileOpen and the last question again, never a generic "what would you like".
  * Otherwise the agent asks what was meant.
  */
@@ -144,8 +163,9 @@ export function fallbackHandler(bridge: BridgeClient, config: BridgeConfig): Req
       }
       // A result still being worked on is fetched by the agent turn below (poll first).
       if (hasOpenTurn(input) && !isAwaitingResult(input)) {
-        const reprompt = getLastOutput(input)?.reprompt ?? REPROMPT;
-        const speech = `${config.skill.fallbackWhileOpen} ${reprompt}`;
+        const last = getLastOutput(input);
+        const reprompt = last?.reprompt ?? REPROMPT;
+        const speech = last?.fallback ?? `${config.skill.fallbackWhileOpen} ${reprompt}`;
         return render(input, { ...done(speech, false), reprompt }, { remember: false });
       }
       const output = await bridge.turn(input, {

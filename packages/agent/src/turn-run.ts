@@ -33,6 +33,7 @@ export interface TurnRunOptions {
   /**
    * speech.resultField (D51): when this run recorded a value, it is spoken instead of the model's
    * text. speech.endSessionField (D58): when set, the last result's flag ends the session.
+   * speech.fallbackField (D70): the last result's hint for a missed reply rides along.
    */
   resultField?: ResultField;
 }
@@ -113,10 +114,12 @@ export class TurnRun {
       const open = fields?.decidesEnd ? !fields.endsSession : endsWithQuestion(speech);
       // A server's own line carries feedback before its question; only the question is repeated.
       const reprompt = fromField || fields?.decidesEnd ? lastQuestion(speech) : speech;
+      const fallback = open ? cleanSpeech(fields?.fallback ?? '') : '';
       return this.finish({
         status: 'done',
         speech,
         ...(open && reprompt ? { reprompt } : {}),
+        ...(fallback ? { fallback } : {}),
         endSession: !open,
         visual: null,
       });

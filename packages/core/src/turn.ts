@@ -119,8 +119,30 @@ export const turnOutputSchema = z.object({
   debug: turnDebugSchema.optional(),
   /** The MCP server needs the user's linked account: the frontend shows how to link it (D48). */
   linkAccount: z.boolean().optional(),
+  /**
+   * The server's own line for a reply the frontend could not make out (speech.fallbackField, D70).
+   * Only on an output that keeps the session open.
+   */
+  fallback: z.string().optional(),
 });
 export type TurnOutput = z.infer<typeof turnOutputSchema>;
+
+/**
+ * The answer while a run works past the budget: skill.stillWorkingMessage and its reprompt. The
+ * session stays open, and the next request fetches the result (D72).
+ */
+export function stillWorkingOutput(skill: {
+  stillWorkingMessage: string;
+  stillWorkingReprompt: string;
+}): TurnOutput {
+  return {
+    status: 'pending',
+    speech: skill.stillWorkingMessage,
+    reprompt: skill.stillWorkingReprompt,
+    endSession: false,
+    visual: null,
+  };
+}
 
 /** The answer when the request has no usable account-linked token. Ends the session. */
 export function linkAccountOutput(): TurnOutput {

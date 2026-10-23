@@ -112,6 +112,42 @@ describe('ResultField (D51)', () => {
   });
 });
 
+describe('ResultField fallback (D70)', () => {
+  const result = (structuredContent: unknown) =>
+    Promise.resolve({ content: [], structuredContent, isError: false });
+  const call = async (field: ResultField, reply: Promise<unknown>) => {
+    const client = { callTool: () => reply } as unknown as BridgeMcpClient;
+    const logger = createLogger({ service: 'test' }, { write: () => undefined });
+    const tool = new BridgeMcpTool(definition('t'), client, logger, undefined, undefined, field);
+    const context = {
+      toolUse: { toolUseId: 't', name: 't', input: {} },
+      cancelSignal: new AbortController().signal,
+    } as unknown as ToolContext;
+    const gen = tool.stream(context);
+    let next = await gen.next();
+    while (!next.done) next = await gen.next();
+  };
+
+  it("keeps the last result's hint, and forgets it on a result without one or on begin()", async () => {
+    const field = new ResultField('say', undefined, 'hint');
+    await call(field, result({ say: 'Which park?', hint: 'Name a park.' }));
+    expect(field.fallback).toBe('Name a park.');
+    await call(field, result({ say: 'Which park?' }));
+    expect(field.fallback).toBeUndefined();
+    await call(field, result({ hint: '  ' }));
+    expect(field.fallback).toBeUndefined();
+    await call(field, result({ hint: 'Say a number.' }));
+    field.begin();
+    expect(field.fallback).toBeUndefined();
+  });
+
+  it('reads nothing without the setting', async () => {
+    const field = new ResultField('say');
+    await call(field, result({ say: 'Which park?', hint: 'Name a park.' }));
+    expect(field.fallback).toBeUndefined();
+  });
+});
+
 describe('WidgetRecorder (D54)', () => {
   const widgetResult = (uri?: string, isError = false) =>
     Promise.resolve({

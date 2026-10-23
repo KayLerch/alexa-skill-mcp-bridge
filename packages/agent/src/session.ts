@@ -73,7 +73,7 @@ export interface BridgeSessionOptions {
  * everything else makes the frontend fall back to its own line.
  */
 export type DirectCallOutcome =
-  | { kind: 'ok'; speech?: string; endsSession: boolean }
+  | { kind: 'ok'; speech?: string; fallback?: string; endsSession: boolean }
   | { kind: 'unauthorized' }
   | { kind: 'failed' };
 
@@ -235,7 +235,13 @@ export class BridgeSession {
       }
       const speech = fields.value;
       this.remember(name, sent, result, intent, speech);
-      return { kind: 'ok', ...(speech ? { speech } : {}), endsSession: fields.endsSession };
+      const fallback = fields.fallback;
+      return {
+        kind: 'ok',
+        ...(speech ? { speech } : {}),
+        ...(fallback ? { fallback } : {}),
+        endsSession: fields.endsSession,
+      };
     } catch (err) {
       if (this.accountLinking && isUnauthorized(err)) {
         this.logger.warn('mcp server refused the account-linked token', { tool: name });
@@ -418,9 +424,11 @@ export class BridgeSession {
     this.mcp = mcp;
     this.definitions = definitions;
     this.hiddenArguments = new HiddenArguments(config.tools.hiddenArguments);
-    const { resultField, endSessionField } = config.speech;
+    const { resultField, endSessionField, fallbackField } = config.speech;
     this.resultField =
-      resultField || endSessionField ? new ResultField(resultField, endSessionField) : undefined;
+      resultField || endSessionField || fallbackField
+        ? new ResultField(resultField, endSessionField, fallbackField)
+        : undefined;
     this.agent = buildAgent({
       model: this.model,
       tools: [

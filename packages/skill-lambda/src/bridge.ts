@@ -4,11 +4,13 @@ import {
 } from '@aws-sdk/client-bedrock-agentcore';
 import type { HandlerInput } from 'ask-sdk-core';
 import {
+  SESSION_ENDING_INTENTS,
   SPOKEN,
   errorFields,
   hashId,
   isValidTimeZone,
   linkAccountOutput,
+  stillWorkingOutput,
   turnOutputSchema,
   type AgentInvocationInput,
   type BridgeConfig,
@@ -24,8 +26,9 @@ import { getTimeZone, isAwaitingResult, setTimeZone } from './session-attrs.js';
 /**
  * The Alexa Skill's client for the agent. Hashes Alexa ids, builds the envelope, calls
  * InvokeAgentRuntime inside the turn budget, and turns an abort into 'pending'.
- * When a result is outstanding it polls first and speaks that result ahead of the new
- * input (plan D16); the poll's time comes out of the main call's budget.
+ * When a result is outstanding it polls first (plan D16) and answers with that result alone
+ * (D72): what the user said after "still working" is most often the same thing again, or
+ * "continue", and never runs as a new turn. Stop, Cancel and their mapped tools drop it instead.
  * With mcp.auth.type 'alexaAccountLinking' the user's account-linked token rides along on
  * every call, in a header beside the envelope (D63); without one the user is asked to link, and the agent only hears a cancel
  * without a token, which makes it forget the conversation (D48).
@@ -48,9 +51,6 @@ export interface BridgeClientOptions {
 
 /** The UPS lookup of the device's time zone may take this long; then the turn goes without (D53). */
 const TIME_ZONE_TIMEOUT_MS = 300;
-
-/** Below this the main call is not worth attempting; answer pending instead. */
-const MIN_BUDGET_MS = 800;
 
 /**
  * The tokenless cancel on the no-token path waits at most this long (D48), so a user who has not
@@ -159,32 +159,20 @@ export class BridgeClient {
       ...(display ? { display } : {}),
     };
     let budgetMs = config.turn.budgetMs - (Date.now() - lookupStarted);
-    let prefix = '';
 
-    // A direct tool call (D57) is the user moving on: the agent drops the old run instead.
-    if (
-      isAwaitingResult(input) &&
-      turn.type !== 'poll' &&
-      turn.type !== 'cancel' &&
-      turn.type !== 'tool'
-    ) {
+    // A result is outstanding: the user hears it, and only it (D72). Still not ready within the
+    // budget: "still working" again.
+    if (isAwaitingResult(input) && fetchesOutstanding(turn)) {
       const started = Date.now();
       const polled = await this.send(call, { type: 'poll' }, budgetMs, log);
+      // Nothing was waiting after all (the run was dropped, a deploy moved the session on):
+      // what the user said is a turn of its own.
+      if (polled.status !== 'done' || polled.speech || polled.linkAccount) return polled;
+      log.info('nothing outstanding after all; running the turn');
       budgetMs -= Date.now() - started;
-      if (polled.status === 'pending') return polled;
-      if (polled.status === 'question') return polled;
-      prefix = polled.speech;
-      if (budgetMs < MIN_BUDGET_MS) {
-        return {
-          ...polled,
-          status: 'pending',
-          speech: `${prefix} ${config.skill.stillWorkingMessage}`.trim(),
-        };
-      }
     }
 
-    const output = await this.send(call, turn, budgetMs, log);
-    return prefix ? { ...output, speech: `${prefix} ${output.speech}`.trim() } : output;
+    return this.send(call, turn, budgetMs, log);
   }
 
   /**
@@ -302,6 +290,15 @@ export function linkedToken(input: HandlerInput): string | undefined {
 }
 
 function pending(config: BridgeConfig): TurnOutput {
-  const speech = config.skill.stillWorkingMessage;
-  return { status: 'pending', speech, reprompt: speech, endSession: false, visual: null };
+  return stillWorkingOutput(config.skill);
+}
+
+/**
+ * Whether a request fetches the outstanding result instead of running (D72): anything but a
+ * poll itself, a cancel, and a goodbye intent's mapped tool, which drops the old run.
+ */
+function fetchesOutstanding(turn: TurnInput): boolean {
+  if (turn.type === 'poll' || turn.type === 'cancel') return false;
+  if (turn.type !== 'tool') return true;
+  return !(SESSION_ENDING_INTENTS as readonly string[]).includes(turn.intent ?? '');
 }

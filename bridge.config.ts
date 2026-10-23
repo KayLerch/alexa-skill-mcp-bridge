@@ -45,7 +45,10 @@ export default defineConfig({
     // Spoken on launch. Unset: derived from the server name and two example phrases.
     // greeting: 'Welcome. Ask me about hotels or the weather.',
     coldStartMessage: "I'm still starting up. Give me a moment and open me again.",
-    stillWorkingMessage: "I'm still working on that. Ask me again in a moment.",
+    // Spoken when a turn runs past the budget, and its reprompt. Whatever the user says next
+    // fetches that result and only that (D72), so the line tells them what to say.
+    stillWorkingMessage: 'Still working on it. Say "continue" in a moment.',
+    stillWorkingReprompt: 'Say "continue" to hear it.',
     // A tool the agent calls on launch without the model (D57), for a server that writes its own
     // welcome: its speech.resultField is spoken, its widget shown, and the session ends only when
     // its speech.endSessionField is true. Unset, or when the call has nothing to say: the greeting.
@@ -88,8 +91,8 @@ export default defineConfig({
     // The agent call's share of Alexa's 8-second limit. The Lambda aborts at this point.
     budgetMs: 6500,
     // After this long without an answer the Alexa Skill says "One moment." (Progressive Response),
-    // once per request. 0 turns it off.
-    progressiveAfterMs: 1500,
+    // once per request. Above a normal turn (1.5 to 3 s), below budgetMs. 0 turns it off.
+    progressiveAfterMs: 3000,
   },
 
   tools: {
@@ -114,6 +117,10 @@ export default defineConfig({
     // Set: the session stays open after every turn unless the last result says so. Unset: it ends
     // when the spoken answer does not end with a question.
     // endSessionField: 'end_session',
+    // A string field of a tool result's structuredContent that the Alexa Skill speaks, exactly,
+    // when Alexa misses the reply to the question it came with (D70), for example
+    // 'Say A, B or C, or "skip".'. Unset or absent: fallbackWhileOpen and the last question.
+    // fallbackField: 'hint',
   },
 
   intents: {

@@ -49,12 +49,13 @@ describe('the launch tool (D57)', () => {
     expect(turns).toEqual([{ type: 'warmup' }]);
   });
 
-  it('does not poll an outstanding result first: the agent drops the old run itself', async () => {
+  it('a mapped built-in after "still working" fetches the outstanding result, not its tool (D72)', async () => {
     const { bridge, turns } = fakeBridge(launchConfig, () => done(LINE));
-    await bridge.turn(
+    const output = await bridge.turn(
       handlerInput({ intent: 'AMAZON.NextIntent', sessionAttributes: { awaitingResult: true } }),
       { type: 'tool', tool: 'skip_question', intent: 'AMAZON.NextIntent' },
     );
-    expect(turns.map((t) => t.type)).toEqual(['tool']);
+    expect(turns.map((t) => t.type)).toEqual(['poll']);
+    expect(output.speech).toBe(LINE);
   });
 });
