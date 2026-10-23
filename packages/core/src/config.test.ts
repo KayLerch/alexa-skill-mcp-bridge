@@ -108,6 +108,12 @@ describe('answers.choices (D67)', () => {
     expect(() => withChoices(choices)).toThrowError(message);
   });
 
+  it("takes Alexa's spelled-letter form as a synonym, the way a lone spoken letter arrives (D73)", () => {
+    expect(withChoices({ a: ['a.', 'ay'], b: ['b.'] }).answers.choices.a).toEqual(['a.', 'ay']);
+    expect(() => withChoices({ a: ['ab.'] })).toThrowError(/answers\.choices\.a/);
+    expect(() => withChoices({ a: ['a..'] })).toThrowError(/answers\.choices\.a/);
+  });
+
   it('refuses a synonym that belongs to two choices or names another choice', () => {
     expect(() => withChoices({ a: ['the one'], b: ['the one'] })).toThrowError(
       /answers\.choices\.b: "the one" is already a synonym of "a"/,

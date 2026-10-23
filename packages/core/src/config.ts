@@ -81,10 +81,22 @@ export type MappableBuiltInIntent = (typeof MAPPABLE_BUILT_IN_INTENTS)[number];
  * with apostrophes, joined by single spaces or hyphens. No digits, no other punctuation.
  */
 export const SPOKEN_WORDS = /^[a-z']+(?:[ -][a-z']+)*$/;
+/**
+ * Spoken words, or a letter in Alexa's spelled form ("a.", "option b."): a lone letter said aloud reaches the skill as
+ * "A.", and without that form as a slot value it falls to AMAZON.FallbackIntent (D73). Synonyms only.
+ */
+export const SPOKEN_WORDS_OR_LETTERS = /^(?:[a-z']+|[a-z]\.)(?:[ -](?:[a-z']+|[a-z]\.))*$/;
 const spokenWords = z
   .string()
   .max(140)
   .regex(SPOKEN_WORDS, 'lowercase words: letters, apostrophes, spaces and hyphens, no digits');
+const spokenSynonym = z
+  .string()
+  .max(140)
+  .regex(
+    SPOKEN_WORDS_OR_LETTERS,
+    'lowercase words or a spelled letter ("a."): letters, apostrophes, spaces and hyphens, no digits',
+  );
 
 /** The default `visual.idleTimeoutMs`: how long the screen asks to stay up without activity. */
 export const SCREEN_IDLE_TIMEOUT_MS = 60_000;
@@ -297,7 +309,7 @@ const bridgeConfigShape = z.object({
        * synonyms that resolve to it, e.g. { b: ['bee', 'option b'] }. "bee" then reaches the
        * agent as "b". Read by the generator only; change it, then npm run generate.
        */
-      choices: z.record(spokenWords, z.array(spokenWords)).default({}),
+      choices: z.record(spokenWords, z.array(spokenSynonym)).default({}),
       /**
        * Which of the bridge's own answer intents ship (D69); unset ships all four. With tool
        * intents off, ['choice'] leaves every other answer to the catch-all, word for word: a date
